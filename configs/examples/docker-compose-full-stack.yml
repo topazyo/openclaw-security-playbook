@@ -1,0 +1,103 @@
+# docker-compose-full-stack.yml
+# Full stack deployment with ClawdBot, monitoring, and security tools
+
+version: '3.8'
+
+services:
+  # Main ClawdBot service
+  clawdbot:
+    image: anthropic/clawdbot:latest
+    container_name: clawdbot-production
+    user: "1000:1000"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+    volumes:
+      - ./config:/app/config:ro
+      - ./skills:/app/skills:ro
+      - ./logs:/app/logs:rw
+    ports:
+      - "127.0.0.1:18789:18789"
+    environment:
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    networks:
+      - openclaw-internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+          pids: 100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    user: "nobody"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - openclaw-internal
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    user: "472"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - openclaw-internal
+    restart: unless-stopped
+
+  # Alertmanager for alerts
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - openclaw-internal
+    restart: unless-stopped
+
+networks:
+  openclaw-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  prometheus-data:
+  grafana-data:

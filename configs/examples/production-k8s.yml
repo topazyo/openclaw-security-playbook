@@ -1,0 +1,124 @@
+# production-k8s.yml
+# Kubernetes deployment for ClawdBot with full security hardening
+# Tested on: Kubernetes 1.28+, EKS, GKE, AKS
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openclaw-production
+  labels:
+    name: openclaw-production
+    environment: production
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clawdbot-config
+  namespace: openclaw-production
+data:
+  gateway.yml: |
+    gateway:
+      bind:
+        address: "0.0.0.0"
+        port: 18789
+      auth:
+        mode: "required"
+        tokenSecret: "${GATEWAY_TOKEN}"
+
+---
+# Secret for credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clawdbot-secrets
+  namespace: openclaw-production
+type: Opaque
+stringData:
+  GATEWAY_TOKEN: "YOUR_GATEWAY_TOKEN_HERE"
+  ANTHROPIC_API_KEY: "sk-ant-api03-..."
+
+---
+# Deployment with full security
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clawdbot
+  namespace: openclaw-production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: clawdbot
+  template:
+    metadata:
+      labels:
+        app: clawdbot
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: clawdbot
+        image: anthropic/clawdbot:2.0.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        ports:
+        - containerPort: 18789
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 18789
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 18789
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: clawdbot
+  namespace: openclaw-production
+spec:
+  selector:
+    app: clawdbot
+  ports:
+  - port: 18789
+    targetPort: 18789
+
+---
+# NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clawdbot-netpol
+  namespace: openclaw-production
+spec:
+  podSelector:
+    matchLabels:
+      app: clawdbot
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
