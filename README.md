@@ -399,12 +399,6 @@ and have rollback procedures ready.
 
 ---
 
-## 📧 Contact
-
-**Maintainer**: Your Name ([your.email@example.com](mailto:your.email@example.com))
-
-**Project Link**: [https://github.com/your-org/clawdbot-security-playbook](https://github.com/your-org/clawdbot-security-playbook)
-
 **Blog Series**:
 - [Part 1: Attack Vectors and Verification](https://your-blog.com/part1)
 - [Part 2: Production Security Playbook](https://your-blog.com/part2)
