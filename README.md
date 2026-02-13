@@ -1,8 +1,8 @@
 # ClawdBot Security Playbook
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Security Audit](https://github.com/your-org/clawdbot-security-playbook/workflows/security-audit/badge.svg)](https://github.com/your-org/clawdbot-security-playbook/actions)
-[![Tests](https://github.com/your-org/clawdbot-security-playbook/workflows/tests/badge.svg)](https://github.com/your-org/clawdbot-security-playbook/actions)
+[![Security Audit](https://github.com/topazyo/clawdbot-security-playbook/workflows/security-audit/badge.svg)](https://github.com/topazyo/clawdbot-security-playbook/actions)
+[![Tests](https://github.com/topazyo/clawdbot-security-playbook/workflows/tests/badge.svg)](https://github.com/topazyo/clawdbot-security-playbook/actions)
 
 Production-ready security tools, configurations, and guides for hardening AI agent deployments. 
 These resources address the attack vectors affecting 1,200+ exposed instances: backup file 
@@ -14,7 +14,7 @@ persistence, localhost authentication bypass, and 91.3% prompt injection success
 
 ```bash
 # 1. Download and run security verification
-curl -fsSL https://raw.githubusercontent.com/your-org/clawdbot-security-playbook/main/scripts/verification/verify_openclaw_security.sh | bash
+curl -fsSL https://raw.githubusercontent.com/topazyo/clawdbot-security-playbook/main/scripts/verification/verify_openclaw_security.sh | bash
 
 # 2. If issues found, fix network binding immediately
 # Edit ~/.moltbot/config.yml:
