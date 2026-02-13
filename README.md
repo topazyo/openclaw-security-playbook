@@ -29,11 +29,11 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 7: Organizational Controls                            │
+│  Layer 7: Organizational Controls                           │
 │  • Shadow AI detection • Governance • Compliance            │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 6: Behavioral Monitoring                             │
-│  • Anomaly detection • Alerting • openclaw-telemetry       │
+│  • Anomaly detection • Alerting • openclaw-telemetry        │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 5: Supply Chain Security                             │
 │  • Skill integrity • GPG verification • Allowlists          │
