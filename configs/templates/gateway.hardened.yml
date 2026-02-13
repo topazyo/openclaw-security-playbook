@@ -1,0 +1,11 @@
+# Hardened Gateway Configuration Template
+# See: docs/guides/03-network-segmentation.md
+
+gateway:
+  bind:
+    address: "127.0.0.1"  # Localhost only
+    port: 18789
+
+  auth:
+    mode: "required"
+    tokenSecret: "${GATEWAY_TOKEN}"  # Generate: openssl rand -base64 32

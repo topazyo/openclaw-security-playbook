@@ -1,0 +1,36 @@
+# Credentials and secrets
+*.bak
+*.bak.*
+credentials.yml
+secrets.yml
+.env
+.env.local
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
