@@ -1,0 +1,245 @@
+{
+  "policy_id": "OPS-001",
+  "department": "Operations",
+  "version": "1.0.0",
+  "effective_date": "2026-01-01",
+  "last_updated": "2026-02-14",
+  "owner": {
+    "role": "VP of Operations",
+    "contact": "vpo@example.com"
+  },
+  "approval_required": true,
+  "review_frequency": "quarterly",
+
+  "description": "Operational policies for ClawdBot deployment and maintenance",
+
+  "scope": {
+    "applies_to": [
+      "DevOps Engineers",
+      "Site Reliability Engineers",
+      "Infrastructure Teams",
+      "Platform Engineers",
+      "On-call Engineers"
+    ],
+    "systems": [
+      "Production ClawdBot infrastructure",
+      "Staging and development environments",
+      "Monitoring and alerting systems",
+      "Deployment pipelines"
+    ]
+  },
+
+  "policies": {
+    "change_management": {
+      "policy": "All changes to production ClawdBot systems must follow change management process",
+      "requirements": [
+        "Change request (CR) required for all production changes",
+        "Changes reviewed and approved before implementation",
+        "Rollback plan documented for all changes",
+        "Post-change validation required",
+        "Emergency change process for critical issues"
+      ],
+      "change_categories": {
+        "standard": {
+          "description": "Pre-approved low-risk changes",
+          "approval": "Automated",
+          "examples": ["Configuration updates", "Dependency updates", "Log level changes"]
+        },
+        "normal": {
+          "description": "Routine changes with moderate risk",
+          "approval": "Change Advisory Board (CAB)",
+          "lead_time": "5 business days",
+          "examples": ["Feature deployments", "Infrastructure changes", "Skill updates"]
+        },
+        "major": {
+          "description": "High-risk or significant changes",
+          "approval": "CAB + VP Engineering",
+          "lead_time": "10 business days",
+          "examples": ["Architecture changes", "Database migrations", "Major version upgrades"]
+        },
+        "emergency": {
+          "description": "Critical fixes requiring immediate action",
+          "approval": "On-call manager + post-implementation review",
+          "examples": ["Security patches", "Production outages", "Critical bugs"]
+        }
+      },
+      "compliance_mapping": {
+        "SOC2": ["CC8.1"],
+        "ISO27001": ["A.12.1.2", "A.14.2.2"],
+        "ITIL": ["Change Management"]
+      }
+    },
+
+    "deployment": {
+      "policy": "Secure and controlled deployment of ClawdBot updates",
+      "requirements": [
+        "All deployments via automated CI/CD pipeline",
+        "Security scans pass before deployment",
+        "Canary or blue-green deployment strategy",
+        "Automated rollback on failure",
+        "Deployment windows: Tuesday-Thursday, 10 AM - 2 PM"
+      ],
+      "deployment_stages": [
+        "1. Development - Feature branch",
+        "2. CI/CD - Automated tests and scans",
+        "3. Staging - Integration testing",
+        "4. Canary - 5% traffic",
+        "5. Production - Full rollout"
+      ],
+      "pre_deployment_checks": [
+        "All tests passing (unit, integration, e2e)",
+        "Security scans passed (SAST, DAST, container)",
+        "Code review approved",
+        "Documentation updated",
+        "Rollback plan documented",
+        "On-call engineer available"
+      ],
+      "compliance_mapping": {
+        "SOC2": ["CC8.1"],
+        "ISO27001": ["A.14.2.2", "A.14.2.9"],
+        "NIST": ["CM-3", "SA-3"]
+      }
+    },
+
+    "monitoring": {
+      "policy": "Comprehensive monitoring of ClawdBot systems",
+      "requirements": [
+        "24/7 monitoring of all production systems",
+        "SLO-based alerting",
+        "On-call rotation maintained",
+        "Incident escalation procedures documented",
+        "Monthly SLI/SLO review"
+      ],
+      "slos": {
+        "availability": {
+          "target": "99.9%",
+          "measurement": "Uptime percentage",
+          "error_budget": "43.2 minutes/month"
+        },
+        "latency": {
+          "p50": "200ms",
+          "p95": "500ms",
+          "p99": "1000ms"
+        },
+        "error_rate": {
+          "target": "<0.1%",
+          "measurement": "Failed requests / Total requests"
+        }
+      },
+      "monitoring_tools": [
+        "Prometheus + Grafana (metrics)",
+        "ELK Stack (logs)",
+        "Jaeger (distributed tracing)",
+        "PagerDuty (alerting)"
+      ],
+      "compliance_mapping": {
+        "SOC2": ["CC7.2", "A1.2"],
+        "ISO27001": ["A.12.1.3"],
+        "NIST": ["SI-4"]
+      }
+    },
+
+    "backup_and_recovery": {
+      "policy": "Regular backups and tested recovery procedures",
+      "requirements": [
+        "Daily automated backups of all critical data",
+        "Backups encrypted and stored offsite",
+        "Quarterly disaster recovery drills",
+        "Recovery Time Objective (RTO): 4 hours",
+        "Recovery Point Objective (RPO): 24 hours"
+      ],
+      "backup_scope": [
+        "Configuration databases",
+        "User data and preferences",
+        "Audit logs (2 year retention)",
+        "Skill manifests and metadata",
+        "Application configurations"
+      ],
+      "recovery_testing": {
+        "frequency": "quarterly",
+        "scope": "Full system recovery",
+        "documentation": "Runbook updated after each test"
+      },
+      "compliance_mapping": {
+        "SOC2": ["A1.2", "A1.3"],
+        "ISO27001": ["A.12.3.1", "A.17.1.2"],
+        "NIST": ["CP-9", "CP-10"]
+      }
+    },
+
+    "capacity_planning": {
+      "policy": "Proactive capacity planning for ClawdBot infrastructure",
+      "requirements": [
+        "Monthly capacity reviews",
+        "80% utilization triggers scaling",
+        "Quarterly capacity forecasting",
+        "Load testing before major releases"
+      ],
+      "metrics_tracked": [
+        "CPU utilization",
+        "Memory usage",
+        "Disk I/O and storage",
+        "Network bandwidth",
+        "API request volume",
+        "Concurrent users"
+      ],
+      "compliance_mapping": {
+        "SOC2": ["A1.2"],
+        "ISO27001": ["A.12.1.3"],
+        "ITIL": ["Capacity Management"]
+      }
+    },
+
+    "access_management": {
+      "policy": "Secure operational access to ClawdBot infrastructure",
+      "requirements": [
+        "Bastion host or VPN for production access",
+        "MFA required for all administrative access",
+        "Privileged access logged and audited",
+        "Just-in-time (JIT) access for sensitive operations",
+        "Quarterly access reviews"
+      ],
+      "access_levels": {
+        "read_only": {
+          "permissions": ["View logs", "View metrics", "View configurations"],
+          "granted_to": "All engineers"
+        },
+        "operator": {
+          "permissions": ["Restart services", "Scale resources", "View secrets"],
+          "granted_to": "On-call engineers",
+          "requires": "MFA + approval"
+        },
+        "administrator": {
+          "permissions": ["Modify infrastructure", "Change configurations", "Manage access"],
+          "granted_to": "Senior SREs",
+          "requires": "MFA + JIT access request"
+        }
+      },
+      "compliance_mapping": {
+        "SOC2": ["CC6.1", "CC6.2"],
+        "ISO27001": ["A.9.1.2", "A.9.2.3"],
+        "NIST": ["AC-2", "AC-6"]
+      }
+    }
+  },
+
+  "on_call": {
+    "rotation": {
+      "primary": "7 days",
+      "secondary": "7 days",
+      "handoff": "Monday 10 AM"
+    },
+    "responsibilities": [
+      "Respond to production alerts",
+      "Triage and resolve incidents",
+      "Escalate to appropriate teams",
+      "Document incident resolution",
+      "Participate in post-mortems"
+    ],
+    "slas": {
+      "P0_critical": "15 minutes",
+      "P1_high": "1 hour",
+      "P2_medium": "4 hours"
+    }
+  }
+}

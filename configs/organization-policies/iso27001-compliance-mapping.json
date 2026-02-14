@@ -1,0 +1,410 @@
+{
+  "framework": "ISO/IEC 27001:2022",
+  "version": "2022",
+  "last_updated": "2026-02-14",
+  "certification_scope": "ClawdBot AI Security Platform",
+  "description": "ISO 27001 compliance mapping for information security management",
+
+  "annex_a_controls": {
+    "organizational_controls": {
+      "A.5.1": {
+        "control": "Policies for information security",
+        "objective": "To provide management direction and support for information security",
+        "clawdbot_implementation": {
+          "policies": [
+            "Engineering Security Policy (ENG-001)",
+            "Security Operations Policy (SEC-001)",
+            "Operations Policy (OPS-001)"
+          ],
+          "review_frequency": "Quarterly",
+          "approval_authority": "CISO and Executive Team"
+        },
+        "evidence": [
+          "Policy documents with version control",
+          "Approval signatures",
+          "Distribution records",
+          "Acknowledgment tracking"
+        ],
+        "status": "implemented"
+      },
+
+      "A.5.7": {
+        "control": "Threat intelligence",
+        "objective": "Collect and analyze threat intelligence",
+        "clawdbot_implementation": {
+          "tools": ["Threat intelligence platform", "OSINT sources", "Vendor feeds"],
+          "process": "Weekly threat intel review and dissemination",
+          "integration": "SIEM correlation with threat indicators"
+        },
+        "evidence": [
+          "Threat intelligence reports",
+          "IOC feeds",
+          "Correlation rules",
+          "Threat briefings"
+        ],
+        "policy_references": ["SEC-001:threat_monitoring"],
+        "status": "implemented"
+      },
+
+      "A.5.23": {
+        "control": "Information security for use of cloud services",
+        "objective": "Processes for acquisition, use, management and exit from cloud services",
+        "clawdbot_implementation": {
+          "cloud_providers": ["AWS", "Anthropic API", "OpenAI API"],
+          "assessment": "Annual vendor security assessments",
+          "agreements": "Security clauses in all cloud contracts",
+          "monitoring": "Cloud security posture management (CSPM)"
+        },
+        "evidence": [
+          "Vendor assessment reports",
+          "Security addendums",
+          "CSPM dashboards",
+          "Cloud audit logs"
+        ],
+        "status": "implemented"
+      }
+    },
+
+    "people_controls": {
+      "A.6.1": {
+        "control": "Screening",
+        "objective": "Ensure personnel are suitable for the roles",
+        "clawdbot_implementation": {
+          "process": "Background checks for all employees",
+          "scope": "Enhanced checks for privileged access",
+          "verification": "HR-led verification process"
+        },
+        "evidence": [
+          "Background check reports",
+          "HR verification records"
+        ],
+        "status": "implemented"
+      },
+
+      "A.6.2": {
+        "control": "Terms and conditions of employment",
+        "objective": "Ensure employees understand security responsibilities",
+        "clawdbot_implementation": {
+          "agreements": ["Employment agreement", "Acceptable use policy", "Code of conduct"],
+          "acknowledgment": "Required before system access",
+          "updates": "Annual re-acknowledgment"
+        },
+        "evidence": [
+          "Signed agreements",
+          "Acknowledgment database",
+          "Policy distribution logs"
+        ],
+        "status": "implemented"
+      },
+
+      "A.6.3": {
+        "control": "Information security awareness, education and training",
+        "objective": "Ensure personnel are aware of information security",
+        "clawdbot_implementation": {
+          "onboarding": "Security training within first week",
+          "annual": "Refresher training every 12 months",
+          "specialized": "Role-specific security training",
+          "testing": "Knowledge assessments (80% pass required)"
+        },
+        "evidence": [
+          "Training completion certificates",
+          "Assessment scores",
+          "Training materials",
+          "Attendance records"
+        ],
+        "policy_references": ["ENG-001:training"],
+        "status": "implemented"
+      }
+    },
+
+    "physical_controls": {
+      "A.7.2": {
+        "control": "Physical entry",
+        "objective": "Secure areas should be protected by appropriate entry controls",
+        "clawdbot_implementation": {
+          "office": "Badge access with logs",
+          "datacenter": "Biometric + badge (two-factor)",
+          "visitors": "Escort required, visitor log maintained"
+        },
+        "evidence": [
+          "Access control logs",
+          "Visitor logs",
+          "Badge provisioning records"
+        ],
+        "status": "implemented"
+      },
+
+      "A.7.4": {
+        "control": "Physical security monitoring",
+        "objective": "Premises should be continuously monitored",
+        "clawdbot_implementation": {
+          "surveillance": "24/7 CCTV monitoring",
+          "retention": "90 days video retention",
+          "alerts": "Automated intrusion detection"
+        },
+        "evidence": [
+          "CCTV footage samples",
+          "Monitoring logs",
+          "Incident reports"
+        ],
+        "status": "implemented"
+      }
+    },
+
+    "technological_controls": {
+      "A.8.2.1": {
+        "control": "Classification of information",
+        "objective": "Information should be classified according to needs",
+        "clawdbot_implementation": {
+          "scheme": "Public, Internal, Confidential, Restricted",
+          "labeling": "Automated classification labels",
+          "handling": "Classification-based access controls",
+          "training": "Classification guidance in security training"
+        },
+        "evidence": [
+          "Classification policy",
+          "Labeling screenshots",
+          "Access control matrix",
+          "Training materials"
+        ],
+        "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"],
+        "status": "implemented"
+      },
+
+      "A.8.10": {
+        "control": "Information deletion",
+        "objective": "Information should be deleted when no longer required",
+        "clawdbot_implementation": {
+          "policy": "Data retention and disposal policy",
+          "process": "Secure deletion procedures",
+          "verification": "Certificate of destruction",
+          "automation": "Automated retention enforcement"
+        },
+        "evidence": [
+          "Retention policy",
+          "Deletion logs",
+          "Disposal certificates"
+        ],
+        "status": "implemented"
+      },
+
+      "A.9.2.1": {
+        "control": "User registration and de-registration",
+        "objective": "Formal user registration and de-registration process",
+        "clawdbot_implementation": {
+          "provisioning": "Automated workflow with approvals",
+          "deprovisioning": "Automated on termination",
+          "review": "Quarterly access recertification"
+        },
+        "evidence": [
+          "Provisioning tickets",
+          "Approval emails",
+          "Termination checklists",
+          "Access review reports"
+        ],
+        "policy_references": ["ENG-001:access_control", "SEC-001:access_reviews"],
+        "status": "implemented"
+      },
+
+      "A.9.2.2": {
+        "control": "User access provisioning",
+        "objective": "Formal process to assign or revoke access rights",
+        "clawdbot_implementation": {
+          "rbac": "Role-based access control",
+          "approval": "Manager and security approval required",
+          "least_privilege": "Minimal access principle enforced",
+          "review": "Quarterly reviews"
+        },
+        "evidence": [
+          "RBAC matrix",
+          "Access request approvals",
+          "Privilege escalation logs"
+        ],
+        "policy_references": ["ENG-001:access_control"],
+        "status": "implemented"
+      },
+
+      "A.10.1.1": {
+        "control": "Cryptographic controls policy",
+        "objective": "Policy on the use of cryptographic controls",
+        "clawdbot_implementation": {
+          "policy": "Encryption standards documented",
+          "at_rest": "AES-256-GCM",
+          "in_transit": "TLS 1.3 minimum",
+          "key_management": "AWS KMS / HashiCorp Vault"
+        },
+        "evidence": [
+          "Cryptography policy",
+          "Key management procedures",
+          "Encryption configuration"
+        ],
+        "policy_references": ["SEC-001:data_protection"],
+        "status": "implemented"
+      },
+
+      "A.12.4.1": {
+        "control": "Event logging",
+        "objective": "Event logs recording activities should be produced and retained",
+        "clawdbot_implementation": {
+          "scope": "All ClawdBot API calls, auth events, config changes",
+          "tools": "ELK Stack, CloudWatch Logs",
+          "retention": "2 years",
+          "protection": "Centralized, immutable logs"
+        },
+        "evidence": [
+          "Log configuration",
+          "Sample log entries",
+          "Retention policies",
+          "Access logs"
+        ],
+        "policy_references": ["ENG-001:monitoring_and_auditing", "OPS-001:monitoring"],
+        "status": "implemented"
+      },
+
+      "A.12.6.1": {
+        "control": "Management of technical vulnerabilities",
+        "objective": "Ensure timely information about technical vulnerabilities",
+        "clawdbot_implementation": {
+          "scanning": "Weekly automated vulnerability scans",
+          "patching": "SLAs: 24h (critical), 7d (high), 30d (medium)",
+          "tracking": "Vulnerability management system",
+          "reporting": "Monthly vulnerability reports"
+        },
+        "evidence": [
+          "Scan reports",
+          "Patch deployment logs",
+          "SLA compliance reports"
+        ],
+        "policy_references": ["SEC-001:vulnerability_management"],
+        "status": "implemented"
+      },
+
+      "A.14.2.1": {
+        "control": "Secure development policy",
+        "objective": "Rules for development of software and systems",
+        "clawdbot_implementation": {
+          "sdlc": "Secure SDLC with security gates",
+          "code_review": "Mandatory peer review + security review",
+          "testing": "SAST, DAST, and manual security testing",
+          "guidelines": "OWASP Top 10 and CWE Top 25"
+        },
+        "evidence": [
+          "SDLC documentation",
+          "Code review records",
+          "Security test results",
+          "Developer guidelines"
+        ],
+        "policy_references": ["ENG-001:code_security"],
+        "status": "implemented"
+      },
+
+      "A.14.2.5": {
+        "control": "Secure system engineering principles",
+        "objective": "Principles for engineering secure systems",
+        "clawdbot_implementation": {
+          "principles": [
+            "Defense in depth",
+            "Least privilege",
+            "Separation of duties",
+            "Fail secure",
+            "Zero trust architecture"
+          ],
+          "architecture_review": "Security architecture review for new systems"
+        },
+        "evidence": [
+          "Architecture diagrams",
+          "Security design documents",
+          "Review sign-offs"
+        ],
+        "policy_references": ["ENG-001:code_security"],
+        "status": "implemented"
+      },
+
+      "A.16.1.2": {
+        "control": "Reporting information security events",
+        "objective": "Ensure information security events are reported",
+        "clawdbot_implementation": {
+          "channels": ["Email", "Slack", "Ticketing system", "Hotline"],
+          "sla": "Report within 1 hour of discovery",
+          "classification": "P0-P3 severity levels",
+          "tracking": "All incidents tracked in JIRA"
+        },
+        "evidence": [
+          "Incident tickets",
+          "Reporting procedures",
+          "Response timelines",
+          "Communication logs"
+        ],
+        "policy_references": ["ENG-001:incident_response", "SEC-001:incident_response"],
+        "status": "implemented"
+      },
+
+      "A.16.1.4": {
+        "control": "Assessment of information security events",
+        "objective": "Evaluate information security events",
+        "clawdbot_implementation": {
+          "triage": "Initial assessment within 15 min (P0)",
+          "investigation": "Root cause analysis",
+          "documentation": "Incident reports with timeline",
+          "postmortem": "Lessons learned and action items"
+        },
+        "evidence": [
+          "Triage logs",
+          "Investigation reports",
+          "Post-mortem documents",
+          "Action item tracking"
+        ],
+        "policy_references": ["SEC-001:incident_response"],
+        "status": "implemented"
+      }
+    }
+  },
+
+  "statement_of_applicability": {
+    "total_controls": 93,
+    "implemented": 45,
+    "planned": 25,
+    "not_applicable": 23,
+    "justification_required": true
+  },
+
+  "certification_audit": {
+    "stage_1": {
+      "description": "Documentation review",
+      "activities": [
+        "Review ISMS documentation",
+        "Assess scope definition",
+        "Verify policy framework",
+        "Identify gaps"
+      ],
+      "duration": "1-2 days"
+    },
+    "stage_2": {
+      "description": "Implementation verification",
+      "activities": [
+        "Test control effectiveness",
+        "Interview personnel",
+        "Sample evidence",
+        "Site inspection"
+      ],
+      "duration": "3-5 days"
+    },
+    "surveillance": {
+      "description": "Annual surveillance audits",
+      "frequency": "Annually (minimum)",
+      "focus": "Changes, incidents, effectiveness"
+    },
+    "recertification": {
+      "description": "Full recertification audit",
+      "frequency": "Every 3 years",
+      "scope": "Complete ISMS review"
+    }
+  },
+
+  "risk_assessment": {
+    "frequency": "Annually and when significant changes occur",
+    "methodology": "NIST SP 800-30 or ISO 27005",
+    "scope": "All information assets",
+    "documentation": "Risk register with treatment plans"
+  }
+}

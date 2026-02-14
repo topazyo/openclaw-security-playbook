@@ -1,0 +1,350 @@
+{
+  "framework": "SOC 2 Type II",
+  "version": "2017 Trust Services Criteria",
+  "last_updated": "2026-02-14",
+  "audit_period": "12 months",
+  "description": "SOC 2 compliance mapping for ClawdBot security controls",
+
+  "trust_service_categories": {
+    "CC": {
+      "name": "Common Criteria",
+      "description": "Foundational criteria related to all trust services principles"
+    },
+    "A": {
+      "name": "Availability",
+      "description": "System availability for operation and use"
+    },
+    "C": {
+      "name": "Confidentiality",
+      "description": "Information designated as confidential is protected"
+    },
+    "P": {
+      "name": "Processing Integrity",
+      "description": "System processing is complete, valid, accurate, timely, and authorized"
+    },
+    "PI": {
+      "name": "Privacy",
+      "description": "Personal information is collected, used, retained, disclosed, and disposed"
+    }
+  },
+
+  "control_mappings": {
+    "CC1.1": {
+      "criterion": "COSO Principle 1: Demonstrates commitment to integrity and ethical values",
+      "clawdbot_controls": [
+        "Code of Conduct policy",
+        "Security awareness training",
+        "Ethics reporting hotline"
+      ],
+      "evidence": [
+        "Signed code of conduct acknowledgments",
+        "Training completion records",
+        "Ethics policy documentation"
+      ],
+      "policy_references": ["ENG-001", "SEC-001"]
+    },
+
+    "CC1.2": {
+      "criterion": "COSO Principle 2: Board independence and oversight",
+      "clawdbot_controls": [
+        "Security committee oversight",
+        "Quarterly security reviews",
+        "Board-level risk reporting"
+      ],
+      "evidence": [
+        "Committee meeting minutes",
+        "Security dashboard reports",
+        "Board presentation materials"
+      ]
+    },
+
+    "CC1.4": {
+      "criterion": "COSO Principle 4: Demonstrates commitment to competence",
+      "clawdbot_controls": [
+        "Role-based security training",
+        "Annual security certification",
+        "Skills assessment program"
+      ],
+      "evidence": [
+        "Training completion certificates",
+        "Assessment scores",
+        "Job descriptions with security requirements"
+      ],
+      "policy_references": ["ENG-001:training", "SEC-001"]
+    },
+
+    "CC6.1": {
+      "criterion": "Logical and physical access controls",
+      "clawdbot_controls": [
+        "Multi-factor authentication (MFA)",
+        "Role-based access control (RBAC)",
+        "Privileged access management (PAM)",
+        "Access reviews (quarterly)",
+        "SSO integration"
+      ],
+      "evidence": [
+        "User access reports",
+        "MFA enrollment logs",
+        "Access review sign-offs",
+        "Termination checklists"
+      ],
+      "policy_references": ["ENG-001:access_control", "SEC-001:access_reviews", "OPS-001:access_management"],
+      "implementation": {
+        "authentication": "Okta/Auth0 SSO with MFA",
+        "authorization": "Attribute-based access control",
+        "monitoring": "Access logs retained 2 years"
+      }
+    },
+
+    "CC6.2": {
+      "criterion": "Prior to issuing credentials, user registration and authorization",
+      "clawdbot_controls": [
+        "Manager approval required",
+        "HR verification process",
+        "Automated provisioning workflow",
+        "Background checks for privileged access"
+      ],
+      "evidence": [
+        "Access request tickets",
+        "Approval email chains",
+        "Provisioning audit logs"
+      ],
+      "policy_references": ["ENG-001:access_control"]
+    },
+
+    "CC6.3": {
+      "criterion": "Periodic review and removal of access",
+      "clawdbot_controls": [
+        "Quarterly access recertification",
+        "Automated termination workflow",
+        "90-day inactive account suspension"
+      ],
+      "evidence": [
+        "Access review reports",
+        "Termination tickets",
+        "Suspended account lists"
+      ],
+      "policy_references": ["SEC-001:access_reviews"]
+    },
+
+    "CC6.6": {
+      "criterion": "Vulnerability management",
+      "clawdbot_controls": [
+        "Weekly vulnerability scans",
+        "Patch management SLAs (24h/7d/30d)",
+        "Container image scanning",
+        "Dependency monitoring"
+      ],
+      "evidence": [
+        "Vulnerability scan reports",
+        "Patch deployment logs",
+        "Trivy scan results",
+        "SBOM artifacts"
+      ],
+      "policy_references": ["SEC-001:vulnerability_management", "SEC-001:supply_chain_security"]
+    },
+
+    "CC6.7": {
+      "criterion": "Data encryption",
+      "clawdbot_controls": [
+        "Encryption at rest (AES-256)",
+        "Encryption in transit (TLS 1.3)",
+        "Key management (AWS KMS/Vault)",
+        "90-day key rotation"
+      ],
+      "evidence": [
+        "Encryption configuration docs",
+        "TLS certificate inventory",
+        "Key rotation logs"
+      ],
+      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"]
+    },
+
+    "CC6.8": {
+      "criterion": "Data classification",
+      "clawdbot_controls": [
+        "Data classification policy",
+        "PII redaction for AI processing",
+        "DLP tools for monitoring",
+        "Classification labels enforced"
+      ],
+      "evidence": [
+        "Data classification matrix",
+        "DLP policy rules",
+        "Redaction test results"
+      ],
+      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"]
+    },
+
+    "CC7.1": {
+      "criterion": "Threat and vulnerability identification",
+      "clawdbot_controls": [
+        "Threat intelligence platform",
+        "Automated vulnerability scanning",
+        "Security advisories monitoring",
+        "Bug bounty program"
+      ],
+      "evidence": [
+        "Threat intel reports",
+        "Scan results",
+        "Security bulletin reviews",
+        "Bug bounty submissions"
+      ],
+      "policy_references": ["SEC-001:threat_monitoring", "SEC-001:vulnerability_management"]
+    },
+
+    "CC7.2": {
+      "criterion": "Security monitoring",
+      "clawdbot_controls": [
+        "SIEM platform (Splunk/ELK)",
+        "24/7 SOC monitoring",
+        "Automated alerting",
+        "Security dashboard"
+      ],
+      "evidence": [
+        "SIEM correlation rules",
+        "Alert logs",
+        "SOC shift reports",
+        "Dashboard screenshots"
+      ],
+      "policy_references": ["SEC-001:threat_monitoring", "OPS-001:monitoring"]
+    },
+
+    "CC7.3": {
+      "criterion": "Incident response",
+      "clawdbot_controls": [
+        "Incident response plan",
+        "24/7 IR capability",
+        "P0-P3 classification system",
+        "Post-incident reviews"
+      ],
+      "evidence": [
+        "IR playbook documentation",
+        "Incident tickets",
+        "Post-mortem reports",
+        "Drill exercise results"
+      ],
+      "policy_references": ["ENG-001:incident_response", "SEC-001:incident_response"]
+    },
+
+    "CC7.4": {
+      "criterion": "Response and mitigation of detected security events",
+      "clawdbot_controls": [
+        "Automated containment procedures",
+        "Incident escalation process",
+        "Forensic investigation capability",
+        "Evidence preservation"
+      ],
+      "evidence": [
+        "Containment playbooks",
+        "Escalation matrix",
+        "Forensic reports",
+        "Evidence chain of custody"
+      ],
+      "policy_references": ["SEC-001:incident_response"]
+    },
+
+    "CC8.1": {
+      "criterion": "Change management",
+      "clawdbot_controls": [
+        "Change Advisory Board (CAB)",
+        "Automated deployment pipeline",
+        "Rollback procedures",
+        "Post-change validation"
+      ],
+      "evidence": [
+        "Change tickets",
+        "CAB meeting minutes",
+        "Deployment logs",
+        "Rollback test results"
+      ],
+      "policy_references": ["OPS-001:change_management", "OPS-001:deployment"]
+    },
+
+    "A1.2": {
+      "criterion": "Environmental protections, software, and backup measures",
+      "clawdbot_controls": [
+        "Daily automated backups",
+        "Offsite backup storage",
+        "Quarterly DR drills",
+        "RTO 4h / RPO 24h"
+      ],
+      "evidence": [
+        "Backup logs",
+        "DR test reports",
+        "Recovery time measurements"
+      ],
+      "policy_references": ["OPS-001:backup_and_recovery"]
+    },
+
+    "C1.1": {
+      "criterion": "Confidential information protection",
+      "clawdbot_controls": [
+        "Confidentiality agreements (NDAs)",
+        "Data classification enforcement",
+        "Access controls for confidential data",
+        "Secure disposal procedures"
+      ],
+      "evidence": [
+        "Signed NDAs",
+        "Data access logs",
+        "Disposal certificates"
+      ],
+      "policy_references": ["SEC-001:data_protection"]
+    },
+
+    "PI1.2": {
+      "criterion": "Privacy notice",
+      "clawdbot_controls": [
+        "Privacy policy published",
+        "User consent mechanisms",
+        "Privacy notice updates",
+        "Opt-out capabilities"
+      ],
+      "evidence": [
+        "Privacy policy documents",
+        "Consent logs",
+        "Policy change notifications"
+      ]
+    }
+  },
+
+  "audit_procedures": {
+    "walkthrough": {
+      "description": "Auditor reviews control design",
+      "activities": [
+        "Interview control owners",
+        "Review policy documentation",
+        "Examine system configurations",
+        "Assess control design effectiveness"
+      ]
+    },
+    "testing": {
+      "description": "Auditor tests control operating effectiveness",
+      "sample_sizes": {
+        "automated_controls": "1 per quarter minimum",
+        "manual_controls": {
+          "quarterly": 1,
+          "monthly": 2,
+          "weekly": 5,
+          "daily": 25
+        }
+      },
+      "activities": [
+        "Select sample items",
+        "Request evidence",
+        "Validate control execution",
+        "Document exceptions"
+      ]
+    }
+  },
+
+  "evidence_retention": {
+    "policy_documents": "7 years",
+    "access_logs": "2 years",
+    "change_tickets": "2 years",
+    "incident_reports": "7 years",
+    "training_records": "3 years",
+    "audit_logs": "2 years"
+  }
+}
