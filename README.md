@@ -213,13 +213,13 @@ Ready-to-use security automation:
      ┌──────────────┤  Shield Guard   ├──────────────┐
      │              │  (Prompt Guard) │              │
      │              └─────────────────┘              │
-     │                                                │
+     │                                               │
 ┌────▼─────┐   ┌──────────────┐   ┌────────────────▼───┐
 │ Layer 5  │   │  Layer 3     │   │    Layer 6         │
 │ Supply   │   │  Sandbox     │   │    Telemetry       │
 │ Chain    │   │  (Docker)    │   │    (Monitoring)    │
 └────┬─────┘   └──────┬───────┘   └────────────────┬───┘
-     │                │                              │
+     │                │                             │
      │         ┌──────▼───────┐                     │
      └─────────┤  Layer 2     ├─────────────────────┘
                │  Network     │
@@ -254,7 +254,7 @@ External Request
               │ ✅ Authenticated
               ▼
 ┌─────────────────────────────────────┐
-│  3. Input Sanitization (Layer 4)   │
+│  3. Input Sanitization (Layer 4)    │
 │  • Prompt injection detection       │
 │  • Delimiter stripping              │
 │  • Pattern matching                 │
@@ -270,14 +270,14 @@ External Request
               │
               ▼
 ┌─────────────────────────────────────┐
-│  5. Output Scanning (Layer 4)      │
+│  5. Output Scanning (Layer 4)       │
 │  • PII/secret redaction             │
 │  • Credential filtering             │
 └─────────────┬───────────────────────┘
               │ ✅ Safe
               ▼
 ┌─────────────────────────────────────┐
-│  6. Monitoring & Logging (Layer 6) │
+│  6. Monitoring & Logging (Layer 6)  │
 │  • Behavioral analysis              │
 │  • Anomaly detection                │
 │  • Audit trail                      │
