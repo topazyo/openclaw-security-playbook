@@ -1,0 +1,565 @@
+# clawdbot.secure.full.yml
+# Complete Secure Configuration Template for ClawdBot AI Agent
+# 
+# This is the FULL production-ready configuration with all options documented.
+# For a minimal configuration, see clawdbot.secure.yml
+#
+# Security Layers: All 7 layers of defense-in-depth implemented
+# Documentation: docs/guides/ for detailed explanations
+# Last Updated: February 14, 2026
+# Version: 1.0.0
+
+# ============================================================================
+# GLOBAL SETTINGS
+# ============================================================================
+
+global:
+  app_name: "ClawdBot"
+  app_version: "2.0.0"
+  environment: "production"  # development, staging, production
+  instance_id: "clawdbot-prod-01"
+  data_dir: "~/.openclaw"
+  temp_dir: "/tmp/clawdbot"
+  timezone: "UTC"
+
+# ============================================================================
+# GATEWAY CONFIGURATION (Layer 2: Network Segmentation)
+# ============================================================================
+
+gateway:
+  bind:
+    address: "127.0.0.1"  # CRITICAL: Use 127.0.0.1 for localhost-only
+    port: 18789
+    ipv6:
+      enabled: false
+      address: "::1"
+
+  tls:
+    enabled: false  # Use reverse proxy (Nginx) for TLS termination
+    certificate: "/etc/clawdbot/ssl/cert.pem"
+    private_key: "/etc/clawdbot/ssl/key.pem"
+    client_auth:
+      enabled: false
+      ca_certificate: "/etc/clawdbot/ssl/client-ca.pem"
+
+  auth:
+    mode: "required"  # none, required, optional
+
+    token:
+      enabled: true
+      secret: "${GATEWAY_TOKEN}"  # From environment or keychain
+      expiration: 3600  # 1 hour
+      refresh_enabled: true
+      refresh_expiration: 604800  # 7 days
+
+    api_key:
+      enabled: false
+      header_name: "X-API-Key"
+      keys_file: "~/.openclaw/config/api_keys.yml"
+
+    oauth2:
+      enabled: false
+      provider: "okta"
+      issuer: "https://your-org.okta.com/oauth2/default"
+      client_id: "${OAUTH_CLIENT_ID}"
+      client_secret: "${OAUTH_CLIENT_SECRET}"
+      redirect_uri: "https://clawdbot.company.com/auth/callback"
+      scopes: ["openid", "profile", "email"]
+      required_groups: ["engineering", "security-team"]
+
+  cors:
+    enabled: false
+    allowed_origins: ["https://dashboard.company.com"]
+    allowed_methods: ["GET", "POST"]
+    allowed_headers: ["Authorization", "Content-Type"]
+    max_age: 3600
+
+  limits:
+    max_body_size: 10485760  # 10 MB
+    max_header_size: 8192  # 8 KB
+    request_timeout: 60
+    keepalive_timeout: 65
+
+  rate_limiting:
+    enabled: true
+    global:
+      requests_per_minute: 60
+      burst: 10
+    endpoints:
+      "/v1/completions":
+        requests_per_minute: 10
+        burst: 2
+      "/v1/messages":
+        requests_per_minute: 10
+        burst: 2
+      "/auth/login":
+        requests_per_minute: 5
+        burst: 2
+
+# ============================================================================
+# CREDENTIALS (Layer 1: Credential Isolation)
+# ============================================================================
+
+credentials:
+  storage: "os_keychain"  # os_keychain, vault, kubernetes_secret, environment
+  fallback: "environment"
+
+  keychain:
+    service_prefix: "ai.openclaw"
+
+    platform:
+      macos:
+        use_secure_enclave: true
+        require_touch_id: false
+      linux:
+        backend: "libsecret"
+        unlock_timeout: 3600
+      windows:
+        use_dpapi: true
+        credential_type: "generic"
+
+    providers:
+      anthropic:
+        service: "ai.openclaw.anthropic"
+        account: "${USER}"
+        key_name: "api_key"
+        required: true
+        rotation:
+          max_age_days: 90
+          warn_before_days: 7
+
+      openai:
+        service: "ai.openclaw.openai"
+        account: "${USER}"
+        key_name: "api_key"
+        required: false
+
+      aws:
+        service: "ai.openclaw.aws"
+        account: "${USER}"
+        access_key_name: "access_key_id"
+        secret_key_name: "secret_access_key"
+        required: false
+
+  vault:
+    enabled: false
+    address: "https://vault.company.com:8200"
+    token: "${VAULT_TOKEN}"
+    namespace: "openclaw"
+    mount_path: "secret"
+    paths:
+      anthropic: "openclaw/anthropic/api_key"
+      openai: "openclaw/openai/api_key"
+
+  kubernetes:
+    enabled: false
+    namespace: "openclaw-production"
+    secret_name: "clawdbot-credentials"
+    keys:
+      anthropic_api_key: "ANTHROPIC_API_KEY"
+      openai_api_key: "OPENAI_API_KEY"
+
+  audit:
+    enabled: true
+    log_access: true
+    log_failures: true
+    log_path: "~/.openclaw/logs/credential-access.jsonl"
+
+# ============================================================================
+# SKILLS (Layer 5: Supply Chain Security)
+# ============================================================================
+
+skills:
+  directory: "~/.openclaw/skills"
+  auto_install: false  # CRITICAL: Disable in production
+  auto_update: false
+  update_policy: "manual"
+
+  sources:
+    allowed_repositories:
+      - "https://github.com/anthropic-ai/openclaw-skills"
+      - "https://github.com/your-org/internal-skills"
+    blocked_repositories:
+      - "https://github.com/malicious-actor/*"
+    require_https: true
+    verify_ssl: true
+
+  verification:
+    require_signature: true
+    trusted_keys:
+      - path: "~/.openclaw/keys/anthropic-release-key.gpg"
+        fingerprint: "ABCD 1234 EFGH 5678..."
+        name: "Anthropic Release Key"
+    on_verification_failure: "block"
+    require_hash_verification: true
+
+  allowlist:
+    enabled: true
+    mode: "strict"
+    allowed_skills:
+      - name: "file-reader"
+        repository: "anthropic-ai/openclaw-skills"
+        version: ">=1.2.0,<2.0.0"
+        sha256: "a1b2c3d4e5f6..."
+      - name: "web-search"
+        repository: "anthropic-ai/openclaw-skills"
+        version: "2.1.0"
+        sha256: "f6e5d4c3b2a1..."
+
+  security_patterns:
+    enabled: true
+    patterns:
+      - pattern: 'eval\('
+        severity: "CRITICAL"
+        action: "block"
+      - pattern: 'exec\('
+        severity: "CRITICAL"
+        action: "block"
+      - pattern: 'os\.system\('
+        severity: "CRITICAL"
+        action: "block"
+      - pattern: 'subprocess\.'
+        severity: "CRITICAL"
+        action: "block"
+
+  integrity:
+    enabled: true
+    check_interval: 3600  # 1 hour
+    manifest_path: "~/.openclaw/manifests/skills-baseline.json"
+    on_failure: "alert_and_disable"
+    alert_channels:
+      - type: "email"
+        recipients: ["security@company.com"]
+      - type: "slack"
+        webhook: "${SLACK_WEBHOOK_URL}"
+
+# ============================================================================
+# TOOLS (Layer 3: Runtime Sandboxing)
+# ============================================================================
+
+tools:
+  mode: "allowlist"  # allowlist, blocklist, permissive
+
+  allowed:
+    - name: "file_read"
+      require_confirmation: false
+      allowed_paths:
+        - "~/.openclaw/data"
+        - "~/.openclaw/documents"
+      blocked_paths:
+        - "~/.ssh"
+        - "~/.openclaw/config"
+        - "/etc"
+
+    - name: "web_search"
+      require_confirmation: false
+      allowed_domains:
+        - "*.company.com"
+        - "docs.anthropic.com"
+      rate_limit:
+        requests_per_minute: 30
+
+    - name: "file_write"
+      require_confirmation: true
+      allowed_paths:
+        - "~/.openclaw/output"
+        - "/tmp/clawdbot"
+      blocked_paths:
+        - "~/.ssh"
+        - "~/.openclaw/config"
+      max_file_size: 10485760  # 10 MB
+
+    - name: "shell_command"
+      require_confirmation: true
+      allowed_commands: ["ls", "cat", "grep"]
+      blocked_commands: ["rm", "sudo", "chmod"]
+      timeout: 30
+
+  blocked:
+    - "exec"
+    - "eval"
+    - "python_repl"
+
+  limits:
+    max_concurrent: 5
+    default_timeout: 60
+    max_memory: 536870912  # 512 MB
+    max_cpu_time: 30
+
+  sandbox:
+    enabled: true
+    type: "docker"
+    docker:
+      image: "alpine:3.19"
+      network: "none"
+      read_only: true
+      user: "nobody"
+      capabilities_drop: ["ALL"]
+      security_opt:
+        - "no-new-privileges:true"
+        - "seccomp=default"
+      tmpfs:
+        - "/tmp:rw,noexec,nosuid,size=100m"
+
+  confirmation:
+    enabled: true
+    timeout: 30
+    method: "interactive"
+
+# ============================================================================
+# MODELS
+# ============================================================================
+
+models:
+  default_provider: "anthropic"
+
+  providers:
+    anthropic:
+      enabled: true
+      default_model: "claude-3-5-sonnet-20241022"
+      allowed_models:
+        - "claude-3-5-sonnet-20241022"
+        - "claude-3-5-haiku-20241022"
+        - "claude-3-opus-20240229"
+      api_base: "https://api.anthropic.com"
+      api_version: "2023-06-01"
+      max_tokens: 4096
+      temperature: 1.0
+      safety:
+        content_filter:
+          enabled: true
+          block_harmful_content: true
+          block_pii: true
+        prompt_guard:
+          enabled: true
+          sensitivity: "high"
+      rate_limit:
+        requests_per_minute: 50
+        tokens_per_minute: 100000
+
+# ============================================================================
+# LOGGING (Layer 6: Behavioral Monitoring)
+# ============================================================================
+
+logging:
+  level: "INFO"
+  format: "json"
+
+  outputs:
+    console:
+      enabled: true
+      level: "INFO"
+      format: "text"
+    file:
+      enabled: true
+      path: "~/.openclaw/logs/clawdbot.log"
+      level: "INFO"
+      rotation:
+        enabled: true
+        max_size: 104857600  # 100 MB
+        max_files: 10
+        compress: true
+
+  components:
+    gateway:
+      enabled: true
+      log_requests: true
+      log_responses: false
+
+    tool_execution:
+      enabled: true
+      log_path: "~/.openclaw/logs/tool-execution.jsonl"
+      log_details:
+        tool_name: true
+        arguments: true
+        result: false
+        execution_time: true
+
+    credential_access:
+      enabled: true
+      log_path: "~/.openclaw/logs/credential-access.jsonl"
+
+    prompts:
+      enabled: true
+      log_path: "~/.openclaw/logs/prompts.jsonl"
+      redact_pii: true
+      redact_patterns:
+        - pattern: 'sk-[a-zA-Z0-9-]{20,}'
+          replacement: '[API_KEY_REDACTED]'
+        - pattern: '\b\d{3}-\d{2}-\d{4}\b'
+          replacement: '[SSN_REDACTED]'
+
+    audit:
+      enabled: true
+      log_path: "~/.openclaw/logs/audit.jsonl"
+      events:
+        - "user_login"
+        - "credential_access"
+        - "skill_install"
+        - "config_change"
+        - "tool_execution"
+        - "auth_failure"
+
+# ============================================================================
+# MONITORING (Layer 6: Behavioral Monitoring)
+# ============================================================================
+
+monitoring:
+  health_check:
+    enabled: true
+    endpoint: "/health"
+
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    bind:
+      address: "127.0.0.1"
+      port: 9090
+
+  behavioral:
+    enabled: false
+    collector_url: "http://localhost:8086"
+    anomaly_detection:
+      enabled: true
+      learning_period: 604800  # 7 days
+      sensitivity: "medium"
+      detectors:
+        - type: "unusual_tool_usage"
+          threshold: 3
+        - type: "credential_access_spike"
+          threshold: 5
+        - type: "off_hours_activity"
+          hours: [22, 23, 0, 1, 2, 3, 4, 5, 6]
+    alerts:
+      enabled: true
+      channels:
+        - type: "slack"
+          webhook: "${SLACK_WEBHOOK_URL}"
+          severity: ["high", "critical"]
+        - type: "email"
+          recipients: ["security@company.com"]
+          severity: ["medium", "high", "critical"]
+
+# ============================================================================
+# SECURITY POLICIES (Layer 4: Runtime Enforcement)
+# ============================================================================
+
+security:
+  input_sanitization:
+    enabled: true
+    remove_patterns:
+      - '</context>'
+      - '<new_instruction>'
+      - '\[INST\]'
+    max_length: 100000
+
+  output_filtering:
+    enabled: true
+    redact_pii: true
+    redact_patterns:
+      - pattern: 'sk-[a-zA-Z0-9-]{20,}'
+        replacement: '[API_KEY_REDACTED]'
+        severity: "critical"
+      - pattern: 'AKIA[0-9A-Z]{16}'
+        replacement: '[AWS_KEY_REDACTED]'
+        severity: "critical"
+      - pattern: 'ghp_[a-zA-Z0-9]{36}'
+        replacement: '[GITHUB_TOKEN_REDACTED]'
+        severity: "critical"
+
+  prompt_injection:
+    enabled: true
+    detection_method: "pattern_matching"
+    sensitivity: "high"
+    action: "block"
+    patterns:
+      - 'ignore (all )?previous (instructions|commands)'
+      - 'disregard (all )?previous'
+      - 'forget (everything|all)'
+      - 'you are now in (developer|admin|debug) mode'
+      - 'DAN mode'
+
+  abuse_prevention:
+    enabled: true
+    auth_failures:
+      max_attempts: 5
+      window: 300
+      lockout_duration: 900
+    failed_requests:
+      max_failures: 10
+      window: 600
+      action: "rate_limit"
+
+# ============================================================================
+# RUNTIME
+# ============================================================================
+
+runtime:
+  workers:
+    processes: 0  # Auto-detect CPU cores
+    threads_per_worker: 4
+
+  limits:
+    max_memory: 2147483648  # 2 GB
+    max_cpu_time: 60
+    max_open_files: 1024
+    max_concurrent_requests: 100
+
+  shutdown:
+    timeout: 30
+    force: true
+
+# ============================================================================
+# COMMUNITY TOOLS
+# ============================================================================
+
+openclaw_shield:
+  enabled: false
+  endpoint: "http://localhost:8080"
+  layers:
+    prompt_guard: true
+    output_scanner: true
+    pii_redactor: true
+    tool_filter: true
+
+openclaw_telemetry:
+  enabled: false
+  endpoint: "http://localhost:8086"
+  options:
+    behavioral_baseline: true
+    anomaly_detection: true
+    real_time_alerts: true
+
+openclaw_detect:
+  enabled: false
+  mode: "passive"
+
+# ============================================================================
+# COMPLIANCE
+# ============================================================================
+
+compliance:
+  frameworks:
+    soc2: true
+    iso27001: true
+    gdpr: true
+    hipaa: false
+
+  retention:
+    logs: 90
+    audit: 365
+    metrics: 30
+
+  data_residency:
+    allowed_regions:
+      - "us-east-1"
+      - "eu-west-1"
+
+  privacy:
+    anonymize_ips: true
+    minimize_data_collection: true
+    enable_data_deletion: true
+
+# ============================================================================
+# END OF CONFIGURATION
+# ============================================================================
