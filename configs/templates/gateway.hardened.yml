@@ -1,11 +1,1492 @@
-# Hardened Gateway Configuration Template
-# See: docs/guides/03-network-segmentation.md
+# gateway.hardened.yml
+# Production-Grade Gateway Configuration for ClawdBot AI Agent
+#
+# This is a comprehensive gateway configuration that implements enterprise-grade
+# security controls including authentication, rate limiting, monitoring, and
+# defense against common attack vectors.
+#
+# Security Features:
+#   - Multi-factor authentication (token, API key, mTLS, OAuth2)
+#   - Advanced rate limiting (per-IP, per-user, per-endpoint)
+#   - Request/response filtering and validation
+#   - DDoS protection
+#   - Geographic access control
+#   - Session management
+#   - Comprehensive logging and monitoring
+#   - Circuit breaker patterns
+#   - Request signing and replay protection
+#
+# Usage:
+#   1. Copy to ~/.openclaw/config/gateway.yml
+#   2. Customize all <PLACEHOLDER> values
+#   3. Generate secrets: openssl rand -base64 32
+#   4. Test configuration: clawdbot gateway validate
+#   5. Start: clawdbot gateway start --config gateway.yml
+#
+# Documentation: docs/guides/03-network-segmentation.md
+# Version: 2.0.0
+# Last Updated: February 14, 2026
 
-gateway:
+# ============================================================================
+# NETWORK BINDING CONFIGURATION
+# ============================================================================
+
+network:
+  # Primary binding
   bind:
-    address: "127.0.0.1"  # Localhost only
+    # CRITICAL SECURITY: Use 127.0.0.1 for localhost-only access
+    # Use 0.0.0.0 ONLY if behind a reverse proxy with strict firewall rules
+    address: "127.0.0.1"  # <PLACEHOLDER: 127.0.0.1 recommended>
     port: 18789
 
-  auth:
-    mode: "required"
-    tokenSecret: "${GATEWAY_TOKEN}"  # Generate: openssl rand -base64 32
+    # Socket options
+    socket:
+      # TCP keep-alive (seconds)
+      keepalive: 60
+
+      # TCP backlog (connection queue)
+      backlog: 511
+
+      # Socket buffer sizes (bytes)
+      recv_buffer: 65536
+      send_buffer: 65536
+
+      # Enable TCP_NODELAY (disable Nagle's algorithm)
+      nodelay: true
+
+      # Enable SO_REUSEADDR
+      reuseaddr: true
+
+  # IPv6 support
+  ipv6:
+    enabled: false
+    address: "::1"  # localhost IPv6
+    port: 18789
+
+  # Unix domain socket (alternative to TCP)
+  unix_socket:
+    enabled: false
+    path: "/var/run/clawdbot/gateway.sock"
+    mode: "0660"  # File permissions
+    owner: "clawdbot"
+    group: "clawdbot"
+
+  # Reverse proxy configuration
+  reverse_proxy:
+    # Enable if behind Nginx, Apache, HAProxy, etc.
+    enabled: false
+
+    # Trust proxy headers (X-Forwarded-For, X-Real-IP)
+    trust_proxy: false
+
+    # Trusted proxy IP addresses (CIDR notation)
+    trusted_proxies:
+      - "127.0.0.1"
+      - "10.0.0.0/8"      # Internal network
+      - "100.64.0.0/10"   # Tailscale CGNAT range
+
+    # Headers to trust
+    trusted_headers:
+      - "X-Forwarded-For"
+      - "X-Forwarded-Proto"
+      - "X-Forwarded-Host"
+      - "X-Real-IP"
+
+    # Remove hop-by-hop headers
+    strip_hop_headers: true
+
+# ============================================================================
+# TLS/SSL CONFIGURATION
+# ============================================================================
+
+tls:
+  # Enable TLS termination at gateway
+  # RECOMMENDED: Terminate TLS at reverse proxy (Nginx) instead
+  enabled: false
+
+  # TLS version constraints
+  min_version: "1.2"  # Minimum: TLS 1.2
+  max_version: "1.3"  # Maximum: TLS 1.3
+
+  # Certificate configuration
+  certificates:
+    # Primary certificate
+    - cert_file: "/etc/clawdbot/ssl/gateway.crt"  # <PLACEHOLDER>
+      key_file: "/etc/clawdbot/ssl/gateway.key"   # <PLACEHOLDER>
+      domains:
+        - "clawdbot.company.internal"  # <PLACEHOLDER>
+
+      # OCSP stapling
+      ocsp:
+        enabled: true
+        responder_url: "http://ocsp.company.com"  # <PLACEHOLDER>
+
+    # Additional certificates (SNI support)
+    # - cert_file: "/etc/clawdbot/ssl/gateway-alt.crt"
+    #   key_file: "/etc/clawdbot/ssl/gateway-alt.key"
+    #   domains:
+    #     - "clawdbot-alt.company.internal"
+
+  # Cipher suites (prioritized order)
+  cipher_suites:
+    # TLS 1.3 (preferred)
+    - "TLS_AES_128_GCM_SHA256"
+    - "TLS_AES_256_GCM_SHA384"
+    - "TLS_CHACHA20_POLY1305_SHA256"
+
+    # TLS 1.2 (fallback)
+    - "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+    - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+    - "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+    - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+    - "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
+    - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+
+  # Prefer server cipher order
+  prefer_server_ciphers: false  # Let client choose for TLS 1.3
+
+  # Session cache
+  session_cache:
+    enabled: true
+    type: "lru"  # LRU cache
+    size: 1000   # Number of sessions
+    timeout: 300 # Seconds
+
+  # Session tickets (disable for forward secrecy)
+  session_tickets: false
+
+  # Client certificate authentication (mTLS)
+  client_auth:
+    enabled: false
+
+    # Verification mode: none, optional, require, require_and_verify
+    mode: "require_and_verify"
+
+    # Client CA certificate(s)
+    ca_file: "/etc/clawdbot/ssl/client-ca.crt"  # <PLACEHOLDER>
+
+    # CRL (Certificate Revocation List)
+    crl_file: "/etc/clawdbot/ssl/client-crl.pem"  # <PLACEHOLDER>
+
+    # Maximum certificate chain depth
+    max_depth: 2
+
+    # Allowed client certificate subjects (DN patterns)
+    allowed_subjects:
+      - "CN=*.company.com,O=Company Inc,C=US"  # <PLACEHOLDER>
+      - "CN=admin-*,OU=Security,O=Company Inc"
+
+    # Denied client certificate subjects
+    denied_subjects:
+      - "CN=revoked-*"
+      - "CN=test-*"
+
+# ============================================================================
+# AUTHENTICATION CONFIGURATION
+# ============================================================================
+
+authentication:
+  # Global authentication mode: none, optional, required
+  mode: "required"  # RECOMMENDED: required
+
+  # Allow anonymous access to specific endpoints
+  anonymous_endpoints:
+    - "/health"
+    - "/metrics"
+    - "/.well-known/*"
+
+  # ========================================================================
+  # TOKEN-BASED AUTHENTICATION (JWT)
+  # ========================================================================
+
+  token:
+    enabled: true
+
+    # Token type: jwt, opaque
+    type: "jwt"
+
+    # JWT configuration
+    jwt:
+      # Signing algorithm: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512
+      algorithm: "HS512"
+
+      # Secret key (for HMAC algorithms)
+      # Generate: openssl rand -base64 64
+      secret: "${JWT_SECRET}"  # <PLACEHOLDER: Store in keychain>
+
+      # OR: Public/private key pair (for RSA/ECDSA algorithms)
+      # public_key_file: "/etc/clawdbot/ssl/jwt-public.pem"
+      # private_key_file: "/etc/clawdbot/ssl/jwt-private.pem"
+
+      # Token lifetime (seconds)
+      expiration: 3600  # 1 hour
+
+      # Not-before time (seconds)
+      not_before: 0
+
+      # Issuer
+      issuer: "clawdbot.company.internal"  # <PLACEHOLDER>
+
+      # Audience
+      audience: "clawdbot-api"
+
+      # Subject claim required
+      require_subject: true
+
+      # Custom claims validation
+      required_claims:
+        - "user_id"
+        - "role"
+
+      # Claims whitelist (only these claims allowed)
+      allowed_claims:
+        - "user_id"
+        - "email"
+        - "role"
+        - "permissions"
+        - "department"
+
+    # Refresh token support
+    refresh_token:
+      enabled: true
+      expiration: 604800  # 7 days
+
+      # Rotation strategy: reuse, rotate_on_use, rotate_on_expiry
+      rotation: "rotate_on_use"
+
+      # Storage backend: redis, database, memory
+      storage: "redis"
+
+      # Redis configuration (if storage=redis)
+      redis:
+        host: "localhost"
+        port: 6379
+        db: 0
+        password: "${REDIS_PASSWORD}"  # <PLACEHOLDER>
+        tls: true
+
+    # Token revocation list
+    revocation:
+      enabled: true
+
+      # Check revocation on every request
+      check_on_request: true
+
+      # Revocation storage
+      storage: "redis"  # redis, database, memory
+
+    # Token extraction
+    extraction:
+      # Header name
+      header: "Authorization"
+
+      # Header scheme
+      scheme: "Bearer"
+
+      # Also check query parameter (not recommended for production)
+      query_param: null
+
+      # Also check cookie
+      cookie: null
+
+  # ========================================================================
+  # API KEY AUTHENTICATION
+  # ========================================================================
+
+  api_key:
+    enabled: true
+
+    # Header name
+    header: "X-API-Key"
+
+    # Query parameter name (disabled by default for security)
+    query_param: null
+
+    # Key format validation (regex)
+    format: "^[a-zA-Z0-9_-]{32,64}$"
+
+    # Key storage
+    storage:
+      type: "database"  # database, file, redis
+
+      # Database configuration
+      database:
+        dsn: "postgresql://user:pass@localhost/clawdbot"  # <PLACEHOLDER>
+        table: "api_keys"
+
+      # OR: File storage
+      # file:
+      #   path: "~/.openclaw/config/api_keys.yml"
+      #   format: "yaml"  # yaml, json
+
+    # Key metadata
+    metadata:
+      # Require key name/description
+      require_name: true
+
+      # Track last used timestamp
+      track_last_used: true
+
+      # Track usage count
+      track_usage_count: true
+
+      # Automatic expiration
+      auto_expire: true
+      default_expiration: 7776000  # 90 days
+
+      # IP restrictions
+      ip_restrictions: true
+
+      # Rate limiting per key
+      rate_limiting: true
+
+    # Key rotation
+    rotation:
+      # Warn before expiration (days)
+      warn_before_days: 7
+
+      # Grace period after expiration (days)
+      grace_period_days: 3
+
+      # Automatic rotation
+      auto_rotate: false
+
+  # ========================================================================
+  # OAUTH2 / OIDC AUTHENTICATION
+  # ========================================================================
+
+  oauth2:
+    enabled: false
+
+    # Provider type: generic, okta, auth0, google, azure, github, keycloak
+    provider: "okta"  # <PLACEHOLDER>
+
+    # OIDC Discovery URL
+    discovery_url: "https://your-org.okta.com/.well-known/openid-configuration"  # <PLACEHOLDER>
+
+    # OAuth2 credentials
+    client_id: "${OAUTH_CLIENT_ID}"      # <PLACEHOLDER>
+    client_secret: "${OAUTH_CLIENT_SECRET}"  # <PLACEHOLDER>
+
+    # Redirect URI
+    redirect_uri: "https://clawdbot.company.com/auth/callback"  # <PLACEHOLDER>
+
+    # Scopes
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+      - "groups"
+
+    # Token validation
+    validate_issuer: true
+    validate_audience: true
+    validate_expiration: true
+
+    # Claims mapping
+    claims_mapping:
+      user_id: "sub"
+      email: "email"
+      name: "name"
+      groups: "groups"
+
+    # Access control
+    access_control:
+      # Require specific groups/roles
+      required_groups:
+        - "engineering"      # <PLACEHOLDER>
+        - "security-team"
+
+      # Denied groups
+      denied_groups:
+        - "contractors"
+        - "external"
+
+      # Custom claim requirements
+      required_claims:
+        email_verified: true
+        account_enabled: true
+
+    # Session management
+    session:
+      type: "cookie"  # cookie, header, redis
+
+      # Cookie settings
+      cookie:
+        name: "clawdbot_session"
+        path: "/"
+        domain: ".company.com"  # <PLACEHOLDER>
+        secure: true
+        httponly: true
+        samesite: "strict"
+        max_age: 3600  # 1 hour
+
+  # ========================================================================
+  # MULTI-FACTOR AUTHENTICATION (MFA)
+  # ========================================================================
+
+  mfa:
+    enabled: false
+
+    # MFA methods: totp, sms, email, webauthn
+    methods:
+      - "totp"
+      - "webauthn"
+
+    # Require MFA for all users
+    required: false
+
+    # Require MFA for specific roles
+    required_roles:
+      - "admin"
+      - "security"
+
+    # Require MFA for sensitive endpoints
+    sensitive_endpoints:
+      - "/admin/*"
+      - "/v1/skills/install"
+      - "/v1/config/*"
+
+    # TOTP configuration
+    totp:
+      issuer: "ClawdBot"
+      digits: 6
+      period: 30
+      algorithm: "SHA1"
+
+    # WebAuthn configuration
+    webauthn:
+      rpid: "clawdbot.company.com"  # <PLACEHOLDER>
+      rpname: "ClawdBot"
+      timeout: 60000  # milliseconds
+      attestation: "direct"
+
+      # Authenticator attachment: platform, cross-platform, any
+      authenticator_attachment: "any"
+
+      # User verification: required, preferred, discouraged
+      user_verification: "preferred"
+
+# ============================================================================
+# AUTHORIZATION CONFIGURATION
+# ============================================================================
+
+authorization:
+  # Authorization engine: rbac, abac, opa
+  engine: "rbac"
+
+  # ========================================================================
+  # ROLE-BASED ACCESS CONTROL (RBAC)
+  # ========================================================================
+
+  rbac:
+    # Role definitions
+    roles:
+      # Read-only user
+      - name: "viewer"
+        permissions:
+          - "gateway:health:read"
+          - "gateway:metrics:read"
+          - "agent:status:read"
+          - "skills:list:read"
+
+      # Standard user
+      - name: "user"
+        inherits: ["viewer"]
+        permissions:
+          - "agent:invoke:write"
+          - "agent:chat:write"
+          - "tools:execute:write"
+
+      # Developer
+      - name: "developer"
+        inherits: ["user"]
+        permissions:
+          - "skills:install:write"
+          - "skills:update:write"
+          - "config:read:read"
+          - "logs:read:read"
+
+      # Administrator
+      - name: "admin"
+        inherits: ["developer"]
+        permissions:
+          - "config:write:write"
+          - "users:manage:write"
+          - "api_keys:manage:write"
+          - "gateway:restart:write"
+          - "*:*:*"  # Wildcard: all permissions
+
+    # Default role for authenticated users
+    default_role: "user"
+
+    # Role assignment source: static, database, ldap, oauth_claims
+    role_source: "oauth_claims"
+
+    # Role claim name (for OAuth2/OIDC)
+    role_claim: "groups"
+
+    # Role mapping (OAuth groups to internal roles)
+    role_mapping:
+      "engineering": "developer"
+      "security-team": "admin"
+      "readonly-access": "viewer"
+
+  # ========================================================================
+  # ATTRIBUTE-BASED ACCESS CONTROL (ABAC)
+  # ========================================================================
+
+  abac:
+    enabled: false
+
+    # Policy files
+    policy_files:
+      - "~/.openclaw/policies/gateway-policies.json"
+
+    # Attribute sources
+    attributes:
+      user:
+        - "user_id"
+        - "email"
+        - "department"
+        - "clearance_level"
+
+      resource:
+        - "endpoint"
+        - "method"
+        - "sensitivity"
+
+      environment:
+        - "time"
+        - "ip_address"
+        - "network"
+        - "geo_location"
+
+  # ========================================================================
+  # OPEN POLICY AGENT (OPA)
+  # ========================================================================
+
+  opa:
+    enabled: false
+
+    # OPA server URL
+    url: "http://localhost:8181"  # <PLACEHOLDER>
+
+    # Policy path
+    policy_path: "/v1/data/clawdbot/gateway/allow"
+
+    # Query timeout (seconds)
+    timeout: 5
+
+    # Input document structure
+    input_mapping:
+      user: "user"
+      request: "request"
+      context: "context"
+
+# ============================================================================
+# RATE LIMITING CONFIGURATION
+# ============================================================================
+
+rate_limiting:
+  enabled: true
+
+  # Rate limit strategy: fixed_window, sliding_window, token_bucket
+  strategy: "sliding_window"
+
+  # Storage backend: memory, redis, database
+  storage: "redis"
+
+  # Redis configuration (if storage=redis)
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 1
+    password: "${REDIS_PASSWORD}"
+    tls: true
+    pool_size: 10
+
+  # ========================================================================
+  # GLOBAL RATE LIMITS
+  # ========================================================================
+
+  global:
+    # Per-IP rate limits
+    per_ip:
+      requests_per_second: 10
+      requests_per_minute: 100
+      requests_per_hour: 1000
+      burst: 20
+
+    # Per-user rate limits (authenticated)
+    per_user:
+      requests_per_second: 20
+      requests_per_minute: 200
+      requests_per_hour: 2000
+      burst: 40
+
+    # Per-API-key rate limits
+    per_api_key:
+      requests_per_second: 50
+      requests_per_minute: 500
+      requests_per_hour: 5000
+      burst: 100
+
+  # ========================================================================
+  # ENDPOINT-SPECIFIC RATE LIMITS
+  # ========================================================================
+
+  endpoints:
+    # Authentication endpoints (stricter limits)
+    - pattern: "/auth/*"
+      methods: ["POST"]
+      limits:
+        requests_per_minute: 5
+        requests_per_hour: 20
+        burst: 2
+
+      # Custom response
+      response:
+        status: 429
+        body:
+          error: "Too many authentication attempts"
+          retry_after: 60
+
+    # AI completion endpoints (expensive operations)
+    - pattern: "/v1/completions"
+      methods: ["POST"]
+      limits:
+        requests_per_minute: 10
+        requests_per_hour: 100
+        burst: 3
+
+      # Token-based rate limiting (for LLM APIs)
+      token_limits:
+        tokens_per_minute: 50000
+        tokens_per_hour: 500000
+
+    - pattern: "/v1/messages"
+      methods: ["POST"]
+      limits:
+        requests_per_minute: 10
+        requests_per_hour: 100
+        burst: 3
+
+    # Skill installation (critical operation)
+    - pattern: "/v1/skills/install"
+      methods: ["POST"]
+      limits:
+        requests_per_hour: 5
+        burst: 1
+
+    # Admin endpoints (very strict)
+    - pattern: "/admin/*"
+      methods: ["POST", "PUT", "DELETE"]
+      limits:
+        requests_per_minute: 10
+        requests_per_hour: 50
+        burst: 2
+
+  # ========================================================================
+  # RATE LIMIT EXEMPTIONS
+  # ========================================================================
+
+  exemptions:
+    # Exempt specific IP addresses
+    ips:
+      - "127.0.0.1"
+      - "10.0.0.0/8"      # Internal network
+      - "100.64.0.0/10"   # Tailscale
+
+    # Exempt specific API keys
+    api_keys:
+      - "admin-key-1234567890"  # <PLACEHOLDER>
+
+    # Exempt specific users
+    users:
+      - "service-account-1"
+      - "monitoring-bot"
+
+  # ========================================================================
+  # RATE LIMIT RESPONSE
+  # ========================================================================
+
+  response:
+    # Status code
+    status: 429
+
+    # Response headers
+    headers:
+      "X-RateLimit-Limit": "{limit}"
+      "X-RateLimit-Remaining": "{remaining}"
+      "X-RateLimit-Reset": "{reset}"
+      "Retry-After": "{retry_after}"
+
+    # Response body
+    body:
+      error: "Rate limit exceeded"
+      message: "Too many requests. Please try again later."
+      retry_after: "{retry_after}"
+
+# ============================================================================
+# REQUEST VALIDATION & FILTERING
+# ============================================================================
+
+request_validation:
+  enabled: true
+
+  # ========================================================================
+  # CONTENT TYPE VALIDATION
+  # ========================================================================
+
+  content_type:
+    # Allowed content types
+    allowed:
+      - "application/json"
+      - "application/x-www-form-urlencoded"
+      - "multipart/form-data"
+      - "text/plain"
+
+    # Require Content-Type header
+    require: true
+
+    # Validate charset
+    validate_charset: true
+    allowed_charsets: ["utf-8", "UTF-8"]
+
+  # ========================================================================
+  # REQUEST SIZE LIMITS
+  # ========================================================================
+
+  size_limits:
+    # Maximum request body size (bytes)
+    max_body_size: 10485760  # 10 MB
+
+    # Maximum header size (bytes)
+    max_header_size: 8192  # 8 KB
+
+    # Maximum URL length
+    max_url_length: 2048
+
+    # Maximum number of headers
+    max_headers: 50
+
+    # Maximum query string length
+    max_query_length: 1024
+
+  # ========================================================================
+  # INPUT SANITIZATION
+  # ========================================================================
+
+  sanitization:
+    enabled: true
+
+    # Remove null bytes
+    remove_null_bytes: true
+
+    # Normalize unicode
+    normalize_unicode: true
+
+    # Strip control characters
+    strip_control_chars: true
+
+    # Remove dangerous patterns
+    patterns:
+      - pattern: '</context>'
+        action: "remove"
+      - pattern: '<new_instruction>'
+        action: "remove"
+      - pattern: '\[INST\]'
+        action: "remove"
+      - pattern: '<INST>'
+        action: "remove"
+      - pattern: '\[/INST\]'
+        action: "remove"
+
+  # ========================================================================
+  # JSON VALIDATION
+  # ========================================================================
+
+  json:
+    # Maximum nesting depth
+    max_depth: 20
+
+    # Maximum array length
+    max_array_length: 1000
+
+    # Maximum string length
+    max_string_length: 10000
+
+    # Disallow duplicate keys
+    disallow_duplicate_keys: true
+
+    # Schema validation (JSON Schema)
+    schema_validation:
+      enabled: false
+      schemas_dir: "~/.openclaw/schemas"
+
+  # ========================================================================
+  # PATH TRAVERSAL PROTECTION
+  # ========================================================================
+
+  path_traversal:
+    enabled: true
+
+    # Block patterns
+    blocked_patterns:
+      - "../"
+      - "..\\"
+      - "%2e%2e"
+      - "..%2f"
+      - "..%5c"
+
+  # ========================================================================
+  # SQL INJECTION PROTECTION
+  # ========================================================================
+
+  sql_injection:
+    enabled: true
+
+    # Block SQL keywords in parameters
+    block_keywords: true
+    keywords:
+      - "union"
+      - "select"
+      - "insert"
+      - "update"
+      - "delete"
+      - "drop"
+      - "exec"
+      - "execute"
+
+# ============================================================================
+# RESPONSE FILTERING
+# ============================================================================
+
+response_filtering:
+  enabled: true
+
+  # ========================================================================
+  # SECURITY HEADERS
+  # ========================================================================
+
+  headers:
+    # Remove server identification
+    remove:
+      - "Server"
+      - "X-Powered-By"
+
+    # Add security headers
+    add:
+      # HTTP Strict Transport Security
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload"
+
+      # Content Security Policy
+      "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+
+      # X-Frame-Options
+      "X-Frame-Options": "DENY"
+
+      # X-Content-Type-Options
+      "X-Content-Type-Options": "nosniff"
+
+      # X-XSS-Protection (legacy)
+      "X-XSS-Protection": "1; mode=block"
+
+      # Referrer-Policy
+      "Referrer-Policy": "strict-origin-when-cross-origin"
+
+      # Permissions-Policy
+      "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+
+  # ========================================================================
+  # PII REDACTION
+  # ========================================================================
+
+  pii_redaction:
+    enabled: true
+
+    # Redaction patterns
+    patterns:
+      # API keys
+      - pattern: 'sk-[a-zA-Z0-9-]{20,}'
+        replacement: '[API_KEY_REDACTED]'
+        severity: "critical"
+
+      # AWS keys
+      - pattern: 'AKIA[0-9A-Z]{16}'
+        replacement: '[AWS_KEY_REDACTED]'
+        severity: "critical"
+
+      # GitHub tokens
+      - pattern: 'ghp_[a-zA-Z0-9]{36}'
+        replacement: '[GITHUB_TOKEN_REDACTED]'
+        severity: "critical"
+
+      # Private keys
+      - pattern: '-----BEGIN [A-Z ]+ KEY-----'
+        replacement: '[PRIVATE_KEY_REDACTED]'
+        severity: "critical"
+
+      # Social Security Numbers
+      - pattern: '\b\d{3}-\d{2}-\d{4}\b'
+        replacement: '[SSN_REDACTED]'
+        severity: "high"
+
+      # Email addresses
+      - pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        replacement: '[EMAIL_REDACTED]'
+        severity: "medium"
+
+      # Credit card numbers
+      - pattern: '\b(?:\d{4}[-\s]?){3}\d{4}\b'
+        replacement: '[CARD_REDACTED]'
+        severity: "high"
+
+      # IP addresses
+      - pattern: '\b(?:\d{1,3}\.){3}\d{1,3}\b'
+        replacement: '[IP_REDACTED]'
+        severity: "low"
+
+  # ========================================================================
+  # ERROR MESSAGES
+  # ========================================================================
+
+  error_handling:
+    # Hide internal error details in production
+    detailed_errors: false
+
+    # Generic error messages
+    messages:
+      400: "Bad Request"
+      401: "Unauthorized"
+      403: "Forbidden"
+      404: "Not Found"
+      429: "Too Many Requests"
+      500: "Internal Server Error"
+      502: "Bad Gateway"
+      503: "Service Unavailable"
+      504: "Gateway Timeout"
+
+    # Include error ID for tracking
+    include_error_id: true
+
+    # Log full error details
+    log_full_errors: true
+
+# ============================================================================
+# CORS (Cross-Origin Resource Sharing)
+# ============================================================================
+
+cors:
+  enabled: false  # Enable only if needed for browser access
+
+  # Allowed origins (specific domains or wildcard)
+  allowed_origins:
+    - "https://dashboard.company.com"  # <PLACEHOLDER>
+    - "https://app.company.com"
+
+  # Allow credentials (cookies, auth headers)
+  allow_credentials: true
+
+  # Allowed HTTP methods
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+
+  # Allowed headers
+  allowed_headers:
+    - "Authorization"
+    - "Content-Type"
+    - "X-Requested-With"
+    - "X-API-Key"
+
+  # Exposed headers (available to JavaScript)
+  exposed_headers:
+    - "X-Request-ID"
+    - "X-RateLimit-Limit"
+    - "X-RateLimit-Remaining"
+
+  # Preflight cache duration (seconds)
+  max_age: 3600
+
+  # Allow private network requests
+  allow_private_network: false
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+
+logging:
+  enabled: true
+
+  # Log level: DEBUG, INFO, WARN, ERROR, CRITICAL
+  level: "INFO"
+
+  # Log format: json, text, clf (Common Log Format)
+  format: "json"
+
+  # ========================================================================
+  # ACCESS LOGGING
+  # ========================================================================
+
+  access:
+    enabled: true
+
+    # Log file path
+    path: "~/.openclaw/logs/gateway-access.log"
+
+    # Log fields
+    fields:
+      - "timestamp"
+      - "remote_addr"
+      - "method"
+      - "path"
+      - "status"
+      - "response_time"
+      - "user_agent"
+      - "user_id"
+      - "request_id"
+
+    # Sensitive data filtering
+    filter_sensitive: true
+
+    # Don't log these endpoints (reduce noise)
+    exclude_paths:
+      - "/health"
+      - "/metrics"
+
+    # Rotation
+    rotation:
+      enabled: true
+      max_size: 104857600  # 100 MB
+      max_files: 10
+      compress: true
+
+  # ========================================================================
+  # ERROR LOGGING
+  # ========================================================================
+
+  error:
+    enabled: true
+    path: "~/.openclaw/logs/gateway-error.log"
+
+    # Include stack traces
+    include_stack_trace: true
+
+    # Include request context
+    include_request: true
+
+    rotation:
+      enabled: true
+      max_size: 104857600
+      max_files: 10
+      compress: true
+
+  # ========================================================================
+  # AUDIT LOGGING
+  # ========================================================================
+
+  audit:
+    enabled: true
+    path: "~/.openclaw/logs/gateway-audit.jsonl"
+
+    # Events to audit
+    events:
+      - "authentication_success"
+      - "authentication_failure"
+      - "authorization_denied"
+      - "api_key_created"
+      - "api_key_revoked"
+      - "config_changed"
+      - "rate_limit_exceeded"
+      - "suspicious_request"
+
+    # Immutable audit log (write-only)
+    immutable: true
+
+    rotation:
+      enabled: true
+      max_size: 104857600
+      max_files: 365  # Keep 1 year
+      compress: true
+
+# ============================================================================
+# MONITORING & HEALTH CHECKS
+# ============================================================================
+
+monitoring:
+  # ========================================================================
+  # HEALTH CHECK ENDPOINT
+  # ========================================================================
+
+  health:
+    enabled: true
+    endpoint: "/health"
+
+    # Detailed health response (includes component status)
+    detailed: true
+
+    # Components to check
+    components:
+      - name: "gateway"
+        check: "self"
+      - name: "backend"
+        check: "http"
+        url: "http://localhost:18790/health"
+      - name: "redis"
+        check: "redis"
+        url: "redis://localhost:6379"
+      - name: "database"
+        check: "database"
+        dsn: "postgresql://localhost/clawdbot"
+
+    # Timeout for component checks (seconds)
+    timeout: 5
+
+  # ========================================================================
+  # METRICS ENDPOINT (Prometheus)
+  # ========================================================================
+
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+
+    # Bind to separate address (optional)
+    bind:
+      address: "127.0.0.1"
+      port: 9090
+
+    # Metrics to collect
+    collectors:
+      # Request metrics
+      - "http_requests_total"
+      - "http_request_duration_seconds"
+      - "http_request_size_bytes"
+      - "http_response_size_bytes"
+
+      # Authentication metrics
+      - "auth_attempts_total"
+      - "auth_failures_total"
+      - "auth_success_total"
+
+      # Rate limiting metrics
+      - "rate_limit_exceeded_total"
+      - "rate_limit_remaining"
+
+      # Gateway metrics
+      - "gateway_uptime_seconds"
+      - "gateway_connections_active"
+      - "gateway_connections_total"
+
+      # TLS metrics (if enabled)
+      - "tls_handshakes_total"
+      - "tls_handshake_errors_total"
+      - "tls_certificate_expiry_seconds"
+
+    # Histogram buckets (response time in seconds)
+    histogram_buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+
+  # ========================================================================
+  # REQUEST TRACING
+  # ========================================================================
+
+  tracing:
+    enabled: false
+
+    # Tracing backend: jaeger, zipkin, datadog, opentelemetry
+    backend: "jaeger"
+
+    # Jaeger configuration
+    jaeger:
+      agent_host: "localhost"
+      agent_port: 6831
+      sampler_type: "probabilistic"
+      sampler_param: 0.1  # Sample 10% of requests
+
+    # Include in trace
+    include:
+      - "request_headers"
+      - "response_headers"
+      - "user_id"
+      - "api_key_id"
+
+# ============================================================================
+# CIRCUIT BREAKER
+# ============================================================================
+
+circuit_breaker:
+  enabled: true
+
+  # Backend circuit breakers
+  backends:
+    - name: "main_backend"
+      url: "http://localhost:18790"
+
+      # Failure threshold (consecutive failures)
+      failure_threshold: 5
+
+      # Success threshold (consecutive successes to close)
+      success_threshold: 2
+
+      # Timeout (seconds)
+      timeout: 30
+
+      # Open circuit duration (seconds)
+      open_duration: 60
+
+      # Half-open requests
+      half_open_requests: 3
+
+# ============================================================================
+# DDOS PROTECTION
+# ============================================================================
+
+ddos_protection:
+  enabled: true
+
+  # ========================================================================
+  # CONNECTION LIMITS
+  # ========================================================================
+
+  connection_limits:
+    # Maximum concurrent connections per IP
+    per_ip: 10
+
+    # Maximum total concurrent connections
+    total: 1000
+
+    # Connection rate (new connections per second per IP)
+    rate_per_ip: 5
+
+  # ========================================================================
+  # SLOWLORIS PROTECTION
+  # ========================================================================
+
+  slowloris_protection:
+    enabled: true
+
+    # Slow headers timeout (seconds)
+    header_timeout: 10
+
+    # Slow body timeout (seconds)
+    body_timeout: 30
+
+    # Minimum data rate (bytes/second)
+    min_data_rate: 1024
+
+  # ========================================================================
+  # SYN FLOOD PROTECTION
+  # ========================================================================
+
+  syn_flood:
+    enabled: true
+
+    # SYN cookies
+    syncookies: true
+
+    # TCP backlog
+    tcp_backlog: 511
+
+    # Maximum SYN backlog
+    max_syn_backlog: 2048
+
+# ============================================================================
+# IP FILTERING & GEO-BLOCKING
+# ============================================================================
+
+ip_filtering:
+  # ========================================================================
+  # IP WHITELIST
+  # ========================================================================
+
+  whitelist:
+    enabled: true
+
+    # Allowed IP addresses/ranges
+    ips:
+      - "127.0.0.1"
+      - "::1"
+      - "10.0.0.0/8"       # Internal network
+      - "100.64.0.0/10"    # Tailscale CGNAT
+      - "192.168.0.0/16"   # Private network
+
+  # ========================================================================
+  # IP BLACKLIST
+  # ========================================================================
+
+  blacklist:
+    enabled: true
+
+    # Blocked IP addresses/ranges
+    ips:
+      - "192.0.2.0/24"     # Example blocked range
+
+    # Automatic blocking
+    auto_block:
+      enabled: true
+
+      # Block after N failed auth attempts
+      auth_failure_threshold: 5
+
+      # Block after N rate limit violations
+      rate_limit_threshold: 10
+
+      # Block duration (seconds)
+      block_duration: 3600  # 1 hour
+
+      # Permanent block after N auto-blocks
+      permanent_after: 5
+
+  # ========================================================================
+  # GEO-BLOCKING
+  # ========================================================================
+
+  geo_blocking:
+    enabled: false
+
+    # GeoIP database
+    database: "/usr/share/GeoIP/GeoLite2-Country.mmdb"
+
+    # Mode: allowlist, blocklist
+    mode: "blocklist"
+
+    # Blocked countries (ISO 3166-1 alpha-2)
+    blocked_countries:
+      - "CN"  # China
+      - "RU"  # Russia
+      - "KP"  # North Korea
+      - "IR"  # Iran
+
+    # OR: Allowed countries
+    # allowed_countries:
+    #   - "US"
+    #   - "CA"
+    #   - "GB"
+
+# ============================================================================
+# SESSION MANAGEMENT
+# ============================================================================
+
+session:
+  enabled: true
+
+  # Session storage: memory, redis, database, cookie
+  storage: "redis"
+
+  # Redis configuration
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 2
+    password: "${REDIS_PASSWORD}"
+    tls: true
+
+  # Session cookie
+  cookie:
+    name: "clawdbot_session"
+    path: "/"
+    domain: ".company.com"  # <PLACEHOLDER>
+    secure: true
+    httponly: true
+    samesite: "strict"
+    max_age: 3600  # 1 hour
+
+  # Session timeout
+  timeout:
+    # Absolute timeout (seconds)
+    absolute: 28800  # 8 hours
+
+    # Idle timeout (seconds)
+    idle: 3600  # 1 hour
+
+  # Session rotation
+  rotation:
+    # Rotate session ID on privilege escalation
+    on_privilege_change: true
+
+    # Rotate session ID periodically
+    periodic: true
+    period: 1800  # 30 minutes
+
+# ============================================================================
+# REPLAY ATTACK PROTECTION
+# ============================================================================
+
+replay_protection:
+  enabled: false
+
+  # Request signing
+  signing:
+    enabled: true
+    algorithm: "HMAC-SHA256"
+
+    # Required headers in signature
+    required_headers:
+      - "Date"
+      - "X-Request-ID"
+      - "Authorization"
+
+  # Nonce validation
+  nonce:
+    enabled: true
+    storage: "redis"
+    ttl: 300  # 5 minutes
+
+  # Timestamp validation
+  timestamp:
+    enabled: true
+
+    # Maximum clock skew (seconds)
+    max_skew: 300  # 5 minutes
+
+# ============================================================================
+# GRACEFUL SHUTDOWN
+# ============================================================================
+
+shutdown:
+  # Graceful shutdown timeout (seconds)
+  timeout: 30
+
+  # Wait for active connections to finish
+  wait_for_connections: true
+
+  # Maximum wait time for connections (seconds)
+  max_wait: 60
+
+  # Force close connections after max_wait
+  force_close: true
+
+# ============================================================================
+# END OF CONFIGURATION
+# ============================================================================
+
+# Production Deployment Checklist:
+# [ ] Update all <PLACEHOLDER> values
+# [ ] Generate strong secrets (JWT, API keys, Redis passwords)
+# [ ] Configure TLS certificates
+# [ ] Set up Redis for rate limiting and sessions
+# [ ] Configure OAuth2 provider (if using)
+# [ ] Set up monitoring and alerting
+# [ ] Test rate limiting thresholds
+# [ ] Review and adjust IP whitelist
+# [ ] Enable audit logging
+# [ ] Configure log rotation
+# [ ] Test failover scenarios
+# [ ] Document all configuration changes
+# [ ] Review security headers
+# [ ] Test authentication flows
+# [ ] Validate authorization rules
+# [ ] Perform load testing
+# [ ] Enable DDoS protection
+# [ ] Configure circuit breakers
+# [ ] Set up health checks
+# [ ] Test graceful shutdown
+
+# For detailed documentation, see:
+# - docs/guides/02-credential-isolation.md
+# - docs/guides/03-network-segmentation.md
+# - docs/guides/06-incident-response.md
