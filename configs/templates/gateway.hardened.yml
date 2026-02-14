@@ -25,7 +25,10 @@
 #
 # Documentation: docs/guides/03-network-segmentation.md
 # Version: 2.0.0
+
 # Last Updated: February 14, 2026
+
+---
 
 # ============================================================================
 # NETWORK BINDING CONFIGURATION
@@ -122,10 +125,10 @@ tls:
         responder_url: "http://ocsp.company.com"  # <PLACEHOLDER>
 
     # Additional certificates (SNI support)
-    # - cert_file: "/etc/clawdbot/ssl/gateway-alt.crt"
-    #   key_file: "/etc/clawdbot/ssl/gateway-alt.key"
-    #   domains:
-    #     - "clawdbot-alt.company.internal"
+    #   - cert_file: "/etc/clawdbot/ssl/gateway-alt.crt"
+    #     key_file: "/etc/clawdbot/ssl/gateway-alt.key"
+    #     domains:
+    #       - "clawdbot-alt.company.internal"
 
   # Cipher suites (prioritized order)
   cipher_suites:
@@ -150,7 +153,7 @@ tls:
     enabled: true
     type: "lru"  # LRU cache
     size: 1000   # Number of sessions
-    timeout: 300 # Seconds
+    timeout: 300  # Seconds
 
   # Session tickets (disable for forward secrecy)
   session_tickets: false
@@ -207,7 +210,9 @@ authentication:
 
     # JWT configuration
     jwt:
-      # Signing algorithm: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512
+      # Signing algorithm:
+      #   HS256, HS384, HS512, RS256, RS384, RS512,
+      #   ES256, ES384, ES512
       algorithm: "HS512"
 
       # Secret key (for HMAC algorithms)
@@ -315,9 +320,9 @@ authentication:
         table: "api_keys"
 
       # OR: File storage
-      # file:
-      #   path: "~/.openclaw/config/api_keys.yml"
-      #   format: "yaml"  # yaml, json
+      #   file:
+      #     path: "~/.openclaw/config/api_keys.yml"
+      #     format: "yaml"  # yaml, json
 
     # Key metadata
     metadata:
@@ -362,7 +367,9 @@ authentication:
     provider: "okta"  # <PLACEHOLDER>
 
     # OIDC Discovery URL
-    discovery_url: "https://your-org.okta.com/.well-known/openid-configuration"  # <PLACEHOLDER>
+    discovery_url:
+      # <PLACEHOLDER>
+      "https://your-org.okta.com/.well-known/openid-configuration"
 
     # OAuth2 credentials
     client_id: "${OAUTH_CLIENT_ID}"      # <PLACEHOLDER>
@@ -879,10 +886,20 @@ response_filtering:
     # Add security headers
     add:
       # HTTP Strict Transport Security
-      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload"
+      "Strict-Transport-Security":
+        "max-age=31536000; includeSubDomains; preload"
 
       # Content Security Policy
-      "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+      "Content-Security-Policy": |
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data:;
+        font-src 'self';
+        connect-src 'self';
+        frame-ancestors 'none';
+        base-uri 'self';
+        form-action 'self';
 
       # X-Frame-Options
       "X-Frame-Options": "DENY"
@@ -897,7 +914,8 @@ response_filtering:
       "Referrer-Policy": "strict-origin-when-cross-origin"
 
       # Permissions-Policy
-      "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+      "Permissions-Policy":
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
 
   # ========================================================================
   # PII REDACTION
@@ -1362,10 +1380,10 @@ ip_filtering:
       - "IR"  # Iran
 
     # OR: Allowed countries
-    # allowed_countries:
-    #   - "US"
-    #   - "CA"
-    #   - "GB"
+    #   allowed_countries:
+    #     - "US"
+    #     - "CA"
+    #     - "GB"
 
 # ============================================================================
 # SESSION MANAGEMENT

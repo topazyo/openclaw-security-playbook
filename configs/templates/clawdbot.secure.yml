@@ -1,6 +1,6 @@
 # clawdbot.secure.full.yml
 # Complete Secure Configuration Template for ClawdBot AI Agent
-# 
+#
 # This is the FULL production-ready configuration with all options documented.
 # For a minimal configuration, see clawdbot.secure.yml
 #
@@ -8,6 +8,8 @@
 # Documentation: docs/guides/ for detailed explanations
 # Last Updated: February 14, 2026
 # Version: 1.0.0
+
+---
 
 # ============================================================================
 # GLOBAL SETTINGS
