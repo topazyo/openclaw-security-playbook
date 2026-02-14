@@ -779,5 +779,13 @@ done
 
 ---
 
+## Cross-references
+
+- [Credential Isolation](02-credential-isolation.md)
+- [Runtime Sandboxing](04-runtime-sandboxing.md)
+- [Gateway Config](../../configs/templates/gateway.hardened.yml)
+
+---
+
 **Last Updated:** February 14, 2026  
 **Tested On:** Ubuntu 22.04+, macOS 14.0+, Tailscale 1.50+, WireGuard 1.0+
