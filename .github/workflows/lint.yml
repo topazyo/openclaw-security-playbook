@@ -13,5 +13,5 @@ jobs:
           yamllint configs/
       - name: ShellCheck
         run: |
-          sudo apt-get install shellcheck
+          sudo apt install shellcheck
           shellcheck scripts/**/*.sh

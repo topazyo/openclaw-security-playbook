@@ -34,3 +34,6 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Local AI agent instructions (do not sync to GitHub)
+.github/copilot-instructions.md
