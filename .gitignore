@@ -1,7 +1,6 @@
 # Credentials and secrets
 *.bak
 *.bak.*
-credentials.yml
 secrets.yml
 .env
 .env.local
