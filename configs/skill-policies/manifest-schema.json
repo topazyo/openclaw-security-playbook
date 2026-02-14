@@ -1,0 +1,298 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openclaw.ai/schemas/skill-manifest-v1.json",
+  "title": "MCP Skill Manifest",
+  "description": "Schema for MCP skill manifest files",
+  "type": "object",
+
+  "required": [
+    "name",
+    "version",
+    "type",
+    "author"
+  ],
+
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Skill name (kebab-case recommended)",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 3,
+      "maxLength": 50,
+      "examples": ["filesystem-mcp", "git-integration"]
+    },
+
+    "version": {
+      "type": "string",
+      "description": "Semantic version (major.minor.patch)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$",
+      "examples": ["1.0.0", "2.1.3-beta.1"]
+    },
+
+    "type": {
+      "type": "string",
+      "description": "Skill type",
+      "enum": ["mcp-server", "mcp-client", "mcp-tool", "mcp-resource"],
+      "examples": ["mcp-server"]
+    },
+
+    "author": {
+      "type": "object",
+      "description": "Skill author information",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Author name or organization",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Author email address"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Author or organization URL"
+        },
+        "pgp_key": {
+          "type": "string",
+          "description": "PGP public key fingerprint",
+          "pattern": "^[A-F0-9]{40}$"
+        }
+      }
+    },
+
+    "description": {
+      "type": "string",
+      "description": "Brief skill description",
+      "minLength": 10,
+      "maxLength": 500
+    },
+
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier",
+      "examples": ["MIT", "Apache-2.0", "GPL-3.0"],
+      "pattern": "^[A-Za-z0-9.-]+$"
+    },
+
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Source code repository URL",
+      "pattern": "^https://github\\.com/|^https://gitlab\\.com/"
+    },
+
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Skill homepage or documentation URL"
+    },
+
+    "keywords": {
+      "type": "array",
+      "description": "Searchable keywords",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      },
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true
+    },
+
+    "dependencies": {
+      "type": "object",
+      "description": "Runtime dependencies",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Version constraint",
+        "pattern": "^[>=<~^]?\\d+\\.\\d+\\.\\d+"
+      }
+    },
+
+    "permissions": {
+      "type": "array",
+      "description": "Required permissions",
+      "items": {
+        "type": "string",
+        "enum": [
+          "filesystem:read",
+          "filesystem:write",
+          "filesystem:list",
+          "network:http",
+          "network:https",
+          "network:unrestricted",
+          "process:exec",
+          "process:spawn",
+          "secrets:read",
+          "secrets:write",
+          "database:read",
+          "database:write"
+        ]
+      },
+      "uniqueItems": true
+    },
+
+    "integrity": {
+      "type": "object",
+      "description": "Integrity verification",
+      "required": ["algorithm", "hash"],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["sha256", "sha512"],
+          "description": "Hash algorithm"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64,128}$",
+          "description": "Cryptographic hash of skill files"
+        },
+        "files": {
+          "type": "array",
+          "description": "List of files included in hash",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+
+    "signature": {
+      "type": "object",
+      "description": "Cryptographic signature (optional)",
+      "required": ["algorithm", "value", "public_key"],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["RSA-SHA256", "ED25519"],
+          "description": "Signature algorithm"
+        },
+        "value": {
+          "type": "string",
+          "description": "Base64-encoded signature"
+        },
+        "public_key": {
+          "type": "string",
+          "description": "Public key or key fingerprint"
+        },
+        "signed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Signature timestamp"
+        }
+      }
+    },
+
+    "security": {
+      "type": "object",
+      "description": "Security metadata",
+      "properties": {
+        "vulnerability_disclosure": {
+          "type": "string",
+          "format": "uri",
+          "description": "Vulnerability disclosure policy URL"
+        },
+        "security_contact": {
+          "type": "string",
+          "format": "email",
+          "description": "Security contact email"
+        },
+        "audit_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Last security audit date"
+        },
+        "cve_ids": {
+          "type": "array",
+          "description": "Known CVE IDs (if any)",
+          "items": {
+            "type": "string",
+            "pattern": "^CVE-\\d{4}-\\d+$"
+          }
+        }
+      }
+    },
+
+    "compatibility": {
+      "type": "object",
+      "description": "Compatibility information",
+      "properties": {
+        "mcp_version": {
+          "type": "string",
+          "description": "MCP protocol version",
+          "pattern": "^\\d+\\.\\d+$",
+          "examples": ["1.0", "2.0"]
+        },
+        "python_version": {
+          "type": "string",
+          "description": "Python version constraint",
+          "pattern": "^>=?\\d+\\.\\d+"
+        },
+        "platforms": {
+          "type": "array",
+          "description": "Supported platforms",
+          "items": {
+            "type": "string",
+            "enum": ["linux", "macos", "windows", "docker"]
+          },
+          "minItems": 1
+        }
+      }
+    },
+
+    "config": {
+      "type": "object",
+      "description": "Configuration schema",
+      "properties": {
+        "required_env": {
+          "type": "array",
+          "description": "Required environment variables",
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional_env": {
+          "type": "array",
+          "description": "Optional environment variables",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        },
+        "downloads": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Download count"
+        },
+        "stars": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "GitHub stars or similar"
+        }
+      }
+    }
+  },
+
+  "additionalProperties": false
+}

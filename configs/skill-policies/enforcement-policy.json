@@ -1,0 +1,170 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-14T12:00:00Z",
+  "description": "Skill security enforcement policy",
+
+  "enforcement_level": {
+    "default": "warn",
+    "production": "block",
+    "development": "log",
+    "testing": "warn"
+  },
+
+  "validation": {
+    "manifest": {
+      "required": true,
+      "schema_validation": true,
+      "fail_on_missing": true,
+      "fail_on_invalid": true
+    },
+
+    "integrity": {
+      "required": false,
+      "algorithm": "sha256",
+      "fail_on_mismatch": true,
+      "allow_unsigned": true
+    },
+
+    "signature": {
+      "required": false,
+      "verify_pgp": false,
+      "trusted_keys": [],
+      "fail_on_invalid": false
+    }
+  },
+
+  "source_validation": {
+    "check_allowlist": true,
+    "block_untrusted": false,
+    "warn_untrusted": true,
+    "require_https": true,
+    "check_certificate": true
+  },
+
+  "pattern_scanning": {
+    "enabled": true,
+    "scan_code": true,
+    "scan_config": true,
+    "scan_dependencies": false,
+
+    "severity_actions": {
+      "critical": "block",
+      "high": "block",
+      "medium": "warn",
+      "low": "log"
+    },
+
+    "ignore_patterns": [
+      "# nosec",
+      "# security: ignore"
+    ]
+  },
+
+  "permissions": {
+    "check_permissions": true,
+    "require_justification": false,
+
+    "dangerous_permissions": {
+      "filesystem:write": "warn",
+      "network:unrestricted": "warn",
+      "process:exec": "warn",
+      "secrets:write": "block"
+    },
+
+    "permission_combinations": {
+      "dangerous": [
+        ["filesystem:write", "network:unrestricted"],
+        ["process:exec", "network:unrestricted"]
+      ]
+    }
+  },
+
+  "quarantine": {
+    "auto_quarantine": false,
+    "quarantine_on": {
+      "integrity_failure": true,
+      "signature_invalid": false,
+      "dangerous_patterns": {
+        "critical": true,
+        "high": false
+      },
+      "blocked_source": true,
+      "blocked_author": true
+    },
+
+    "retention_days": 90,
+    "notify_on_quarantine": true
+  },
+
+  "monitoring": {
+    "continuous_monitoring": true,
+    "scan_interval_seconds": 300,
+    "watch_for_changes": true,
+    "alert_on_modifications": true
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_validation": true,
+    "log_scans": true,
+    "log_quarantine": true,
+    "audit_all_actions": true,
+
+    "rotation": {
+      "max_size_mb": 100,
+      "retention_days": 30
+    }
+  },
+
+  "notifications": {
+    "enabled": false,
+    "channels": {
+      "email": {
+        "enabled": false,
+        "recipients": ["security@example.com"],
+        "on_events": ["quarantine", "critical_pattern", "integrity_failure"]
+      },
+      "slack": {
+        "enabled": false,
+        "webhook_url": "",
+        "on_events": ["quarantine"]
+      },
+      "webhook": {
+        "enabled": false,
+        "url": "",
+        "auth_header": "Authorization: Bearer TOKEN"
+      }
+    }
+  },
+
+  "exceptions": {
+    "skills": [
+      {
+        "id": "legacy-skill",
+        "reason": "Grandfather clause for existing deployment",
+        "expiry": "2026-12-31",
+        "skip_checks": ["pattern_scanning"]
+      }
+    ]
+  },
+
+  "compliance": {
+    "frameworks": [
+      "OWASP-SAMM",
+      "NIST-SSDF"
+    ],
+    "sbom_required": false,
+    "license_compliance": {
+      "check_licenses": true,
+      "allowed_licenses": [
+        "MIT",
+        "Apache-2.0",
+        "BSD-3-Clause",
+        "ISC"
+      ],
+      "blocked_licenses": [
+        "GPL-3.0"
+      ]
+    }
+  }
+}

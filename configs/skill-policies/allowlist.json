@@ -1,0 +1,106 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-14T12:00:00Z",
+  "description": "Allowlist for approved MCP skills and sources",
+
+  "sources": {
+    "trusted": [
+      "https://github.com/anthropics/",
+      "https://github.com/modelcontextprotocol/",
+      "https://github.com/openclaw/"
+    ],
+    "approved": [
+      "https://github.com/trusted-org/mcp-skill-example",
+      "https://registry.npmjs.org/@modelcontextprotocol/"
+    ],
+    "blocked": [
+      "https://github.com/malicious-user/",
+      "http://insecure-registry.com/"
+    ]
+  },
+
+  "skills": {
+    "approved": [
+      {
+        "id": "filesystem-mcp",
+        "name": "@modelcontextprotocol/server-filesystem",
+        "version": ">=0.5.0",
+        "source": "https://github.com/modelcontextprotocol/servers",
+        "allowed_permissions": [
+          "filesystem:read",
+          "filesystem:list"
+        ],
+        "notes": "Official MCP filesystem server"
+      },
+      {
+        "id": "git-mcp",
+        "name": "@modelcontextprotocol/server-git",
+        "version": ">=0.2.0",
+        "source": "https://github.com/modelcontextprotocol/servers",
+        "allowed_permissions": [
+          "filesystem:read",
+          "process:exec"
+        ],
+        "notes": "Official MCP git server"
+      },
+      {
+        "id": "brave-search-mcp",
+        "name": "@modelcontextprotocol/server-brave-search",
+        "version": ">=0.3.0",
+        "source": "https://github.com/modelcontextprotocol/servers",
+        "allowed_permissions": [
+          "network:https"
+        ],
+        "notes": "Official MCP Brave Search integration"
+      }
+    ],
+
+    "deprecated": [
+      {
+        "id": "legacy-skill-v1",
+        "name": "old-mcp-skill",
+        "version": "<1.0.0",
+        "reason": "Security vulnerabilities in older versions",
+        "replacement": "new-skill-v2",
+        "deprecated_since": "2025-12-01"
+      }
+    ],
+
+    "blocked": [
+      {
+        "id": "malicious-skill",
+        "name": "evil-mcp-skill",
+        "reason": "Known malware",
+        "cve": "CVE-2025-12345",
+        "blocked_since": "2025-11-15"
+      }
+    ]
+  },
+
+  "authors": {
+    "trusted": [
+      "anthropic",
+      "modelcontextprotocol",
+      "openclaw-team"
+    ],
+    "verified": [
+      "trusted-developer@example.com"
+    ],
+    "blocked": [
+      "malicious-actor@evil.com"
+    ]
+  },
+
+  "domains": {
+    "allowed": [
+      "anthropic.com",
+      "github.com",
+      "npmjs.org",
+      "pypi.org"
+    ],
+    "blocked": [
+      "malware-domain.ru",
+      "phishing-site.xyz"
+    ]
+  }
+}

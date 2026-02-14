@@ -1,0 +1,181 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-14T12:00:00Z",
+  "description": "Dangerous code patterns for MCP skill scanning",
+
+  "patterns": [
+    {
+      "id": "exec-dangerous",
+      "name": "Dangerous exec/eval",
+      "pattern": "\\b(exec|eval)\\s*\\(",
+      "severity": "critical",
+      "description": "Direct code execution can lead to arbitrary code execution",
+      "languages": ["python", "javascript"],
+      "recommendation": "Avoid exec/eval. Use safe alternatives like ast.literal_eval()"
+    },
+    {
+      "id": "shell-injection",
+      "name": "Shell injection risk",
+      "pattern": "(os\\.system|subprocess\\.call|subprocess\\.run)\\s*\\([^)]*\\+",
+      "severity": "critical",
+      "description": "String concatenation in shell commands can lead to injection",
+      "languages": ["python"],
+      "recommendation": "Use subprocess with list arguments, not string concatenation"
+    },
+    {
+      "id": "sql-injection",
+      "name": "SQL injection risk",
+      "pattern": "(execute|cursor\\.execute)\\s*\\([^)]*%s|[^)]*\\+.*%|[^)]*f['\"]",
+      "severity": "critical",
+      "description": "String formatting in SQL queries can lead to SQL injection",
+      "languages": ["python"],
+      "recommendation": "Use parameterized queries with ? placeholders"
+    },
+    {
+      "id": "path-traversal",
+      "name": "Path traversal risk",
+      "pattern": "open\\s*\\([^)]*\\+|join\\s*\\([^)]*\\.\\.",
+      "severity": "high",
+      "description": "Unsanitized file paths can lead to directory traversal",
+      "languages": ["python"],
+      "recommendation": "Validate and sanitize file paths, use os.path.abspath()"
+    },
+    {
+      "id": "hardcoded-credentials",
+      "name": "Hardcoded credentials",
+      "pattern": "(password|api[_-]?key|secret|token)\\s*=\\s*['\"][^'\"]{8,}['\"]",
+      "severity": "high",
+      "description": "Hardcoded credentials in source code",
+      "languages": ["python", "javascript"],
+      "recommendation": "Use environment variables or secure secret management"
+    },
+    {
+      "id": "unsafe-deserialization",
+      "name": "Unsafe deserialization",
+      "pattern": "pickle\\.loads|yaml\\.load\\s*\\([^)]*Loader\\s*=\\s*yaml\\.Loader",
+      "severity": "critical",
+      "description": "Unsafe deserialization can lead to arbitrary code execution",
+      "languages": ["python"],
+      "recommendation": "Use json.loads() or yaml.safe_load() instead"
+    },
+    {
+      "id": "insecure-random",
+      "name": "Insecure random",
+      "pattern": "random\\.(random|randint|choice)",
+      "severity": "medium",
+      "description": "Standard random module is not cryptographically secure",
+      "languages": ["python"],
+      "recommendation": "Use secrets module for security-sensitive operations"
+    },
+    {
+      "id": "weak-crypto",
+      "name": "Weak cryptography",
+      "pattern": "\\b(md5|sha1|des|rc4)\\b",
+      "severity": "high",
+      "description": "Weak or deprecated cryptographic algorithms",
+      "languages": ["python", "javascript"],
+      "recommendation": "Use SHA-256 or stronger algorithms"
+    },
+    {
+      "id": "unsafe-file-permissions",
+      "name": "Unsafe file permissions",
+      "pattern": "chmod\\s*\\([^)]*0o?777",
+      "severity": "medium",
+      "description": "Overly permissive file permissions",
+      "languages": ["python"],
+      "recommendation": "Use restrictive permissions like 0o600 for sensitive files"
+    },
+    {
+      "id": "unverified-ssl",
+      "name": "Unverified SSL",
+      "pattern": "verify\\s*=\\s*False|CERT_NONE",
+      "severity": "high",
+      "description": "SSL certificate verification disabled",
+      "languages": ["python"],
+      "recommendation": "Always verify SSL certificates in production"
+    },
+    {
+      "id": "debug-mode",
+      "name": "Debug mode enabled",
+      "pattern": "debug\\s*=\\s*True|DEBUG\\s*=\\s*True",
+      "severity": "medium",
+      "description": "Debug mode may expose sensitive information",
+      "languages": ["python"],
+      "recommendation": "Disable debug mode in production"
+    },
+    {
+      "id": "unsafe-redirect",
+      "name": "Open redirect",
+      "pattern": "redirect\\s*\\([^)]*request\\.",
+      "severity": "medium",
+      "description": "Unvalidated redirects can be used in phishing attacks",
+      "languages": ["python"],
+      "recommendation": "Validate redirect URLs against allowlist"
+    },
+    {
+      "id": "xxe-vulnerability",
+      "name": "XXE vulnerability",
+      "pattern": "XMLParser\\s*\\(.*resolve_entities\\s*=\\s*True",
+      "severity": "high",
+      "description": "XML external entity processing enabled",
+      "languages": ["python"],
+      "recommendation": "Disable external entity resolution"
+    },
+    {
+      "id": "command-injection-js",
+      "name": "Command injection (JS)",
+      "pattern": "child_process\\.(exec|spawn)\\s*\\([^)]*\\+",
+      "severity": "critical",
+      "description": "Command injection via string concatenation",
+      "languages": ["javascript"],
+      "recommendation": "Use array arguments for spawn/execFile"
+    },
+    {
+      "id": "prototype-pollution",
+      "name": "Prototype pollution",
+      "pattern": "__proto__|constructor\\[\"prototype\"\\]",
+      "severity": "high",
+      "description": "Prototype pollution vulnerability",
+      "languages": ["javascript"],
+      "recommendation": "Validate object properties before assignment"
+    }
+  ],
+
+  "file_patterns": [
+    {
+      "id": "suspicious-extensions",
+      "name": "Suspicious file extensions",
+      "pattern": "\\.(exe|dll|so|dylib|bat|cmd|ps1)$",
+      "severity": "high",
+      "description": "Executable files in skill package",
+      "recommendation": "Skills should not contain compiled executables"
+    },
+    {
+      "id": "hidden-files",
+      "name": "Hidden files",
+      "pattern": "^\\..*(?<!gitignore)$",
+      "severity": "low",
+      "description": "Hidden files may contain sensitive data",
+      "recommendation": "Review hidden files for sensitive information"
+    }
+  ],
+
+  "network_patterns": [
+    {
+      "id": "suspicious-domains",
+      "name": "Suspicious domains",
+      "pattern": "\\.(ru|xyz|tk|ml|ga|cn)/",
+      "severity": "medium",
+      "description": "Connections to high-risk TLDs",
+      "recommendation": "Review network connections carefully"
+    },
+    {
+      "id": "ip-address-connection",
+      "name": "IP address connection",
+      "pattern": "https?://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+      "severity": "medium",
+      "description": "Direct IP connections bypass DNS-based security",
+      "recommendation": "Use domain names instead of IP addresses"
+    }
+  ]
+}
