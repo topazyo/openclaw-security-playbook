@@ -1,0 +1,339 @@
+{
+  "alert_rules": {
+    "category": "Critical Severity (P0/P1)",
+    "description": "Immediate response required. PagerDuty high-urgency escalation for P0. All alerts notify #security-alerts Slack channel. Response SLA: P0 15-30 minutes, P1 1 hour.",
+    "notification_channels": {
+      "pagerduty": {
+        "service_key": "${PAGERDUTY_SERVICE_KEY}",
+        "urgency": "high",
+        "auto_resolve": false
+      },
+      "slack": {
+        "webhook_url": "${SLACK_WEBHOOK_SECURITY_ALERTS}",
+        "channel": "#security-alerts",
+        "username": "OpenClaw Security",
+        "icon_emoji": ":rotating_light:"
+      }
+    },
+    "rules": [
+      {
+        "id": "critical-001",
+        "name": "P0 Security Incident Detected",
+        "severity": "P0-Critical",
+        "description": "Active P0 security incident requiring immediate response. Examples: credential exfiltration, data breach, ransomware, supply chain compromise.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:INCIDENT_CREATED AND incident.severity:\"P0-Critical\" AND incident.status:\"active\"",
+          "time_window": "5m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "0m"
+        },
+        "frequency": "30s",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "🚨 P0 SECURITY INCIDENT: {{incident.id}} - {{incident.title}}. Type: {{incident.type}}. Affected: {{incident.affected_resources}}. ACTIVATE INCIDENT RESPONSE TEAM IMMEDIATELY.",
+            "dedup_key": "{{incident.id}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 🚨 *P0 CRITICAL INCIDENT*\n*ID:* {{incident.id}}\n*Type:* {{incident.type}}\n*Title:* {{incident.title}}\n*Affected:* {{incident.affected_resources}}\n*Detected:* {{@timestamp}}\n*Playbook:* {{incident.playbook_link}}\n*Status Page:* {{incident.status_page_link}}\n\n*ACTION REQUIRED:* Join war room immediately - {{incident.war_room_link}}"
+          }
+        ],
+        "related_playbooks": ["IRP-001", "IRP-002", "IRP-003", "IRP-004", "IRP-007"],
+        "escalation": {
+          "if_no_ack_within": "5m",
+          "escalate_to": "CISO",
+          "escalation_message": "P0 incident {{incident.id}} NOT ACKNOWLEDGED after 5 minutes. Escalating to CISO."
+        }
+      },
+      {
+        "id": "critical-002",
+        "name": "Multiple Failed Login Attempts (Brute Force)",
+        "severity": "P0-Critical",
+        "description": "Credential brute force attack detected. >3 failed logins for same user within 5 minutes indicates automated attack or credential stuffing.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:LOGIN_FAILURE",
+          "time_window": "5m",
+          "group_by": "user_id.keyword"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 3,
+          "evaluation_delay": "1m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "🔐 BRUTE FORCE ATTACK: User {{user_id}} has {{count}} failed login attempts in 5 minutes. Source IPs: {{source_ips}}. Account may be under active attack.",
+            "dedup_key": "brute-force-{{user_id}}"
+          },
+          {
+            "type": "slack",
+            "message": "🔐 *CREDENTIAL ATTACK DETECTED*\n*User:* {{user_id}}\n*Failed Attempts:* {{count}} in 5 minutes\n*Source IPs:* {{source_ips}}\n*Last Failure Reason:* {{failure_reason}}\n\n*AUTO-ACTION:* Account locked per SEC-002. Activate IRP-001 if confirmed compromise."
+          },
+          {
+            "type": "auto_remediation",
+            "action": "lock_account",
+            "params": {
+              "user_id": "{{user_id}}",
+              "reason": "Brute force attack detected",
+              "duration": "1h",
+              "unlock_method": "manual_review"
+            }
+          }
+        ],
+        "related_playbooks": ["IRP-001 (Credential Theft)"],
+        "compliance": ["SOC 2 CC6.1 (Logical Access)", "ISO 27001 A.9.4.3 (Password Management)"]
+      },
+      {
+        "id": "critical-003",
+        "name": "Admin Credential Use After Hours",
+        "severity": "P0-Critical",
+        "description": "Administrative account activity detected outside business hours (10PM-6AM UTC). High risk of compromised privileged account.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "metadata.role:\"admin\" AND (hour:[22 TO 23] OR hour:[0 TO 6]) AND event_type:(LOGIN_SUCCESS OR ACCESS_GRANTED OR PERMISSION_ESCALATION)",
+          "time_window": "5m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "0m"
+        },
+        "frequency": "30s",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "👤 ADMIN AFTER-HOURS: User {{user_id}} (admin role) active at {{@timestamp}} UTC. Action: {{event_type}}. Resource: {{resource}}. Source IP: {{source_ip}}. POSSIBLE ACCOUNT COMPROMISE.",
+            "dedup_key": "admin-after-hours-{{user_id}}-{{date}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 👤 *ADMIN AFTER-HOURS ACTIVITY*\n*User:* {{user_id}}\n*Role:* {{metadata.role}}\n*Time:* {{@timestamp}} UTC (outside 6AM-10PM)\n*Action:* {{event_type}}\n*Resource:* {{resource}}\n*Source IP:* {{source_ip}}\n*Geographic Location:* {{geo.city}}, {{geo.country}}\n\n*VERIFICATION REQUIRED:* Contact user immediately to confirm legitimate activity. If no response in 15 minutes, activate IRP-001 and suspend account."
+          }
+        ],
+        "related_playbooks": ["IRP-001 (Credential Theft)", "SEC-002 (Access Control Policy - After-hours monitoring)"],
+        "false_positive_handling": "Legitimate after-hours work (on-call, incidents, deployments) should be logged in advance via change request. Otherwise, assume compromise."
+      },
+      {
+        "id": "critical-004",
+        "name": "Large Data Exfiltration Detected",
+        "severity": "P0-Critical",
+        "description": "Abnormal outbound data transfer >100MB in 10 minutes. Possible data breach, credential theft, or insider threat exfiltration.",
+        "query": {
+          "datasource": "Prometheus",
+          "query_expr": "sum(rate(openclaw_network_bytes_total{direction=\"outbound\"}[10m])) > 100000000",
+          "time_window": "10m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 100000000,
+          "evaluation_delay": "1m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "📤 DATA EXFILTRATION: {{bytes_mb}}MB outbound in 10 minutes. User: {{user_id}}. Destination: {{destination_ip}} ({{destination_country}}). Service: {{service}}. ACTIVATE IRP-004 DATA BREACH PROTOCOL.",
+            "dedup_key": "exfiltration-{{user_id}}-{{date}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 📤 *LARGE DATA TRANSFER ALERT*\n*Volume:* {{bytes_mb}} MB in 10 minutes\n*User:* {{user_id}}\n*Source Service:* {{service}}\n*Destination IP:* {{destination_ip}}\n*Destination Country:* {{destination_country}}\n*Protocol:* {{protocol}}\n*Files/Resources:* {{affected_resources}}\n\n*IMMEDIATE ACTION:* Review dashboard-user-activity.json Panel 8 (Data Export Activity). If unauthorized, block destination IP and activate IRP-004."
+          },
+          {
+            "type": "auto_remediation",
+            "action": "alert_dlp_monitor",
+            "params": {
+              "user_id": "{{user_id}}",
+              "destination_ip": "{{destination_ip}}",
+              "volume_bytes": "{{bytes}}",
+              "classification_check": "Restricted"
+            }
+          }
+        ],
+        "related_playbooks": ["IRP-004 (Data Breach)", "data-classification.py (DLP blocking)"],
+        "compliance": ["GDPR Article 33 (Breach Notification - 72 hour deadline may apply)", "SOC 2 CC6.7 (Transmission Security)"]
+      },
+      {
+        "id": "critical-005",
+        "name": "Unauthorized Skill Installation (Shadow AI)",
+        "severity": "P0-Critical",
+        "description": "openclaw-detect identified unauthorized AI skill or MCP server installation. Supply chain attack vector - malicious skill could exfiltrate credentials or inject prompts.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:SKILL_INSTALLED AND openclaw_detect.shadow_ai:true",
+          "time_window": "5m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "0m"
+        },
+        "frequency": "30s",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "🔌 UNAUTHORIZED SKILL: Shadow AI detected by openclaw-detect. Skill: {{skill.name}} ({{skill.version}}). Author: {{skill.author}}. User: {{user_id}}. Host: {{host}}. ACTIVATE IRP-003 SUPPLY CHAIN COMPROMISE.",
+            "dedup_key": "shadow-ai-{{skill.name}}-{{host}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 🔌 *SHADOW AI DETECTED*\n*Skill Name:* {{skill.name}}\n*Version:* {{skill.version}}\n*Author:* {{skill.author}}\n*Publisher:* {{skill.publisher}}\n*Signature Valid:* {{skill.signature_valid}}\n*Installed By:* {{user_id}}\n*Host:* {{host}}\n*Installation Method:* {{installation_method}}\n\n*THREAT:* Unsigned/unauthorized skills bypass supply chain controls. May contain: backdoors, credential theft, prompt injection, data exfiltration.\n\n*AUTO-ACTION:* Skill quarantined. Activate IRP-003. Run skill_manifest.py --verify."
+          },
+          {
+            "type": "auto_remediation",
+            "action": "quarantine_skill",
+            "params": {
+              "skill_name": "{{skill.name}}",
+              "host": "{{host}}",
+              "preserve_evidence": true
+            }
+          }
+        ],
+        "related_playbooks": ["IRP-003 (Malicious Skill Deployment)", "skill_integrity_monitor.sh", "SEC-003 (Supply Chain Security)"],
+        "compliance": ["SOC 2 CC8.1 (Change Management)", "ISO 27001 A.12.1.2 (Change Management)", "NIST 800-53 CM-3"]
+      },
+      {
+        "id": "critical-006",
+        "name": "Impossible Travel (Credential Compromise)",
+        "severity": "P0-Critical",
+        "description": "User accessed system from two geographic locations >500km apart within 1 hour. Physically impossible travel indicates stolen credentials or session hijacking.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:(LOGIN_SUCCESS OR ACCESS_GRANTED)",
+          "time_window": "1h",
+          "group_by": "user_id.keyword",
+          "aggregations": {
+            "geo_distance": {
+              "field": "geo.location",
+              "threshold_km": 500
+            }
+          }
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 500,
+          "evaluation_delay": "5m"
+        },
+        "frequency": "5m",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "🌍 IMPOSSIBLE TRAVEL: User {{user_id}} accessed from {{location1}} at {{time1}}, then {{location2}} at {{time2}} ({{distance_km}}km in {{time_diff_minutes}} minutes). CREDENTIAL COMPROMISE CONFIRMED.",
+            "dedup_key": "impossible-travel-{{user_id}}-{{date}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 🌍 *IMPOSSIBLE TRAVEL DETECTED*\n*User:* {{user_id}}\n*Location 1:* {{location1}} at {{time1}} UTC\n*Location 2:* {{location2}} at {{time2}} UTC\n*Distance:* {{distance_km}} km\n*Time Difference:* {{time_diff_minutes}} minutes\n*Source IPs:* {{ip1}}, {{ip2}}\n\n*CONFIRMED COMPROMISE:* Physical travel impossible. Stolen credentials or session.\n\n*AUTO-ACTIONS:* 1) Force password reset, 2) Invalidate all sessions, 3) Notify user via alternate channel, 4) Activate IRP-001"
+          },
+          {
+            "type": "auto_remediation",
+            "action": "force_password_reset",
+            "params": {
+              "user_id": "{{user_id}}",
+              "reason": "Impossible travel detected - credential compromise",
+              "invalidate_sessions": true,
+              "require_mfa_re_enrollment": true,
+              "notify_user": true
+            }
+          }
+        ],
+        "related_playbooks": ["IRP-001 (Credential Theft)", "dashboard-user-activity.json Panel 6 (Geographic Anomalies)"],
+        "compliance": ["SOC 2 CC6.1 (Logical Access)", "ISO 27001 A.9.4.2 (Secure Logon)"],
+        "false_positive_handling": "VPN usage may trigger false positives. Whitelist corporate VPN exit IPs. Legitimate international travel should be pre-registered in system."
+      },
+      {
+        "id": "critical-007",
+        "name": "Ransomware / Mass File Encryption Detected",
+        "severity": "P0-Critical",
+        "description": "Abnormal file encryption activity. >100 files encrypted in 5 minutes with suspicious extensions (.encrypted, .locked, .enc). Ransomware indicator.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:FILE_MODIFIED AND file.extension:(.encrypted OR .locked OR .enc OR .crypt OR .ransom) AND @timestamp:[now-5m TO now]",
+          "time_window": "5m",
+          "group_by": "host.keyword"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 100,
+          "evaluation_delay": "0m"
+        },
+        "frequency": "30s",
+        "actions": [
+          {
+            "type": "pagerduty",
+            "severity": "critical",
+            "message": "🦠 RANSOMWARE DETECTED: {{count}} files encrypted on {{host}} in 5 minutes. User: {{user_id}}. Process: {{process.name}}. ISOLATE SYSTEM IMMEDIATELY. Activate IRP-007 DoS + forensics.",
+            "dedup_key": "ransomware-{{host}}-{{date}}"
+          },
+          {
+            "type": "slack",
+            "message": "@channel 🦠 *RANSOMWARE ALERT*\n*Host:* {{host}}\n*Files Encrypted:* {{count}} in 5 minutes\n*User:* {{user_id}}\n*Process:* {{process.name}} (PID {{process.pid}})\n*File Extensions:* {{file_extensions}}\n*Directories Affected:* {{affected_directories}}\n\n*CONTAINMENT ACTIONS (AUTOMATIC):*\n1. Network isolation initiated\n2. Process {{process.pid}} terminated\n3. Snapshots preserved\n4. Forensic evidence collected\n\n*MANUAL ACTIONS REQUIRED:*\n1. Do NOT pay ransom\n2. Activate IRP-007 (DoS) + forensics-collector.py\n3. Restore from backup-verification.py (RTO 4h)\n4. Notify Legal/PR if data exfiltration suspected"
+          },
+          {
+            "type": "auto_remediation",
+            "action": "isolate_host",
+            "params": {
+              "host": "{{host}}",
+              "method": "network_quarantine",
+              "terminate_process": "{{process.pid}}",
+              "snapshot_filesystems": true,
+              "preserve_memory": true
+            }
+          }
+        ],
+        "related_playbooks": ["IRP-007 (Denial of Service)", "backup-verification.py (Restore)", "forensics-collector.py"],
+        "compliance": ["ISO 27001 A.16.1.5 (Response to Information Security Incidents)", "SOC 2 CC7.3 (System Recovery)"],
+        "escalation": {
+          "notify_immediately": ["CISO", "Legal", "PR", "CEO"],
+          "external_notification": "Law enforcement (FBI IC3) if ransom demanded"
+        }
+      }
+    ],
+    "testing": {
+      "schedule": "Monthly drills for P0 alerts",
+      "test_scenarios": [
+        {
+          "alert": "critical-001",
+          "test": "Create synthetic P0 incident in test environment",
+          "expected": "PagerDuty page within 30 seconds, Slack notification, war room created"
+        },
+        {
+          "alert": "critical-002",
+          "test": "Simulate 5 failed logins for test user",
+          "expected": "Account locked, PagerDuty alert, Slack notification with IP"
+        },
+        {
+          "alert": "critical-006",
+          "test": "Login from US, then Europe within 30 minutes (VPN rotation)",
+          "expected": "Impossible travel alert, forced password reset, sessions invalidated"
+        }
+      ]
+    },
+    "sla": {
+      "P0_acknowledgment": "5 minutes",
+      "P0_containment": "15 minutes",
+      "P0_resolution": "30 minutes (or escalate to P1 for extended investigation)",
+      "escalation_if_no_ack": "Ladder: On-call engineer (0-5min) → Lead (5-10min) → CISO (10-15min) → CEO (15min+)"
+    }
+  }
+}

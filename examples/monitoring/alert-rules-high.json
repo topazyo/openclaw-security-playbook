@@ -1,0 +1,255 @@
+{
+  "alert_rules": {
+    "category": "High Severity (P2)",
+    "description": "Urgent response required within 8 hours (P2 SLA). Slack notifications to #security-alerts. Escalate to PagerDuty if unaddressed within 4 hours. Requires investigation and remediation.",
+    "notification_channels": {
+      "slack": {
+        "webhook_url": "${SLACK_WEBHOOK_SECURITY_ALERTS}",
+        "channel": "#security-alerts",
+        "username": "OpenClaw Security",
+        "icon_emoji": ":warning:"
+      },
+      "pagerduty": {
+        "service_key": "${PAGERDUTY_SERVICE_KEY}",
+        "urgency": "low",
+        "auto_resolve": true,
+        "escalation_delay": "4h"
+      }
+    },
+    "rules": [
+      {
+        "id": "high-001",
+        "name": "P1 Security Incident Detected",
+        "severity": "P2-High",
+        "description": "Active P1 (High severity) incident requiring response within 1 hour. Examples: policy violations, unsuccessful attack attempts, configuration drift.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:INCIDENT_CREATED AND incident.severity:\"P1-High\" AND incident.status:\"active\"",
+          "time_window": "5m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "1m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "⚠️ *P1 HIGH SEVERITY INCIDENT*\n*ID:* {{incident.id}}\n*Type:* {{incident.type}}\n*Title:* {{incident.title}}\n*Affected:* {{incident.affected_resources}}\n*Assigned To:* {{incident.assigned_to}}\n*SLA:* Resolve within 1 hour\n*Playbook:* {{incident.playbook_link}}\n\nRespond in thread with investigation notes."
+          }
+        ],
+        "related_playbooks": ["All IRP playbooks"],
+        "escalation": {
+          "if_no_ack_within": "15m",
+          "notify": "Security team lead"
+        }
+      },
+      {
+        "id": "high-002",
+        "name": "Behavioral Anomaly Detected (Risk Score >0.8)",
+        "severity": "P2-High",
+        "description": "openclaw-telemetry ML model detected unusual user behavior with risk score >0.8. Possible compromised account, insider threat, or policy violation.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "openclaw.telemetry.anomaly_detected:true AND openclaw.telemetry.risk_score:>0.8",
+          "time_window": "10m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "5m"
+        },
+        "frequency": "5m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "🤖 *BEHAVIORAL ANOMALY (ML Detection)*\n*User:* {{user_id}}\n*Risk Score:* {{openclaw.telemetry.risk_score}}/100\n*Anomaly Score:* {{openclaw.telemetry.anomaly_score}}\n*Anomaly Type:* {{openclaw.telemetry.anomaly_type}}\n*Reason:* {{openclaw.telemetry.anomaly_reason}}\n*Recent Activity:* {{recent_actions}}\n\n*INVESTIGATION:* Review dashboard-anomaly-detection.json Panel 4 (Risk Scores) and Panel 5 (Timeline). Correlate with dashboard-user-activity.json. If confirmed malicious, activate IRP-001.\n\n*Model Context:* Baseline trained on {{openclaw_telemetry_training_samples}} samples. Confidence: {{openclaw_telemetry_model_confidence}}%."
+          }
+        ],
+        "related_playbooks": ["dashboard-anomaly-detection.json", "IRP-001 (if credential compromise)", "openclaw-telemetry integration docs"],
+        "compliance": ["SOC 2 CC7.2 (System Monitoring)", "ISO 27001 A.12.4.1 (Event Logging)"],
+        "false_positive_handling": "New users (<30 days tenure) may trigger false positives due to insufficient baseline. Validate via manager. Mark false positives in Elasticsearch with false_positive:true to improve model."
+      },
+      {
+        "id": "high-003",
+        "name": "Policy Violation (openclaw-shield Block)",
+        "severity": "P2-High",
+        "description": "openclaw-shield blocked action due to policy violation. Examples: unauthorized skill execution, restricted data access, prompt injection attempt.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:POLICY_VIOLATION AND openclaw_shield.action:\"block\"",
+          "time_window": "10m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "2m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "🛡️ *POLICY VIOLATION BLOCKED*\n*User:* {{user_id}}\n*Policy:* {{openclaw_shield.policy_name}}\n*Action Attempted:* {{openclaw_shield.blocked_action}}\n*Resource:* {{resource}}\n*Violation Type:* {{openclaw_shield.violation_type}}\n*Block Reason:* {{openclaw_shield.block_reason}}\n*Timestamp:* {{@timestamp}}\n\n*REVIEW:* Determine if legitimate need (policy exception required) or malicious intent. If repeated violations (>5 in 1h), escalate to security team for account review.\n\n*Policy Definition:* {{openclaw_shield.policy_definition_link}}"
+          }
+        ],
+        "related_playbooks": ["SEC-003 (skill-policies/enforcement-policy.json)", "openclaw-shield configuration"],
+        "compliance": ["SOC 2 CC6.6 (Logical Access Restrictions)", "ISO 27001 A.9.2.3 (Management of Privileged Access Rights)"],
+        "aggregation": "If same user triggers >5 violations in 1 hour, create P1 incident for potential abuse"
+      },
+      {
+        "id": "high-004",
+        "name": "Rate Limit Violations (Potential Attack)",
+        "severity": "P2-High",
+        "description": "Rate limit exceeded >10 times in 5 minutes for same user/IP. Possible: DoS attempt, bot activity, compromised API key, or misconfigured client.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:RATE_LIMIT_EXCEEDED",
+          "time_window": "5m",
+          "group_by": "source_ip.keyword"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 10,
+          "evaluation_delay": "1m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "⏱️ *EXCESSIVE RATE LIMIT VIOLATIONS*\n*Source IP:* {{source_ip}} ({{geo.country}})\n*Violations:* {{count}} in 5 minutes\n*User/API Key:* {{user_id}}\n*Endpoint:* {{http.request.uri}}\n*Rate Limit:* {{rate_limit.limit}} requests per {{rate_limit.window}}\n\n*POSSIBLE CAUSES:*\n- DoS attack (activate IRP-007 if sustained)\n- Bot/scraper activity\n- Compromised API key (rotate if confirmed)\n- Misconfigured client (check retry logic)\n\n*RECOMMENDATION:* Temporarily block {{source_ip}} if external. Review rate-limiting.py configuration."
+          }
+        ],
+        "related_playbooks": ["IRP-007 (Denial of Service)", "rate-limiting.py", "SEC-002 (rate limit policy)"],
+        "auto_remediation": {
+          "enabled": true,
+          "action": "temporary_ip_block",
+          "duration": "1h",
+          "condition": "IF count > 50 AND source_ip NOT IN internal_ips"
+        }
+      },
+      {
+        "id": "high-005",
+        "name": "Unauthorized Configuration Change",
+        "severity": "P2-High",
+        "description": "Security-sensitive configuration modified without change request. Examples: IAM role creation, security group rule 0.0.0.0/0, firewall disable, MFA requirement removal.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:CONFIG_CHANGE AND (resource_type:(iam_role OR security_group OR firewall OR mfa_policy)) AND (metadata.cidr:\"0.0.0.0/0\" OR action:\"disable\" OR action:\"delete\")",
+          "time_window": "10m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "2m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "⚙️ *UNAUTHORIZED CONFIG CHANGE*\n*Resource Type:* {{resource_type}}\n*Resource ID:* {{resource_id}}\n*Action:* {{action}}\n*Changed By:* {{user_id}} ({{metadata.role}})\n*Change Details:* {{change_summary}}\n*Timestamp:* {{@timestamp}}\n*Change Request ID:* {{change_request_id}} (❌ NOT FOUND if unauthorized)\n\n*SECURITY IMPACT:*\n{{#if metadata.cidr}}🚨 CIDR 0.0.0.0/0 detected - PUBLICLY ACCESSIBLE{{/if}}\n{{#if action == \"disable\"}}🚨 Security control DISABLED{{/if}}\n{{#if resource_type == \"mfa_policy\"}}🚨 MFA requirement removed - credentials at risk{{/if}}\n\n*ACTION:* Verify with {{user_id}}. If unauthorized, revert immediately and activate IRP-001 (possible compromised admin account)."
+          }
+        ],
+        "related_playbooks": ["SEC-005 (Change Management)", "IRP-001 (if admin compromise)", "configuration baseline docs"],
+        "compliance": ["SOC 2 CC8.1 (Change Management)", "ISO 27001 A.12.1.2 (Change Management)", "NIST 800-53 CM-3"],
+        "auto_remediation": {
+          "enabled": false,
+          "reason": "Manual verification required to avoid disrupting legitimate emergency changes. Revert via change-control process within 4 hours."
+        }
+      },
+      {
+        "id": "high-006",
+        "name": "Privilege Escalation Without Approval",
+        "severity": "P2-High",
+        "description": "User role changed to admin or agent_operator without documented CISO approval. Violates SEC-002 least privilege principle.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:PERMISSION_ESCALATION AND metadata.new_role:(\"admin\" OR \"agent_operator\") AND NOT metadata.approval_ticket:*",
+          "time_window": "10m"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "2m"
+        },
+        "frequency": "1m",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "🔐 *UNAUTHORIZED PRIVILEGE ESCALATION*\n*User:* {{user_id}}\n*Old Role:* {{metadata.old_role}}\n*New Role:* {{metadata.new_role}}\n*Granted By:* {{metadata.changed_by}}\n*Approval Ticket:* ❌ NOT FOUND\n*Timestamp:* {{@timestamp}}\n*Justification:* {{metadata.justification}}\n\n*POLICY VIOLATION:* SEC-002 requires CISO approval for admin role grants. Approval ticket must be documented.\n\n*ACTION:* Contact {{metadata.changed_by}} for approval documentation. If none provided within 1 hour, revoke permissions and document in quarterly access review."
+          }
+        ],
+        "related_playbooks": ["SEC-002 (Access Control)", "dashboard-user-activity.json Panel 4 (Privilege Escalations)", "dashboard-access-reviews.json Panel 6 (Permission Changes)"],
+        "compliance": ["SOC 2 CC6.2 (Prior to Access)", "ISO 27001 A.9.2.2 (User Access Provisioning)"]
+      },
+      {
+        "id": "high-007",
+        "name": "Vulnerable Dependency Detected (HIGH severity)",
+        "severity": "P2-High",
+        "description": "vulnerability-scanning.py found HIGH or CRITICAL severity CVE in production dependency. Patch SLA: HIGH 30 days, CRITICAL 7 days per SEC-003.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:VULNERABILITY_DETECTED AND vulnerability.severity:(\"HIGH\" OR \"CRITICAL\") AND environment:\"production\"",
+          "time_window": "1h"
+        },
+        "condition": {
+          "operator": "above",
+          "threshold": 0,
+          "evaluation_delay": "10m"
+        },
+        "frequency": "1h",
+        "actions": [
+          {
+            "type": "slack",
+            "message": "🔍 *HIGH SEVERITY VULNERABILITY*\n*CVE:* {{vulnerability.cve_id}}\n*Severity:* {{vulnerability.severity}} (CVSS {{vulnerability.cvss_score}})\n*Package:* {{vulnerability.package_name}}@{{vulnerability.package_version}}\n*Fixed In:* {{vulnerability.fixed_version}}\n*Service:* {{service}}\n*Environment:* {{environment}}\n\n*IMPACT:* {{vulnerability.description}}\n*Exploit Available:* {{vulnerability.exploit_available}}\n*EPSS Score:* {{vulnerability.epss_score}} (exploitability probability)\n\n*REMEDIATION:*\n1. Review vulnerability-scanning.py output\n2. Update to {{vulnerability.fixed_version}}\n3. Test in staging\n4. Deploy to production\n5. Verify with re-scan\n\n*SLA:* {{vulnerability.patch_deadline}} ({{vulnerability.days_remaining}} days remaining)"
+          }
+        ],
+        "related_playbooks": ["vulnerability-scanning.py", "SEC-003 (patch SLA policy)", "create-tickets.py (Jira automation)"],
+        "compliance": ["SOC 2 CC7.1 (Risk Mitigation)", "ISO 27001 A.12.6.1 (Technical Vulnerabilities)", "PCI DSS 6.2 (Security Patches)"],
+        "auto_remediation": {
+          "enabled": true,
+          "action": "create_jira_ticket",
+          "priority_mapping": {
+            "CRITICAL": "P1",
+            "HIGH": "P2"
+          }
+        }
+      }
+    ],
+    "aggregation_rules": [
+      {
+        "name": "Repeated Policy Violations - Single User",
+        "condition": "IF event_type:POLICY_VIOLATION AND user_id:X COUNT > 5 IN 1h",
+        "action": "Escalate to P1 incident - Potential malicious insider or compromised account",
+        "create_incident": {
+          "severity": "P1-High",
+          "title": "Repeated policy violations by {{user_id}}",
+          "playbook": "IRP-001"
+        }
+      },
+      {
+        "name": "Multiple Rate Limit Violations - Distributed",
+        "condition": "IF event_type:RATE_LIMIT_EXCEEDED UNIQUE_IPS > 20 IN 5m",
+        "action": "Escalate to P0 - Distributed DoS attack",
+        "create_incident": {
+          "severity": "P0-Critical",
+          "title": "DDoS attack detected - {{unique_ips}} source IPs",
+          "playbook": "IRP-007"
+        }
+      }
+    ],
+    "sla": {
+      "P2_acknowledgment": "1 hour",
+      "P2_investigation": "4 hours",
+      "P2_resolution": "8 hours",
+      "escalation": "If unresolved after 4 hours, escalate to PagerDuty low-urgency"
+    }
+  }
+}

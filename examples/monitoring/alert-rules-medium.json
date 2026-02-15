@@ -1,0 +1,265 @@
+{
+  "alert_rules": {
+    "category": "Medium Severity (P3)",
+    "description": "Non-urgent issues requiring resolution within 72 hours (P3 SLA). Email notifications and daily/weekly digests. No immediate action required, but track for trends and compliance.",
+    "notification_channels": {
+      "email": {
+        "smtp_server": "${SMTP_SERVER}",
+        "from": "security-alerts@openclaw.ai",
+        "to": ["security-team@openclaw.ai"],
+        "subject_prefix": "[P3 Security]"
+      },
+      "slack": {
+        "webhook_url": "${SLACK_WEBHOOK_SECURITY_NOTIFICATIONS}",
+        "channel": "#security-notifications",
+        "username": "OpenClaw Security Bot",
+        "icon_emoji": ":information_source:"
+      }
+    },
+    "rules": [
+      {
+        "id": "medium-001",
+        "name": "P2/P3 Incident Daily Digest",
+        "severity": "P3-Medium",
+        "description": "Daily summary of P2 and P3 incidents for security team review. Sent at 9 AM UTC with previous 24 hours activity.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:INCIDENT_CREATED AND incident.severity:(\"P2-Medium\" OR \"P3-Low\") AND @timestamp:[now-24h TO now]",
+          "time_window": "24h"
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 9 * * *",
+          "timezone": "UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "subject": "Daily Incident Digest - {{date}}",
+            "body_template": "# Security Incident Daily Digest\n**Date:** {{date}}\n**Report Period:** Last 24 hours\n\n## Summary\n- **Total Incidents:** {{total_count}}\n- **P2 (Medium):** {{p2_count}}\n- **P3 (Low):** {{p3_count}}\n\n## P2 Incidents Requiring Attention\n{{#each p2_incidents}}\n- **{{id}}:** {{title}} ({{type}}) - Assigned: {{assigned_to}} - SLA: {{hours_until_due}}h remaining\n{{/each}}\n\n## P3 Incidents\n{{#each p3_incidents}}\n- **{{id}}:** {{title}} ({{type}}) - Status: {{status}}\n{{/each}}\n\n## Actions Required\n{{#if overdue_incidents}}\n⚠️ **{{overdue_count}} incidents past SLA** - Review immediately\n{{/if}}\n\n[View Full Dashboard]({{dashboard_link}})\n\n---\nAutomated report from OpenClaw Security Monitoring"
+          }
+        ],
+        "related_playbooks": ["dashboard-incident-response.json", "All IRP playbooks"]
+      },
+      {
+        "id": "medium-002",
+        "name": "Non-Security Configuration Changes",
+        "severity": "P3-Medium",
+        "description": "Daily summary of non-security configuration changes for change management audit trail. Tracks deployments, feature flags, application config.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "event_type:CONFIG_CHANGE AND NOT resource_type:(iam_role OR security_group OR firewall OR mfa_policy) AND @timestamp:[now-24h TO now]",
+          "time_window": "24h"
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 17 * * *",
+          "timezone": "UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "subject": "Configuration Changes - {{date}}",
+            "body_template": "# Configuration Change Summary\n**Date:** {{date}}\n**Total Changes:** {{total_count}}\n\n## Changes by Type\n{{#each change_types}}\n- **{{type}}:** {{count}} changes\n{{/each}}\n\n## Changes by Service\n{{#each services}}\n- **{{service}}:** {{count}} changes\n{{/each}}\n\n## Detailed Changes\n{{#each changes}}\n**{{timestamp}}** - {{service}}\n- **Resource:** {{resource_id}}\n- **Type:** {{resource_type}}\n- **Action:** {{action}}\n- **Changed By:** {{user_id}}\n- **Change Request:** {{change_request_id}}\n- **Summary:** {{change_summary}}\n\n{{/each}}\n\n[View Change Management Dashboard]({{dashboard_link}})\n\n---\nCompliance Evidence: SOC 2 CC8.1, ISO 27001 A.12.1.2"
+          }
+        ],
+        "compliance": ["SOC 2 CC8.1 (Change Management)", "ISO 27001 A.12.1.2 (Change Management)"],
+        "retention": "Retain emails for 7 years per SOC 2 CC7.2 audit trail requirement"
+      },
+      {
+        "id": "medium-003",
+        "name": "Security Training Overdue",
+        "severity": "P3-Medium",
+        "description": "Weekly reminder for users with security training >365 days old. SOC 2 CC1.4 requires annual training. Escalates to manager if >30 days overdue.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "metadata.training_last_completed:<now-365d",
+          "aggregations": {
+            "terms": {
+              "field": "user_id.keyword",
+              "size": 1000
+            }
+          }
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 10 * * 1",
+          "timezone": "UTC",
+          "description": "Every Monday at 10 AM UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "recipients": "{{user_email}}",
+            "cc": "{{manager_email}}",
+            "subject": "Action Required: Annual Security Training Overdue",
+            "body_template": "Hi {{user_name}},\n\nOur records show your last security training was completed on **{{training_last_completed}}**, which is **{{days_overdue}} days ago**.\n\n**SOC 2 Compliance Requirement:** All employees must complete annual security training per policy SEC-002.\n\n**Action Required:**\n1. Complete the security awareness training at: {{training_portal_link}}\n2. Estimated time: 45 minutes\n3. Deadline: {{deadline}}\n\n**Training Modules:**\n- Password security and MFA\n- Phishing recognition\n- Data classification and handling\n- Incident reporting\n- AI agent security (OpenClaw-specific)\n\n**Consequences of Non-Completion:**\n- After {{deadline}}: Access to non-critical systems may be restricted\n- After 30 additional days: Manager escalation and access suspension\n\nQuestions? Contact security-team@openclaw.ai\n\nThank you,\nOpenClaw Security Team"
+          },
+          {
+            "type": "slack",
+            "channel": "#security-notifications",
+            "message": "📚 *Training Overdue Report*\n**Week of {{week_start}}:**\n- Users with overdue training: {{overdue_count}}\n- By department: {{department_breakdown}}\n- >30 days overdue (requires escalation): {{critical_overdue_count}}\n\n[View Training Dashboard]({{training_dashboard_link}})"
+          }
+        ],
+        "escalation": {
+          "if_overdue_30_days": "Email manager and CISO",
+          "if_overdue_60_days": "Suspend non-critical access, final warning",
+          "if_overdue_90_days": "Suspend all access pending training completion"
+        },
+        "compliance": ["SOC 2 CC1.4 (Security Awareness)", "ISO 27001 A.7.2.2 (Information Security Awareness)"]
+      },
+      {
+        "id": "medium-004",
+        "name": "Access Review Pending (Quarterly)",
+        "severity": "P3-Medium",
+        "description": "Weekly reminder for pending quarterly access reviews <30 days before deadline. Sent to department managers with user-role matrix for approval.",
+        "query": {
+          "datasource": "Elasticsearch",
+          "index": "openclaw-logs-*",
+          "query_string": "access_review.status:\"pending\" AND access_review.due_date:<now+30d",
+          "aggregations": {
+            "terms": {
+              "field": "metadata.department.keyword",
+              "size": 50
+            }
+          }
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 9 * * 1",
+          "timezone": "UTC",
+          "description": "Every Monday at 9 AM UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "recipients": "{{department_manager_email}}",
+            "cc": ["security-team@openclaw.ai", "CISO@openclaw.ai"],
+            "subject": "Action Required: Quarterly Access Review Due {{due_date}}",
+            "body_template": "Hi {{manager_name}},\n\n**Quarterly Access Review - {{quarter}} {{year}}**\n**Your Department:** {{department}}\n**Due Date:** {{due_date}} (**{{days_until_due}} days remaining**)\n\n**Users Pending Review:** {{pending_user_count}}\n\n**Action Required:**\n1. Review the attached user-role assignment matrix\n2. For each user, indicate:\n   - ✅ **APPROVE** - Access appropriate for current role\n   - ⚠️ **MODIFY** - Reduce permissions (specify changes)\n   - ❌ **REVOKE** - Remove access (user departed or role changed)\n3. Provide business justification for admin/elevated roles\n4. Return completed matrix to security-team@openclaw.ai by {{due_date}}\n\n**Compliance Requirement:**\nSOC 2 CC6.1 and ISO 27001 A.9.2.5 require quarterly access reviews with 100% completion per SEC-002.\n\n**Attachment:** user-role-matrix-{{department}}-{{quarter}}.csv\n\n**Direct Dashboard Link (requires authentication):**\n{{dashboard_access_reviews_link}}\n\nQuestions? Reply to this email or contact CISO.\n\nThank you,\nOpenClaw Security Team\n\n---\n**Review Schedule:**\n- Q1: January 15\n- Q2: April 15\n- Q3: July 15\n- Q4: October 15"
+          }
+        ],
+        "attachments": [
+          {
+            "type": "csv_export",
+            "query": "event_type:ROLE_CHANGE OR USER_CREATED AND metadata.department:{{department}}",
+            "filename": "user-role-matrix-{{department}}-{{quarter}}.csv",
+            "columns": ["user_id", "user_name", "role", "assigned_date", "assigned_by", "business_justification", "last_access_date"]
+          }
+        ],
+        "escalation": {
+          "if_no_response_7_days": "Email CISO and department head",
+          "if_no_response_14_days": "Auto-revoke all users pending review in that department (manual re-grant required)"
+        },
+        "compliance": ["SOC 2 CC6.1 (Logical Access)", "ISO 27001 A.9.2.5 (Review of Access Rights)"],
+        "related_playbooks": ["dashboard-access-reviews.json", "access-review.md procedure"]
+      },
+      {
+        "id": "medium-005",
+        "name": "Vulnerability Scan Weekly Summary",
+        "severity": "P3-Medium",
+        "description": "Weekly vulnerability scan results with HIGH and CRITICAL findings. Sent Friday 5 PM UTC for review and planning upcoming sprint patching priorities.",
+        "query": {
+          "datasource": "Prometheus",
+          "query_expr": "openclaw_vulnerabilities_total{severity=~\"HIGH|CRITICAL\"}",
+          "time_window": "7d"
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 17 * * 5",
+          "timezone": "UTC",
+          "description": "Every Friday at 5 PM UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "subject": "Weekly Vulnerability Summary - Week {{week_number}}",
+            "body_template": "# Weekly Vulnerability Report\n**Week:** {{week_start}} to {{week_end}}\n**Scanned Services:** {{scanned_services}}\n**Total Vulnerabilities:** {{total_vulns}}\n\n## Summary by Severity\n- 🔴 **CRITICAL:** {{critical_count}} (Patch SLA: 7 days)\n- 🟠 **HIGH:** {{high_count}} (Patch SLA: 30 days)\n- 🟡 **MEDIUM:** {{medium_count}} (Patch SLA: 90 days)\n- ⚪ **LOW:** {{low_count}} (No SLA)\n\n## Top 5 Critical Vulnerabilities\n{{#each critical_vulns}}\n**{{cve_id}}** - CVSS {{cvss_score}}\n- Package: {{package_name}}@{{package_version}}\n- Service: {{service}}\n- Fixed In: {{fixed_version}}\n- Exploit Available: {{exploit_available}}\n- EPSS: {{epss_score}}% (exploitability probability)\n- Age: {{days_since_detection}} days\n- Jira Ticket: {{jira_ticket}}\n\n{{/each}}\n\n## Patch Status\n- ✅ **Patched this week:** {{patched_count}}\n- ⏳ **In progress:** {{in_progress_count}}\n- 🚨 **Overdue (past SLA):** {{overdue_count}}\n\n## Services Needing Attention\n{{#each services_with_critical}}\n- **{{service}}:** {{critical_count}} CRITICAL, {{high_count}} HIGH\n{{/each}}\n\n## Actions Required\n{{#if overdue_count}}\n⚠️ **{{overdue_count}} vulnerabilities past patch SLA** - Immediate remediation required per SEC-003\n{{/if}}\n\n**Next Steps:**\n1. Review dashboard-system-health.json Panel 10 (Vulnerability Scan Results)\n2. Prioritize CRITICAL vulns with exploit_available:true\n3. Test patches in staging\n4. Deploy to production per change management\n5. Verify with re-scan\n\n[View Vulnerability Dashboard]({{vulnerability_dashboard_link}})\n[View Jira Board]({{jira_board_link}})\n\n---\nCompliance: SOC 2 CC7.1, ISO 27001 A.12.6.1, PCI DSS 6.2"
+          }
+        ],
+        "attachments": [
+          {
+            "type": "csv_export",
+            "query": "vulnerability.severity:(CRITICAL OR HIGH)",
+            "filename": "vulnerabilities-{{week_number}}.csv"
+          }
+        ],
+        "compliance": ["SOC 2 CC7.1 (Risk Mitigation)", "ISO 27001 A.12.6.1 (Technical Vulnerabilities)", "PCI DSS 6.2"],
+        "related_playbooks": ["vulnerability-scanning.py", "patch-management.md", "dashboard-system-health.json Panel 10"]
+      },
+      {
+        "id": "medium-006",
+        "name": "Backup Verification Warnings",
+        "severity": "P3-Medium",
+        "description": "Weekly backup health report. Includes: success rate, failed backups, verification failures, restore test results, RTO/RPO compliance.",
+        "query": {
+          "datasource": "Prometheus",
+          "queries": [
+            {
+              "metric": "openclaw_backup_success_total",
+              "time_window": "7d"
+            },
+            {
+              "metric": "openclaw_backup_failure_total",
+              "time_window": "7d"
+            },
+            {
+              "metric": "openclaw_backup_verification_failures",
+              "time_window": "7d"
+            }
+          ]
+        },
+        "schedule": {
+          "type": "cron",
+          "expression": "0 8 * * 1",
+          "timezone": "UTC",
+          "description": "Every Monday at 8 AM UTC"
+        },
+        "actions": [
+          {
+            "type": "email",
+            "subject": "Backup Health Report - Week {{week_number}}",
+            "body_template": "# Backup Health Report\n**Week:** {{week_start}} to {{week_end}}\n**Report Generated:** {{timestamp}}\n\n## Summary\n- **Success Rate:** {{success_rate}}% (Target: >99%)\n- **Total Backups:** {{total_backups}}\n- **Failed Backups:** {{failed_backups}}\n- **Verification Failures:** {{verification_failures}}\n\n## Backup Status by Service\n{{#each services}}\n**{{service}}:**\n- Success Rate: {{success_rate}}%\n- Last Successful: {{last_successful_backup}}\n- Last Verification: {{last_verification}}\n- Size: {{backup_size_gb}} GB\n- Retention: {{retention_days}} days\n\n{{/each}}\n\n## Failed Backups (Require Attention)\n{{#if failed_backups}}\n{{#each failures}}\n**{{service}}** - {{timestamp}}\n- Error: {{error_message}}\n- Retry Attempts: {{retry_count}}\n- Jira Ticket: {{jira_ticket}}\n\n{{/each}}\n{{else}}\n✅ No failed backups this week\n{{/if}}\n\n## Disaster Recovery Metrics\n- **RTO (Recovery Time Objective):** Target <4h, Actual: {{actual_rto}}\n- **RPO (Recovery Point Objective):** Target <15min, Actual: {{actual_rpo}}\n- **Last DR Test:** {{last_dr_test}} (Quarterly requirement)\n- **Next DR Test:** {{next_dr_test}}\n\n## Actions Required\n{{#if success_rate < 99}}\n⚠️ **Backup success rate below 99%** - Violates SEC-004 RTO/RPO requirements. Investigate failures immediately.\n{{/if}}\n{{#if days_since_dr_test > 90}}\n⚠️ **Disaster recovery test overdue** - Quarterly DR drill required per SEC-004. Schedule within 7 days.\n{{/if}}\n\n[View Backup Dashboard]({{backup_dashboard_link}})\n\n---\nCompliance: SOC 2 CC7.3, ISO 27001 A.12.3.1, SEC-004"
+          }
+        ],
+        "escalation": {
+          "if_success_rate_below_95": "Page on-call SRE team",
+          "if_no_backup_24h": "Page CISO - critical data loss risk"
+        },
+        "compliance": ["SOC 2 CC7.3 (System Recovery)", "ISO 27001 A.12.3.1 (Backup)"],
+        "related_playbooks": ["backup-verification.py", "SEC-004 (Incident Response - RTO/RPO)", "disaster-recovery-plan.md"]
+      }
+    ],
+    "digest_schedules": {
+      "daily": {
+        "time": "09:00",
+        "timezone": "UTC",
+        "includes": ["Incidents P2/P3", "Configuration changes", "Policy violations <10"],
+        "recipients": ["security-team@openclaw.ai"]
+      },
+      "weekly": {
+        "day": "Monday",
+        "time": "08:00",
+        "timezone": "UTC",
+        "includes": ["Training overdue", "Access reviews pending", "Vulnerability summary", "Backup health"],
+        "recipients": ["security-team@openclaw.ai", "ops-team@openclaw.ai", "CISO@openclaw.ai"]
+      },
+      "monthly": {
+        "day": 1,
+        "time": "09:00",
+        "timezone": "UTC",
+        "includes": ["Executive KPIs", "Compliance status", "Major incidents summary", "Upcoming milestones"],
+        "recipients": ["CISO@openclaw.ai", "CEO@openclaw.ai", "board@openclaw.ai"]
+      }
+    },
+    "sla": {
+      "P3_acknowledgment": "24 hours",
+      "P3_investigation": "72 hours",
+      "P3_resolution": "72 hours (3 business days)",
+      "escalation": "If unresolved after 5 days, escalate to security team lead for prioritization"
+    }
+  }
+}

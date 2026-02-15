@@ -1,0 +1,1304 @@
+{
+  "dashboard": {
+    "title": "OpenClaw Incident Response",
+    "description": "Real-time incident response coordination and SLA tracking",
+    "version": "8.12.0",
+    "author": "OpenClaw IR Team",
+    "created": "2026-02-14T00:00:00Z",
+    "tags": ["incident-response", "soc", "sla", "p0", "p1"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Incidents by Severity",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:(\"active\" OR \"investigating\" OR \"contained\") AND incident.severity:\"P0-Critical\"",
+            "alias": "P0 - Critical",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:(\"active\" OR \"investigating\" OR \"contained\") AND incident.severity:\"P1-High\"",
+            "alias": "P1 - High",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:(\"active\" OR \"investigating\" OR \"contained\") AND incident.severity:\"P2-Medium\"",
+            "alias": "P2 - Medium",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:(\"active\" OR \"investigating\" OR \"contained\") AND incident.severity:\"P3-Low\"",
+            "alias": "P3 - Low",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P0 - Critical"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "dark-red",
+                    "mode": "fixed"
+                  }
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "dark-red",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P1 - High"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P2 - Medium"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "yellow",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P3 - Low"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "blue",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "horizontal"
+        },
+        "alert": {
+          "name": "P0 Incident Active",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["P0 - Critical", "1m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "30s",
+          "handler": 1,
+          "message": "🚨 P0-CRITICAL INCIDENT ACTIVE 🚨\\nSLA: 15-30min response time. Activate war room immediately.",
+          "noDataState": "no_data",
+          "notifications": [
+            {
+              "uid": "pagerduty-p0-critical"
+            },
+            {
+              "uid": "slack-security-alerts"
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Response Time vs SLA",
+        "type": "bargauge",
+        "gridPos": {
+          "x": 0,
+          "y": 6,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.severity:\"P0-Critical\" AND incident.status:\"closed\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "avg",
+                "field": "incident.response_time_minutes"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "incident.severity.keyword",
+                "settings": {
+                  "size": 4,
+                  "order": "desc"
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "P0-Critical": "P0 (Target: 15min)",
+                "P1-High": "P1 (Target: 60min)",
+                "P2-Medium": "P2 (Target: 8h)",
+                "P3-Low": "P3 (Target: 72h)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "m",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 15
+                },
+                {
+                  "color": "red",
+                  "value": 30
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P0 (Target: 15min)"
+              },
+              "properties": [
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 15
+                      },
+                      {
+                        "color": "red",
+                        "value": 30
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P1 (Target: 60min)"
+              },
+              "properties": [
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 60
+                      },
+                      {
+                        "color": "red",
+                        "value": 120
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P2 (Target: 8h)"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "h"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 8
+                      },
+                      {
+                        "color": "red",
+                        "value": 12
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P3 (Target: 72h)"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "h"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 72
+                      },
+                      {
+                        "color": "red",
+                        "value": 96
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        },
+        "description": "Average response time per severity vs SLA target (SEC-004 Incident Response Policy)"
+      },
+      {
+        "id": 3,
+        "title": "Containment Status Funnel",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 6,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"detected\"",
+            "alias": "1. Detected",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "1h"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"contained\"",
+            "alias": "2. Contained",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "1h"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"eradicated\"",
+            "alias": "3. Eradicated",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "1h"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"recovered\"",
+            "alias": "4. Recovered",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "1h"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"closed\"",
+            "alias": "5. Closed (PIR Complete)",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "1h"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "display": true,
+            "placement": "bottom",
+            "calcs": ["sum"]
+          }
+        },
+        "description": "5-phase incident response methodology (Detection → Containment → Eradication → Recovery → Closed)"
+      },
+      {
+        "id": 4,
+        "title": "incidents (Last 7 Days)",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 14,
+          "w": 24,
+          "h": 10
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.created:true",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "raw_document"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "_id": true,
+                "_index": true,
+                "_score": true
+              },
+              "indexByName": {
+                "incident.id": 0,
+                "incident.severity": 1,
+                "incident.type": 2,
+                "incident.status": 3,
+                "incident.detected_at": 4,
+                "incident.response_time_minutes": 5,
+                "incident.playbook": 6,
+                "incident.affected_resources": 7,
+                "incident.assigned_to": 8
+              },
+              "renameByName": {
+                "incident.id": "Incident ID",
+                "incident.severity": "Severity",
+                "incident.type": "Type",
+                "incident.status": "Status",
+                "incident.detected_at": "Detected At",
+                "incident.response_time_minutes": "Response Time",
+                "incident.playbook": "Playbook",
+                "incident.affected_resources": "Affected Resources",
+                "incident.assigned_to": "Assigned To"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "Detected At",
+                  "desc": true
+                },
+                {
+                  "field": "Severity",
+                  "desc": false
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Incident ID"
+              },
+              "properties": [
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "View in Jira",
+                      "url": "https://openclaw.atlassian.net/browse/${__value.raw}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Severity"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "value": "P0-Critical",
+                      "text": "🔴 P0 - Critical",
+                      "color": "dark-red"
+                    },
+                    {
+                      "type": "value",
+                      "value": "P1-High",
+                      "text": "🟠 P1 - High",
+                      "color": "red"
+                    },
+                    {
+                      "type": "value",
+                      "value": "P2-Medium",
+                      "text": "🟡 P2 - Medium",
+                      "color": "yellow"
+                    },
+                    {
+                      "type": "value",
+                      "value": "P3-Low",
+                      "text": "🟢 P3 - Low",
+                      "color": "green"
+                    }
+                  ]
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-text"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Status"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "value": "active",
+                      "text": "🔴 ACTIVE",
+                      "color": "red"
+                    },
+                    {
+                      "type": "value",
+                      "value": "investigating",
+                      "text": "🟠 Investigating",
+                      "color": "orange"
+                    },
+                    {
+                      "type": "value",
+                      "value": "contained",
+                      "text": "🟡 Contained",
+                      "color": "yellow"
+                    },
+                    {
+                      "type": "value",
+                      "value": "eradicated",
+                      "text": "🔵 Eradicated",
+                      "color": "blue"
+                    },
+                    {
+                      "type": "value",
+                      "value": "recovered",
+                      "text": "🟢 Recovered",
+                      "color": "green"
+                    },
+                    {
+                      "type": "value",
+                      "value": "closed",
+                      "text": "✅ Closed",
+                      "color": "light-green"
+                    }
+                  ]
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-text"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Detected At"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeFromNow"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Response Time"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "m"
+                },
+                {
+                  "id": "custom.align",
+                  "value": "right"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 60
+                      },
+                      {
+                        "color": "red",
+                        "value": 120
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Playbook"
+              },
+              "properties": [
+                {
+                  "id": "links",
+                  "value": [
+                    {
+                      "title": "Open Playbook",
+                      "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-${__value.raw}.md"
+                    }
+                  ]
+                },
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "value": "IRP-001",
+                      "text": "IRP-001 (Credential Theft)"
+                    },
+                    {
+                      "type": "value",
+                      "value": "IRP-002",
+                      "text": "IRP-002 (Prompt Injection)"
+                    },
+                    {
+                      "type": "value",
+                      "value": "IRP-003",
+                      "text": "IRP-003 (Skill Compromise)"
+                    },
+                    {
+                      "type": "value",
+                      "value": "IRP-004",
+                      "text": "IRP-004 (Data Breach)"
+                    },
+                    {
+                      "type": "value",
+                      "value": "IRP-007",
+                      "text": "IRP-007 (DoS/DDoS)"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": []
+        }
+      },
+      {
+        "id": 5,
+        "title": "Incident Trends (8 Weeks)",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.created:true",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "incident.type.keyword",
+                "settings": {
+                  "size": 10
+                }
+              },
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "1w"
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "always",
+              "pointSize": 5
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "display": true,
+            "placement": "bottom",
+            "calcs": ["sum", "mean"]
+          }
+        },
+        "description": "Weekly incident count by type (identify patterns and recurring issues)"
+      },
+      {
+        "id": 6,
+        "title": "Playbook Execution Checklist",
+        "type": "table",
+        "gridPos": {
+          "x": 12,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"active\" AND incident.playbook_step:*",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "incident.id.keyword",
+                "settings": {
+                  "size": 10
+                }
+              },
+              {
+                "type": "terms",
+                "field": "incident.playbook_step.keyword",
+                "settings": {
+                  "size": 20
+                }
+              },
+              {
+                "type": "terms",
+                "field": "incident.step_completed.keyword",
+                "settings": {
+                  "size": 2
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "incident.id": 0,
+                "incident.playbook_step": 1,
+                "incident.step_completed": 2
+              },
+              "renameByName": {
+                "incident.id": "Incident ID",
+                "incident.playbook_step": "Playbook Step",
+                "incident.step_completed": "Completed"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Completed"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "value": "true",
+                      "text": "✅"
+                    },
+                    {
+                      "type": "value",
+                      "value": "false",
+                      "text": "⏳"
+                    }
+                  ]
+                },
+                {
+                  "id": "custom.align",
+                  "value": "center"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Incident ID"
+            }
+          ]
+        },
+        "description": "Real-time playbook execution status for active incidents"
+      },
+      {
+        "id": 7,
+        "title": "Mean Time To Resolve (MTTR)",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 32,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"closed\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "avg",
+                "field": "incident.time_to_resolve_hours"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "decimals": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 24
+                },
+                {
+                  "color": "red",
+                  "value": 48
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["mean"]
+          }
+        },
+        "description": "Average time from incident detection to resolution (closed status with PIR complete)"
+      },
+      {
+        "id": 8,
+        "title": "SLA Compliance Rate",
+        "type": "gauge",
+        "gridPos": {
+          "x": 12,
+          "y": 32,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.sla_met:true",
+            "alias": "SLA Met",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.created:true",
+            "alias": "Total Incidents",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "SLA Met",
+              "operator": "/",
+              "right": "Total Incidents",
+              "replaceFields": true,
+              "alias": "SLA Compliance"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.85
+                },
+                {
+                  "color": "green",
+                  "value": 0.95
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true,
+          "text": {
+            "titleSize": 18,
+            "valueSize": 48
+          }
+        },
+        "description": "Percentage of incidents resolved within SLA targets (Target: >95%)"
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Incident Created",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "red",
+          "query": "incident.created:true",
+          "textField": "incident.id",
+          "tagsField": "incident.severity"
+        },
+        {
+          "name": "Incident Closed",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "green",
+          "query": "incident.status:\"closed\"",
+          "textField": "incident.id",
+          "tagsField": "incident.playbook"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "severity",
+          "type": "custom",
+          "label": "Severity",
+          "query": "All,P0-Critical,P1-High,P2-Medium,P3-Low",
+          "current": {
+            "value": "All",
+            "text": "All"
+          },
+          "multi": false,
+          "includeAll": false
+        },
+        {
+          "name": "incident_type",
+          "type": "query",
+          "label": "Incident Type",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"incident.type.keyword\", \"query\": \"*\"}",
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          },
+          "multi": true,
+          "includeAll": true
+        },
+        {
+          "name": "assigned_to",
+          "type": "query",
+          "label": "Assigned To",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"incident.assigned_to.keyword\", \"query\": \"*\"}",
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          },
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "IRP-001: Credential Theft",
+        "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-credential-theft.md",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "IRP-002: Prompt Injection",
+        "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-prompt-injection.md",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "IRP-003: Skill Compromise",
+        "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-skill-compromise.md",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "IRP-004: Data Breach",
+        "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-data-breach.md",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "IRP-007: DoS/DDoS",
+        "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-denial-of-service.md",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "PagerDuty Incidents",
+        "url": "https://openclaw.pagerduty.com/incidents",
+        "type": "link",
+        "icon": "external link"
+      },
+      {
+        "title": "Jira Security Board",
+        "url": "https://openclaw.atlassian.net/secure/RapidBoard.jspa?rapidView=123",
+        "type": "link",
+        "icon": "external link"
+      }
+    ]
+  },
+  "overwrite": true,
+  "message": "OpenClaw Incident Response Dashboard - Real-time IR coordination with SLA tracking",
+  "folderId": 0,
+  "folderUid": "incident-response",
+  "references": {
+    "playbooks": [
+      "examples/incident-response/playbook-credential-theft.md",
+      "examples/incident-response/playbook-prompt-injection.md",
+      "examples/incident-response/playbook-skill-compromise.md",
+      "examples/incident-response/playbook-data-breach.md",
+      "examples/incident-response/playbook-denial-of-service.md",
+      "examples/incident-response/reporting-template.md"
+    ],
+    "policies": [
+      "docs/policies/incident-response-policy.md"
+    ],
+    "procedures": [
+      "docs/procedures/incident-response-runbook.md"
+    ]
+  },
+  "usage": {
+    "audience": "SOC Team, Incident Commanders, Security Engineers, On-Call Responders",
+    "update_frequency": "Real-time (30-second refresh during active incidents)",
+    "alerting": "PagerDuty integration for P0/P1 incidents",
+    "war_room": "Shared screen in security war room during P0 incidents",
+    "sla": "99.99% dashboard availability (critical for incident response)"
+  },
+  "compliance": {
+    "soc2": "CC7.3 (Incident Response and Detection), CC7.4 (Incident Response Communication)",
+    "iso27001": "A.16.1.5 (Response to Information Security Incidents), A.16.1.6 (Learning from Information Security Incidents)",
+    "sla_targets": {
+      "p0": "15-30 minutes response time",
+      "p1": "1 hour response time",
+      "p2": "8 hours response time",
+      "p3": "72 hours response time"
+    }
+  }
+}

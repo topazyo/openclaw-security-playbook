@@ -1,0 +1,1268 @@
+{
+  "dashboard": {
+    "title": "OpenClaw Compliance Evidence",
+    "description": "SOC 2, ISO 27001, and GDPR compliance status dashboard for auditors",
+    "version": "8.12.0",
+    "author": "OpenClaw Compliance Team",
+    "created": "2026-02-14T00:00:00Z",
+    "tags": ["compliance", "audit", "soc2", "iso27001", "gdpr"],
+    "timezone": "UTC",
+    "refresh": "5m",
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "SOC 2 Control Status",
+        "type": "gauge",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 8,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"SOC2\" AND compliance.control_implemented:true",
+            "alias": "SOC 2 Implemented",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.7
+                },
+                {
+                  "color": "orange",
+                  "value": 0.9
+                },
+                {
+                  "color": "green",
+                  "value": 0.95
+                }
+              ]
+            },
+            "mappings": [],
+            "description": "Percentage of SOC 2 controls implemented (36 total controls across CC6, CC7)"
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true,
+          "text": {
+            "titleSize": 18,
+            "valueSize": 48
+          },
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["mean"]
+          }
+        },
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "reduceRow",
+              "reduce": {
+                "reducer": "sum"
+              },
+              "replaceFields": false,
+              "alias": "Implemented Count"
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "Implemented Count",
+              "operator": "/",
+              "right": "36",
+              "replaceFields": true,
+              "alias": "Implementation Percentage"
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "ISO 27001 Control Percentage",
+        "type": "piechart",
+        "gridPos": {
+          "x": 8,
+          "y": 0,
+          "w": 8,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"ISO27001\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "compliance.status.keyword",
+                "settings": {
+                  "size": 5,
+                  "order": "desc"
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Implemented"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "green",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "In Progress"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "yellow",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Not Started"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut",
+          "tooltip": {
+            "mode": "single"
+          },
+          "displayLabels": ["percent"]
+        },
+        "description": "ISO 27001:2022 implementation status (93 total controls across Annexure A)"
+      },
+      {
+        "id": 3,
+        "title": "GDPR Compliance Status",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 0,
+          "w": 8,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"GDPR\" AND compliance.article:32",
+            "alias": "Article 32 (Security)",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"GDPR\" AND compliance.article:33 AND compliance.within_72h:true",
+            "alias": "Article 33 (Breach Notification <72h)",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"GDPR\" AND compliance.article:30",
+            "alias": "Article 30 (Records of Processing)",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "value": "0",
+                "text": "✗ Not Compliant"
+              },
+              {
+                "type": "range",
+                "from": 1,
+                "to": 999999,
+                "text": "✓ Compliant"
+              }
+            ]
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "vertical"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Access Review Status (Quarterly)",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "event_type:\"access_review\" AND review_quarter:\"Q1-2026\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "department.keyword",
+                "settings": {
+                  "size": 20,
+                  "order": "desc"
+                }
+              },
+              {
+                "type": "terms",
+                "field": "review_status.keyword",
+                "settings": {
+                  "size": 5
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "department": 0,
+                "review_status": 1,
+                "Count": 2
+              },
+              "renameByName": {
+                "department": "Department",
+                "review_status": "Review Status",
+                "Count": "Users Reviewed"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Review Status"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "value": "completed",
+                      "text": "✓ Completed",
+                      "color": "green"
+                    },
+                    {
+                      "type": "value",
+                      "value": "in_progress",
+                      "text": "⏳ In Progress",
+                      "color": "yellow"
+                    },
+                    {
+                      "type": "value",
+                      "value": "overdue",
+                      "text": "✗ Overdue",
+                      "color": "red"
+                    }
+                  ]
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Department"
+            }
+          ]
+        },
+        "description": "Quarterly access review completion status per SEC-002 Access Control Policy"
+      },
+      {
+        "id": 5,
+        "title": "Training Completion Rates",
+        "type": "bargauge",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "event_type:\"training_completion\" AND training_type:\"security_awareness\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "department.keyword",
+                "settings": {
+                  "size": 15,
+                  "order": "desc"
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "Count",
+              "operator": "/",
+              "right": "department_headcount",
+              "replaceFields": true,
+              "alias": "Completion Rate"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.7
+                },
+                {
+                  "color": "green",
+                  "value": 0.9
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        },
+        "description": "Annual security awareness training completion by department (SOC 2 CC1.4 requirement)"
+      },
+      {
+        "id": 6,
+        "title": "Compliance Percentage Trend (Quarterly)",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"SOC2\" AND compliance.control_implemented:true",
+            "alias": "SOC 2",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "1M"
+                }
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"ISO27001\" AND compliance.control_implemented:true",
+            "alias": "ISO 27001",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "1M"
+                }
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.framework:\"GDPR\" AND compliance.requirement_met:true",
+            "alias": "GDPR",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "1M"
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "SOC 2",
+              "operator": "/",
+              "right": "36",
+              "replaceFields": false,
+              "alias": "SOC 2 %"
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "ISO 27001",
+              "operator": "/",
+              "right": "93",
+              "replaceFields": false,
+              "alias": "ISO 27001 %"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 3,
+              "fillOpacity": 10,
+              "showPoints": "always",
+              "pointSize": 8
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "transparent",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1.0
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "display": true,
+            "placement": "bottom",
+            "calcs": ["last", "mean"]
+          }
+        },
+        "description": "Compliance percentage progress toward full certification (Target: 100% by Q4 2026)"
+      },
+      {
+        "id": 7,
+        "title": "Audit Evidence Collection Status",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "compliance.evidence_type:*",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "compliance.control_id.keyword",
+                "settings": {
+                  "size": 50,
+                  "order": "asc"
+                }
+              },
+              {
+                "type": "terms",
+                "field": "compliance.evidence_type.keyword",
+                "settings": {
+                  "size": 10
+                }
+              },
+              {
+                "type": "max",
+                "field": "@timestamp"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "compliance.control_id": 0,
+                "compliance.evidence_type": 1,
+                "Count": 2,
+                "Max @timestamp": 3
+              },
+              "renameByName": {
+                "compliance.control_id": "Control ID",
+                "compliance.evidence_type": "Evidence Type",
+                "Count": "Evidence Count",
+                "Max @timestamp": "Last Updated"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Evidence Count"
+              },
+              "properties": [
+                {
+                  "id": "custom.align",
+                  "value": "right"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1
+                      },
+                      {
+                        "color": "green",
+                        "value": 5
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Last Updated"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeFromNow"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Control ID"
+            }
+          ]
+        },
+        "description": "Automated evidence collection for compliance controls (logs, screenshots, configuration exports)"
+      },
+      {
+        "id": 8,
+        "title": "Data Breach Notification Compliance (GDPR Article 33)",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 32,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.type:\"data_breach\" AND incident.status:\"closed\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "incident.id.keyword",
+                "settings": {
+                  "size": 50
+                }
+              },
+              {
+                "type": "date_range",
+                "field": "incident.detected_at"
+              },
+              {
+                "type": "date_range",
+                "field": "incident.dpa_notified_at"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "incident.dpa_notified_at",
+              "operator": "-",
+              "right": "incident.detected_at",
+              "replaceFields": false,
+              "alias": "Time to Notification (hours)"
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "incident.id": 0,
+                "incident.detected_at": 1,
+                "incident.dpa_notified_at": 2,
+                "Time to Notification (hours)": 3
+              },
+              "renameByName": {
+                "incident.id": "Incident ID",
+                "incident.detected_at": "Detected At",
+                "incident.dpa_notified_at": "DPA Notified At",
+                "Time to Notification (hours)": "Time to Notification (hours)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Time to Notification (hours)"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "h"
+                },
+                {
+                  "id": "custom.align",
+                  "value": "right"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 48
+                      },
+                      {
+                        "color": "red",
+                        "value": 72
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                },
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "range",
+                      "from": 0,
+                      "to": 72,
+                      "text": "✓ Compliant (<72h)"
+                    },
+                    {
+                      "type": "range",
+                      "from": 72.01,
+                      "to": 999999,
+                      "text": "✗ Non-Compliant (>72h)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Detected At"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeAsIso"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "DPA Notified At"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeAsIso"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Detected At",
+              "desc": true
+            }
+          ]
+        },
+        "description": "GDPR Article 33 compliance: Data breaches must be notified to DPA within 72 hours of detection"
+      },
+      {
+        "id": 9,
+        "title": "Encryption Status (GDPR Article 32)",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 40,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "encryption.at_rest:true AND encryption.algorithm:\"AES-256\"",
+            "alias": "Data Encrypted at Rest",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "encryption.in_transit:true AND encryption.tls_version:\"1.3\"",
+            "alias": "TLS 1.3 in Transit",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "mappings": [
+              {
+                "type": "range",
+                "from": 1,
+                "to": 999999,
+                "text": "✓ Compliant"
+              },
+              {
+                "type": "value",
+                "value": "0",
+                "text": "✗ Not Compliant"
+              }
+            ]
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "vertical"
+        },
+        "description": "GDPR Article 32: Encryption of personal data at rest (AES-256) and in transit (TLS 1.3)"
+      },
+      {
+        "id": 10,
+        "title": "Log Retention Compliance",
+        "type": "stat",
+        "gridPos": {
+          "x": 8,
+          "y": 40,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "log.retention_days:>=2555",
+            "alias": "7-Year Retention (SOC 2)",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "mappings": [
+              {
+                "type": "range",
+                "from": 1,
+                "to": 999999,
+                "text": "✓ Compliant (7 years)"
+              },
+              {
+                "type": "value",
+                "value": "0",
+                "text": "✗ Retention < 7 years"
+              }
+            ]
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "description": "SOC 2 CC7.2: Audit logs must be retained for 7 years (2555 days). Current retention configured."
+      },
+      {
+        "id": 11,
+        "title": "Backup Success Rate (ISO 27001 A.12.3.1)",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 40,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "backup.status:\"success\"",
+            "alias": "Successful Backups",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "backup.status:*",
+            "alias": "Total Backup Attempts",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "left": "Successful Backups",
+              "operator": "/",
+              "right": "Total Backup Attempts",
+              "replaceFields": true,
+              "alias": "Success Rate"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.95
+                },
+                {
+                  "color": "green",
+                  "value": 0.99
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["mean"]
+          }
+        },
+        "description": "ISO 27001 A.12.3.1: Backup procedures must have >99% success rate. Includes daily automated verification."
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Audits",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "purple",
+          "query": "event_type:\"audit\" AND audit_phase:(\"opening\" OR \"closing\")",
+          "textField": "audit.type",
+          "tagsField": "audit.framework"
+        },
+        {
+          "name": "Policy Updates",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "event_type:\"policy_update\"",
+          "textField": "policy.id",
+          "tagsField": "policy.version"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "framework",
+          "type": "custom",
+          "label": "Compliance Framework",
+          "query": "SOC2,ISO27001,GDPR,All",
+          "current": {
+            "value": "All",
+            "text": "All"
+          },
+          "multi": false,
+          "includeAll": false
+        },
+        {
+          "name": "quarter",
+          "type": "custom",
+          "label": "Quarter",
+          "query": "Q1-2026,Q2-2026,Q3-2026,Q4-2026",
+          "current": {
+            "value": "Q1-2026",
+            "text": "Q1 2026"
+          },
+          "multi": false,
+          "includeAll": false
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "SOC 2 Compliance Mapping",
+        "url": "/configs/organization-policies/soc2-compliance-mapping.json",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "ISO 27001 Compliance Mapping",
+        "url": "/configs/organization-policies/iso27001-compliance-mapping.json",
+        "type": "link",
+        "icon": "doc"
+      },
+      {
+        "title": "GDPR Compliance Guide",
+        "url": "/docs/compliance/gdpr-compliance.md",
+        "type": "link",
+        "icon": "doc"
+      }
+    ]
+  },
+  "overwrite": true,
+  "message": "OpenClaw Compliance Evidence Dashboard - Audit support for SOC 2, ISO 27001, GDPR",
+  "folderId": 0,
+  "folderUid": "compliance",
+  "references": {
+    "policies": [
+      "docs/policies/access-control-policy.md",
+      "docs/policies/data-classification-policy.md",
+      "docs/policies/incident-response-policy.md"
+    ],
+    "procedures": [
+      "docs/procedures/access-review.md",
+      "docs/procedures/backup-recovery.md",
+      "docs/procedures/vulnerability-management.md"
+    ],
+    "playbooks": [
+      "examples/incident-response/playbook-data-breach.md"
+    ],
+    "compliance_docs": [
+      "docs/compliance/soc2-compliance.md",
+      "docs/compliance/iso27001-compliance.md",
+      "docs/compliance/gdpr-compliance.md"
+    ]
+  },
+  "usage": {
+    "audience": "Auditors, Compliance Officers, CISO, Legal Team",
+    "update_frequency": "Real-time with 5-minute refresh (evidence collection continuous)",
+    "export_capability": "Automated weekly PDF reports to compliance@openclaw.ai",
+    "data_retention": "7 years (SOC 2 requirement)",
+    "sla": "99.95% dashboard availability for audit support"
+  },
+  "compliance": {
+    "soc2": "CC7.2 (System Monitoring), CC3.4 (Monitoring Activities)",
+    "iso27001": "A.12.4.1 (Event Logging), A.18.1.5 (Information Security in Project Management)",
+    "gdpr": "Article 30 (Records of Processing Activities), Article 32 (Security Monitoring), Article 33 (Breach Notification)"
+  }
+}

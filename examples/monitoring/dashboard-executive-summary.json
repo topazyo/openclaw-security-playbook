@@ -1,0 +1,771 @@
+{
+  "dashboard": {
+    "title": "Executive Summary - Security KPIs",
+    "description": "High-level security posture dashboard for CISO and executive leadership. Monthly/quarterly KPIs tracking compliance, incidents, training, and uptime. Updated daily at 9 AM UTC.",
+    "tags": ["executive", "KPIs", "CISO", "compliance", "summary", "leadership"],
+    "timezone": "UTC",
+    "refresh": "1d",
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "version": 1,
+    "uid": "openclaw-executive-summary",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Incidents This Month",
+        "type": "stat",
+        "description": "Total security incidents (P0-P3) opened this month. Target: <5 per month. Trending upward = systemic issue requiring attention.",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:INCIDENT_CREATED AND @timestamp:[now-30d TO now]",
+            "metrics": [{"type": "count", "id": "1"}]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 3, "color": "yellow"},
+                {"value": 5, "color": "orange"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Users Trained (This Year)",
+        "type": "stat",
+        "description": "Percentage of users who completed annual security training. SOC 2 CC1.4 requires 100% within 30 days of hire and annually. <100% = audit finding.",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:TRAINING_COMPLETED AND @timestamp:[now-365d TO now]",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          },
+          {
+            "query": "user_id:*",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "2"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "binary": {
+                "left": "Cardinality user_id.keyword (1)",
+                "operator": "/",
+                "right": "Cardinality user_id.keyword (2)"
+              },
+              "replaceFields": true
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "unary",
+              "unary": {
+                "operator": "*",
+                "value": 100
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 90, "color": "yellow"},
+                {"value": 100, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Overall Compliance %",
+        "type": "stat",
+        "description": "Weighted compliance percentage across SOC 2 (36 controls), ISO 27001 (93 controls), and GDPR. Target: 100%. <95% = remediation required.",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(openclaw_compliance_soc2_implemented * 36 + openclaw_compliance_iso27001_implemented * 93 + openclaw_compliance_gdpr_implemented * 30) / (36 + 93 + 30) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 90, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Platform Uptime (30d)",
+        "type": "stat",
+        "description": "Service availability over last 30 days. SLA target: 99.9% (43 minutes downtime allowed per month). <99.9% = SLA breach, financial penalties possible.",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(sum(up{job=~\"openclaw-.*\"}) / count(up{job=~\"openclaw-.*\"})) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 3,
+            "min": 99,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99, "color": "red"},
+                {"value": 99.9, "color": "yellow"},
+                {"value": 99.95, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Incident Count Trend (12 Months)",
+        "type": "timeseries",
+        "description": "Monthly security incident volume by severity. Upward trend = security posture degrading. Investigate root causes (new threats, process gaps, training needs).",
+        "gridPos": {"h": 9, "w": 12, "x": 0, "y": 6},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:INCIDENT_CREATED AND incident.severity:\"P0-Critical\"",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {"interval": "30d"}
+              }
+            ],
+            "alias": "P0 Critical"
+          },
+          {
+            "query": "event_type:INCIDENT_CREATED AND incident.severity:\"P1-High\"",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {"interval": "30d"}
+              }
+            ],
+            "alias": "P1 High"
+          },
+          {
+            "query": "event_type:INCIDENT_CREATED AND incident.severity:\"P2-Medium\"",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {"interval": "30d"}
+              }
+            ],
+            "alias": "P2 Medium"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "stacking": {
+                "mode": "normal"
+              }
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "P0 Critical"},
+              "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "P1 High"},
+              "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "P2 Medium"},
+              "properties": [{"id": "color", "value": {"fixedColor": "yellow", "mode": "fixed"}}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Compliance % Trend (Quarterly)",
+        "type": "timeseries",
+        "description": "Quarterly compliance percentage toward 100% target. Shows implementation progress for SOC 2, ISO 27 001, and GDPR. Steady upward trend = healthy security program.",
+        "gridPos": {"h": 9, "w": 12, "x": 12, "y": 6},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "openclaw_compliance_soc2_implemented * 100",
+            "refId": "A",
+            "legendFormat": "SOC 2 (36 controls)"
+          },
+          {
+            "expr": "openclaw_compliance_iso27001_implemented * 100",
+            "refId": "B",
+            "legendFormat": "ISO 27001 (93 controls)"
+          },
+          {
+            "expr": "openclaw_compliance_gdpr_implemented * 100",
+            "refId": "C",
+            "legendFormat": "GDPR (30 articles)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "lineWidth": 3,
+              "fillOpacity": 10,
+              "gradientMode": "opacity"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 90, "color": "yellow"},
+                {"value": 100, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Training Completion by Department",
+        "type": "piechart",
+        "description": "Security training completion breakdown by department. Identify lagging departments for targeted follow-up. SOC 2 CC1.4 requires 100% org-wide.",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 15},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:TRAINING_COMPLETED AND @timestamp:[now-365d TO now]",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "metadata.department.keyword",
+                "id": "2",
+                "settings": {"size": "15", "order": "desc"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut",
+          "displayLabels": ["name", "percent"]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Uptime vs SLA (Monthly)",
+        "type": "gauge",
+        "description": "Current month uptime against 99.9% SLA threshold. GREEN: ≥99.95%, YELLOW: 99.9-99.95%, RED: <99.9% (SLA breach).",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 15},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(sum(up{job=~\"openclaw-.*\"}) / count(up{job=~\"openclaw-.*\"})) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 3,
+            "min": 99,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99, "color": "red"},
+                {"value": 99.9, "color": "yellow"},
+                {"value": 99.95, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "Mean Time To Resolve (MTTR)",
+        "type": "stat",
+        "description": "Average incident resolution time (detection to resolved). SEC-004 target: <4 hours for P0/P1. Trending upward = process inefficiency or resource constraints.",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 15},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:INCIDENT_RESOLVED AND @timestamp:[now-30d TO now]",
+            "metrics": [
+              {
+                "type": "avg",
+                "field": "incident.resolution_time_hours",
+                "id": "1"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 2, "color": "yellow"},
+                {"value": 4, "color": "orange"},
+                {"value": 8, "color": "red"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "range",
+                "options": {
+                  "from": 0,
+                  "to": 4,
+                  "result": {
+                    "text": "✓ Within RTO",
+                    "color": "green"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Month-over-Month Comparison",
+        "type": "table",
+        "description": "Key metric deltas from previous month. GREEN: improving, RED: degrading. Review red metrics for root cause and corrective action plan.",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 23},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:MONTHLY_METRICS_SNAPSHOT",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "metric_name": true,
+                "current_month": true,
+                "previous_month": true,
+                "delta_absolute": true,
+                "delta_percent": true,
+                "trend": true
+              },
+              "renameByName": {
+                "metric_name": "Metric",
+                "current_month": "This Month",
+                "previous_month": "Last Month",
+                "delta_absolute": "Δ Absolute",
+                "delta_percent": "Δ %",
+                "trend": "Trend"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Δ %"},
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "gradient-gauge"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": -50, "color": "dark-red"},
+                      {"value": -10, "color": "red"},
+                      {"value": 0, "color": "yellow"},
+                      {"value": 10, "color": "green"},
+                      {"value": 50, "color": "dark-green"}
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Trend"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "improving": {"text": "↗ Improving", "color": "green"},
+                        "degrading": {"text": "↘ Degrading", "color": "red"},
+                        "stable": {"text": "→ Stable", "color": "yellow"}
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "title": "Risk Exposure by Category",
+        "type": "bar",
+        "description": "Open risk items by category. Categories: Credential Theft, Data Breach, Prompt Injection, Supply Chain, DoS, Insider Threat. Prioritize high-count categories for remediation.",
+        "gridPos": {"h": 9, "w": 12, "x": 0, "y": 33},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "risk.status:\"open\" AND @timestamp:[now-30d TO now]",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "risk.category.keyword",
+                "id": "2",
+                "settings": {"size": "10", "order": "desc"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "showValue": "always",
+          "xField": "risk.category.keyword"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "orange"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Security Budget Utilization",
+        "type": "gauge",
+        "description": "YTD security spending vs annual budget. Tracks: tools/subscriptions, training, incident response, audits, consulting. <80% = underutilized, >100% = over budget.",
+        "gridPos": {"h": 9, "w": 12, "x": 12, "y": 33},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(openclaw_security_spending_ytd / openclaw_security_budget_annual) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 120,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "blue"},
+                {"value": 80, "color": "green"},
+                {"value": 100, "color": "yellow"},
+                {"value": 110, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 13,
+        "title": "Top 5 Security Initiatives (In Progress)",
+        "type": "table",
+        "description": "Current quarter security projects with completion status. Examples: SOC 2 certification, MFA rollout, BCP testing, skill integrity monitoring.",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 42},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "project.type:\"security\" AND project.status:(\"in_progress\" OR \"on_hold\")",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "project.name": true,
+                "project.owner": true,
+                "project.completion_percent": true,
+                "project.target_date": true,
+                "project.status": true,
+                "project.risk_level": true
+              },
+              "renameByName": {
+                "project.name": "Initiative",
+                "project.owner": "Owner",
+                "project.completion_percent": "Progress",
+                "project.target_date": "Target Date",
+                "project.status": "Status",
+                "project.risk_level": "Risk"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Progress"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "gradient-gauge"
+                },
+                {
+                  "id": "min",
+                  "value": 0
+                },
+                {
+                  "id": "max",
+                  "value": 100
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "red"},
+                      {"value": 50, "color": "yellow"},
+                      {"value": 80, "color": "green"}
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Risk"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "low": {"color": "green"},
+                        "medium": {"color": "yellow"},
+                        "high": {"color": "red"}
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "time_period",
+          "type": "custom",
+          "label": "Time Period",
+          "options": [
+            {"text": "Last 7 Days", "value": "now-7d"},
+            {"text": "Last 30 Days", "value": "now-30d"},
+            {"text": "Last Quarter", "value": "now-90d"},
+            {"text": "Last Year", "value": "now-365d"}
+          ],
+          "current": {
+            "text": "Last 30 Days",
+            "value": "now-30d"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Elasticsearch",
+          "name": "Major Incidents",
+          "enable": true,
+          "iconColor": "red",
+          "query": "event_type:INCIDENT_CREATED AND incident.severity:(\"P0-Critical\" OR \"P1-High\")"
+        },
+        {
+          "datasource": "Elasticsearch",
+          "name": "Compliance Milestones",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "event_type:COMPLIANCE_MILESTONE"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "frameworks": [
+      {
+        "name": "SOC 2",
+        "controls": ["CC1.4 (Security Awareness)", "CC7.2 (System Monitoring)", "CC7.3 (System Recovery)"],
+        "evidence": "CC1.4: Training completion tracking. CC7.2: Uptime and incident metrics. CC7.3: MTTR demonstrates recovery capability."
+      },
+      {
+        "name": "ISO 27001",
+        "controls": ["A.6.1.1 (Information Security Roles)", "A.16.1.4 (Assessment and Decision)", "A.18.1.1 (Compliance with Legal Requirements)"],
+        "evidence": "A.6.1.1: CISO dashboard with executive oversight. A.16.1.4: Incident trends inform decision-making. A.18.1.1: Compliance percentage tracking for legal requirements."
+      },
+      {
+        "name": "Board Reporting",
+        "controls": ["Risk oversight", "Incident disclosure", "Budget allocation"],
+        "evidence": "Quarterly board presentations include: incident trends, compliance status, risk exposure, MTTR, budget utilization. Demonstrates effective security governance."
+      }
+    ]
+  },
+  "audience": {
+    "CISO": "Primary dashboard for security posture overview. Review daily for trends. Present monthly to executive team. Use month-over-month comparison to identify areas needing attention.",
+    "CEO/CFO": "High-level KPIs demonstrating security investment ROI. Key metrics: uptime (customer impact), compliance % (audit readiness), MTTR (operational efficiency), budget utilization (financial controls).",
+    "Board_of_Directors": "Quarterly presentation material. Focus on: incident trends (risk oversight), compliance progress (regulatory obligations), major initiatives (strategic alignment), budget vs actual (fiscal responsibility).",
+    "Auditors": "Evidence for SOC 2/ISO 27001 audits. Demonstrates continuous monitoring, management review, corrective action tracking. Export quarterly reports for audit evidence."
+  },
+  "usage": "CISO reviews daily at 9 AM UTC. Monthly presentations to executive team (first Monday). Quarterly board reports (mid-quarter review). Export PDF for audit evidence. ESCALATION: Any RED metric triggers immediate investigation. Month-over-month degrading trends require corrective action plan within 5 business days. Share URL with board for real-time access (read-only).",
+  "related_documents": [
+    "SEC-004 incident-response-policy.md: MTTR <4 hour target",
+    "SOC 2 compliance mapping: Training completion requirement (CC1.4)",
+    "ISO 27001 compliance: Management review evidence (Clause 9.3)"
+  ]
+}
