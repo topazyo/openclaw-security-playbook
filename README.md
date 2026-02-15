@@ -874,7 +874,6 @@ Special thanks to:
 ### Getting Help
 
 - **Documentation Issues:** Open a GitHub issue
-- **Security Questions:** security@company.com
 - **General Discussion:** GitHub Discussions
 - **Emergency Security Issues:** Follow responsible disclosure in [SECURITY.md](SECURITY.md)
 
