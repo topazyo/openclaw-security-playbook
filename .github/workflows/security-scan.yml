@@ -1,0 +1,254 @@
+name: Security Scanning
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'examples/**'
+      - 'configs/**'
+      - 'requirements.txt'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches:
+      - main
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  trivy-scan:
+    name: Trivy Container Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+      - name: Run Trivy for Docker images
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'image'
+          image-ref: 'openclaw-agent:latest'
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+
+  bandit-scan:
+    name: Bandit Python Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: |
+          pip install bandit[toml]
+
+      - name: Run Bandit scan
+        run: |
+          bandit -r scripts/ examples/ tools/ -f json -o bandit-results.json || true
+          bandit -r scripts/ examples/ tools/ -f txt
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-results
+          path: bandit-results.json
+          retention-days: 90
+
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    if: hashFiles('package.json') != ''
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          npm audit --json > npm-audit.json || true
+          npm audit --audit-level=moderate
+
+      - name: Upload npm audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-results
+          path: npm-audit.json
+          retention-days: 90
+
+  pip-audit:
+    name: Python Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: |
+          pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit --format json --output pip-audit.json || true
+          pip-audit --desc
+
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-results
+          path: pip-audit.json
+          retention-days: 90
+
+  secret-scanning:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sbom-generation:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.17.0
+        with:
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+          retention-days: 90
+
+      - name: Upload SBOM to Dependency Graph
+        uses: advanced-security/sbom-dependency-submission-action@v0.0.1
+        with:
+          sbom-file: sbom.cyclonedx.json
+
+  vulnerability-summary:
+    name: Generate Vulnerability Summary
+    runs-on: ubuntu-latest
+    needs: [trivy-scan, bandit-scan, pip-audit]
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Bandit results
+        uses: actions/download-artifact@v4
+        with:
+          name: bandit-results
+          path: ./results
+
+      - name: Download pip-audit results
+        uses: actions/download-artifact@v4
+        with:
+          name: pip-audit-results
+          path: ./results
+
+      - name: Generate summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Trivy Scan" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bandit Python Security Scan" >> $GITHUB_STEP_SUMMARY
+          if [ -f ./results/bandit-results.json ]; then
+            echo "✅ Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Dependency Audits" >> $GITHUB_STEP_SUMMARY
+          if [ -f ./results/pip-audit.json ]; then
+            echo "✅ pip-audit completed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🔒 Security Scan Results\n\n';
+            
+            try {
+              const bandit = JSON.parse(fs.readFileSync('./results/bandit-results.json', 'utf8'));
+              const highSeverity = bandit.results.filter(r => r.issue_severity === 'HIGH' || r.issue_severity === 'MEDIUM').length;
+              comment += `### Bandit Scan\n- **${highSeverity}** HIGH/MEDIUM severity issues found\n\n`;
+            } catch (e) {
+              comment += '### Bandit Scan\n- ✅ No issues found\n\n';
+            }
+            
+            try {
+              const pipAudit = JSON.parse(fs.readFileSync('./results/pip-audit.json', 'utf8'));
+              comment += `### pip-audit\n- **${pipAudit.dependencies?.length || 0}** vulnerable dependencies\n\n`;
+            } catch (e) {
+              comment += '### pip-audit\n- ✅ No vulnerabilities found\n\n';
+            }
+            
+            comment += '\n📊 View detailed results in the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });

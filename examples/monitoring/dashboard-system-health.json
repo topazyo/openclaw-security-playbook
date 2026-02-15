@@ -1,0 +1,821 @@
+{
+  "dashboard": {
+    "title": "System Health - Operational Monitoring",
+    "description": "Real-time operational health metrics for OpenClaw platform reliability and performance. 99.9% uptime SLA tracking. Updated every 1 minute. Alerts on service degradation, resource exhaustion, and backup failures.",
+    "tags": ["operations", "health", "reliability", "sla", "performance", "monitoring"],
+    "timezone": "UTC",
+    "refresh": "1m",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "version": 1,
+    "uid": "openclaw-system-health",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Uptime (99.9% SLA)",
+        "type": "gauge",
+        "description": "Platform uptime percentage over 30 days. SLA target: 99.9% (43 minutes downtime/month allowed). Current month-to-date uptime. RED: <99.9%, YELLOW: 99.9-99.95%, GREEN: >99.95%.",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(sum(up{job=\"openclaw-gateway\"}) / count(up{job=\"openclaw-gateway\"})) * 100",
+            "refId": "A",
+            "legendFormat": "Gateway Uptime"
+          },
+          {
+            "expr": "(sum(up{job=\"openclaw-agent\"}) / count(up{job=\"openclaw-agent\"})) * 100",
+            "refId": "B",
+            "legendFormat": "Agent Uptime"
+          },
+          {
+            "expr": "(sum(up{job=\"mcp-server\"}) / count(up{job=\"mcp-server\"})) * 100",
+            "refId": "C",
+            "legendFormat": "MCP Server Uptime"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 95,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 95, "color": "red"},
+                {"value": 99.9, "color": "yellow"},
+                {"value": 99.95, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "alert": {
+          "name": "Uptime SLA breach",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [99.9],
+                "type": "lt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "handler": 1,
+          "message": "CRITICAL: Uptime dropped below 99.9% SLA. Current outage duration exceeds monthly allowance (43 minutes). Escalate to on-call engineer immediately.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-oncall"},
+            {"id": 2, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Rate by Service",
+        "type": "timeseries",
+        "description": "HTTP 5xx errors and application exceptions per service. Threshold: >5% error rate triggers alert. Investigate: recent deployments, upstream dependencies, resource exhaustion.",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\",job=\"openclaw-gateway\"}[5m])) / sum(rate(http_requests_total{job=\"openclaw-gateway\"}[5m])) * 100",
+            "refId": "A",
+            "legendFormat": "Gateway Errors"
+          },
+          {
+            "expr": "sum(rate(openclaw_agent_errors_total[5m])) / sum(rate(openclaw_agent_requests_total[5m])) * 100",
+            "refId": "B",
+            "legendFormat": "Agent Errors"
+          },
+          {
+            "expr": "sum(rate(mcp_server_errors_total[5m])) / sum(rate(mcp_server_requests_total[5m])) * 100",
+            "refId": "C",
+            "legendFormat": "MCP Server Errors"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 10,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "opacity",
+              "axisPlacement": "auto"
+            }
+          }
+        },
+        "alert": {
+          "name": "High error rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [5],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Error rate >5% detected. Check recent deployments, upstream API health, and resource limits. Review logs in Elasticsearch for stack traces.",
+          "notifications": [
+            {"id": 1, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Request Latency (p50, p95, p99)",
+        "type": "timeseries",
+        "description": "API response time percentiles. SLA target: p95 <500ms, p99 <2s. Investigate latency spikes: database queries, external API calls, resource contention.",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"openclaw-gateway\"}[5m])) by (le)) * 1000",
+            "refId": "A",
+            "legendFormat": "p50 (median)"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"openclaw-gateway\"}[5m])) by (le)) * 1000",
+            "refId": "B",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"openclaw-gateway\"}[5m])) by (le)) * 1000",
+            "refId": "C",
+            "legendFormat": "p99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {
+              "lineWidth": 2,
+              "drawStyle": "line"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 500, "color": "yellow"},
+                {"value": 2000, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "CPU Usage by Service",
+        "type": "timeseries",
+        "description": "CPU utilization percentage. Threshold: >80% sustained for 5 minutes = scale up. >95% = resource exhaustion, potential DoS.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "avg(rate(process_cpu_seconds_total{job=\"openclaw-gateway\"}[5m])) * 100",
+            "refId": "A",
+            "legendFormat": "Gateway CPU"
+          },
+          {
+            "expr": "avg(rate(process_cpu_seconds_total{job=\"openclaw-agent\"}[5m])) * 100",
+            "refId": "B",
+            "legendFormat": "Agent CPU"
+          },
+          {
+            "expr": "avg(rate(process_cpu_seconds_total{job=\"mcp-server\"}[5m])) * 100",
+            "refId": "C",
+            "legendFormat": "MCP Server CPU"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "High CPU usage",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [80],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "for": "5m",
+          "handler": 1,
+          "message": "CPU usage sustained >80% for 5 minutes. Consider scaling horizontally. Check for resource-intensive operations (conversation processing, skill execution).",
+          "notifications": [
+            {"id": 1, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage by Service",
+        "type": "timeseries",
+        "description": "Memory utilization percentage. Threshold: >80% = memory pressure, >90% = OOM kill risk. Monitor for memory leaks in long-running processes.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(process_resident_memory_bytes{job=\"openclaw-gateway\"} / container_spec_memory_limit_bytes{job=\"openclaw-gateway\"}) * 100",
+            "refId": "A",
+            "legendFormat": "Gateway Memory"
+          },
+          {
+            "expr": "(process_resident_memory_bytes{job=\"openclaw-agent\"} / container_spec_memory_limit_bytes{job=\"openclaw-agent\"}) * 100",
+            "refId": "B",
+            "legendFormat": "Agent Memory"
+          },
+          {
+            "expr": "(process_resident_memory_bytes{job=\"mcp-server\"} / container_spec_memory_limit_bytes{job=\"mcp-server\"}) * 100",
+            "refId": "C",
+            "legendFormat": "MCP Server Memory"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 80, "color": "yellow"},
+                {"value": 90, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "High memory usage",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [90],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "handler": 1,
+          "message": "CRITICAL: Memory usage >90%. OOM kill imminent. Investigate memory leaks and scale immediately. Review heap dumps if available.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-oncall"},
+            {"id": 2, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Disk Usage by Volume",
+        "type": "bar",
+        "description": "Disk space utilization. Threshold: >80% = cleanup required, >90% = service disruption risk. Monitor: logs (/var/log), data (/var/lib), temp files (/tmp).",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/var/log\"} / node_filesystem_size_bytes{mountpoint=\"/var/log\"})) * 100",
+            "refId": "A",
+            "legendFormat": "/var/log"
+          },
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/var/lib\"} / node_filesystem_size_bytes{mountpoint=\"/var/lib\"})) * 100",
+            "refId": "B",
+            "legendFormat": "/var/lib"
+          },
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/tmp\"} / node_filesystem_size_bytes{mountpoint=\"/tmp\"})) * 100",
+            "refId": "C",
+            "legendFormat": "/tmp"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 80, "color": "yellow"},
+                {"value": 90, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "showValue": "always"
+        },
+        "alert": {
+          "name": "Disk space critical",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [90],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "max"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "CRITICAL: Disk usage >90%. Service disruption imminent. Rotate logs immediately, clear temp files, expand volume if needed.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-oncall"}
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Network Traffic (Inbound/Outbound)",
+        "type": "timeseries",
+        "description": "Network bandwidth utilization. Monitor for: DDoS attacks (sudden inbound spike), data exfiltration (sustained outbound spike), API call volume.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])) by (instance) * 8 / 1000000",
+            "refId": "A",
+            "legendFormat": "Inbound (Mbps)"
+          },
+          {
+            "expr": "sum(rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])) by (instance) * 8 / 1000000",
+            "refId": "B",
+            "legendFormat": "Outbound (Mbps)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Mbps",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Database Connection Pool",
+        "type": "gauge",
+        "description": "Active database connections vs pool limit. >80% pool utilization = connection exhaustion risk. Tune pool size or investigate connection leaks.",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 24},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(openclaw_db_active_connections / openclaw_db_max_connections) * 100",
+            "refId": "A",
+            "legendFormat": "Pool Utilization"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "Database connection pool exhaustion",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [95],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "1m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Database connection pool >95% utilized. Connection exhaustion imminent. Check for connection leaks and increase pool size if needed.",
+          "notifications": [
+            {"id": 1, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "title": "Backup Success Rate",
+        "type": "stat",
+        "description": "Percentage of successful backups in last 7 days. Target: >99%. Failed backups = RTO/RPO violation risk. Review backup-verification.py logs.",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 24},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(sum(openclaw_backup_success_total) / (sum(openclaw_backup_success_total) + sum(openclaw_backup_failure_total))) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 95, "color": "yellow"},
+                {"value": 99, "color": "green"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "range",
+                "options": {
+                  "from": 99,
+                  "to": 100,
+                  "result": {
+                    "text": "✓ Compliant",
+                    "color": "green"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "alert": {
+          "name": "Backup failure rate high",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [99],
+                "type": "lt"
+              },
+              "query": {
+                "params": ["A", "1d", "now"]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1h",
+          "handler": 1,
+          "message": "Backup success rate <99% in last 7 days. RTO/RPO compliance at risk per SEC-004. Review backup-verification.py logs and fix failures immediately.",
+          "notifications": [
+            {"id": 1, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "Vulnerability Scan Results",
+        "type": "piechart",
+        "description": "Vulnerabilities by severity from last scan (vulnerability-scanning.py). CRITICAL/HIGH require patches per vulnerability-management.md SLAs.",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 24},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "openclaw_vulnerabilities_total{severity=\"CRITICAL\"}",
+            "refId": "A",
+            "legendFormat": "CRITICAL"
+          },
+          {
+            "expr": "openclaw_vulnerabilities_total{severity=\"HIGH\"}",
+            "refId": "B",
+            "legendFormat": "HIGH"
+          },
+          {
+            "expr": "openclaw_vulnerabilities_total{severity=\"MEDIUM\"}",
+            "refId": "C",
+            "legendFormat": "MEDIUM"
+          },
+          {
+            "expr": "openclaw_vulnerabilities_total{severity=\"LOW\"}",
+            "refId": "D",
+            "legendFormat": "LOW"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              }
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "CRITICAL": {"color": "dark-red"},
+                  "HIGH": {"color": "red"},
+                  "MEDIUM": {"color": "orange"},
+                  "LOW": {"color": "yellow"}
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "TLS Certificate Expiration",
+        "type": "table",
+        "description": "Days until TLS certificate expiration. Renew certificates >30 days before expiration (SEC-003). Auto-renewal via Let's Encrypt or cert-manager recommended.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-exporter\"} - time()) / 86400",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "instance": "Certificate",
+                "Value": "Days Until Expiry"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "days",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 30, "color": "yellow"},
+                {"value": 90, "color": "green"}
+              ]
+            },
+            "custom": {
+              "displayMode": "color-background"
+            }
+          }
+        },
+        "alert": {
+          "name": "TLS certificate expiring soon",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [30],
+                "type": "lt"
+              },
+              "query": {
+                "params": ["A", "1d", "now"]
+              },
+              "reducer": {
+                "type": "min"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1d",
+          "handler": 1,
+          "message": "TLS certificate expires in <30 days. Renew immediately per SEC-003 cryptographic controls policy. Service outage will occur if certificate expires.",
+          "notifications": [
+            {"id": 1, "uid": "slack-ops-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "title": "Mean Time To Recovery (MTTR)",
+        "type": "stat",
+        "description": "Average time from incident detection to resolution over last 30 days. Target: <4 hours per SEC-004. Trending upward = process improvement needed.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:INCIDENT_RESOLVED",
+            "metrics": [
+              {
+                "type": "avg",
+                "field": "duration_ms",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "30d"
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 2, "color": "yellow"},
+                {"value": 4, "color": "red"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "range",
+                "options": {
+                  "from": 0,
+                  "to": 4,
+                  "result": {
+                    "text": "✓ Within RTO",
+                    "color": "green"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "reduce": {
+                "reducer": "mean"
+              },
+              "replaceFields": true,
+              "binary": {
+                "left": "Average duration_ms",
+                "operator": "/",
+                "right": "3600000"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "label": "Service",
+          "datasource": "Prometheus",
+          "query": "label_values(up, job)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "time_range",
+          "type": "interval",
+          "label": "Time Range",
+          "options": [
+            {"text": "Last 1 hour", "value": "now-1h"},
+            {"text": "Last 6 hours", "value": "now-6h"},
+            {"text": "Last 24 hours", "value": "now-24h"},
+            {"text": "Last 7 days", "value": "now-7d"}
+          ],
+          "current": {
+            "text": "Last 1 hour",
+            "value": "now-1h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Elasticsearch",
+          "name": "Deployments",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "event_type:CONFIG_CHANGE AND action:deployment"
+        },
+        {
+          "datasource": "Elasticsearch",
+          "name": "Incidents",
+          "enable": true,
+          "iconColor": "red",
+          "query": "event_type:INCIDENT_CREATED"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "frameworks": [
+      {
+        "name": "SOC 2",
+        "controls": ["CC7.1 (Risk Mitigation)", "CC7.2 (System Monitoring)", "CC7.3 (System Recovery)"],
+        "evidence": "Continuous system monitoring (CC7.2) with 99.9% uptime SLA. Backup success rate tracking for system recovery (CC7.3). MTTR metrics demonstrate risk mitigation (CC7.1)."
+      },
+      {
+        "name": "ISO 27001",
+        "controls": ["A.12.1.1 (Operational Procedures)", "A.12.1.2 (Change Management)", "A.17.1.2 (Business Continuity)"],
+        "evidence": "Operational health monitoring (A.12.1.1), deployment annotations for change tracking (A.12.1.2), RTO/RPO compliance via backup monitoring (A.17.1.2)."
+      },
+      {
+        "name": "NIST 800-53",
+        "controls": ["CP-2 (Contingency Plan)", "CP-9 (System Backup)", "SI-4 (System Monitoring)"],
+        "evidence": "MTTR and uptime tracking support contingency planning (CP-2). Backup success rate validates backup procedures (CP-9). Real-time system monitoring (SI-4)."
+      }
+    ]
+  },
+  "usage": "This dashboard is used by SRE and Operations teams for day-to-day platform monitoring. REVIEW SCHEDULE: Check every shift change (3x daily). SLA TRACKING: Green = healthy, Yellow = degraded, Red = SLA breach (escalate immediately). CAPACITY PLANNING: Trend CPU/memory/disk weekly to forecast scaling needs. INCIDENT CORRELATION: Use deployment annotations to correlate errors with recent changes.",
+  "related_playbooks": [
+    "playbook-denial-of-service.md (IRP-007): Activate on CPU/memory exhaustion or network spikes",
+    "backup-recovery.md procedure: Use backup success panel for compliance validation",
+    "SEC-004 incident-response-policy.md: MTTR <4h requirement tracking"
+  ]
+}

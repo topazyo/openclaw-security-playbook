@@ -1,0 +1,723 @@
+{
+  "dashboard": {
+    "title": "Access Reviews - Quarterly Compliance",
+    "description": "Quarterly access review dashboard for SOC 2 CC6.1 and ISO 27001 A.9.2.5 compliance. Tracks user-role assignments, inactive accounts, orphaned access, and permission changes. Review cycle: Q1=Jan 15, Q2=Apr 15, Q3=Jul 15, Q4=Oct 15.",
+    "tags": ["compliance", "access-control", "audit", "SOC2", "ISO27001", "quarterly-review"],
+    "timezone": "UTC",
+    "refresh": "1h",
+    "time": {
+      "from": "now-90d",
+      "to": "now"
+    },
+    "version": 1,
+    "uid": "openclaw-access-reviews",
+    "panels": [
+      {
+        "id": 1,
+        "title": "User-Role Assignment Matrix",
+        "type": "table",
+        "description": "Complete mapping of users to assigned roles. QUARTERLY REVIEW ACTION: Verify each assignment is still appropriate. Remove unnecessary permissions per principle of least privilege (SEC-002).",
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:ROLE_CHANGE OR event_type:USER_CREATED",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "user_id": true,
+                "metadata.role": true,
+                "metadata.assigned_by": true,
+                "@timestamp": true,
+                "metadata.business_justification": true
+              },
+              "renameByName": {
+                "user_id": "User ID",
+                "metadata.role": "Role",
+                "metadata.assigned_by": "Assigned By",
+                "@timestamp": "Assignment Date",
+                "metadata.business_justification": "Justification"
+              }
+            }
+          },
+          {
+            "id": "reduce",
+            "options": {
+              "reducers": ["last"]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Role"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "admin": {"color": "red", "text": "ADMIN (Review Required)"},
+                        "agent_operator": {"color": "orange", "text": "Agent Operator"},
+                        "user": {"color": "green", "text": "User"},
+                        "guest": {"color": "blue", "text": "Guest (Read-only)"}
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Last Access Timestamps",
+        "type": "table",
+        "description": "Days since last login/activity for each user. >90 days = inactive account (disable per SEC-002). >30 days = low activity (verify still employed).",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 12},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:LOGIN_SUCCESS OR event_type:ACCESS_GRANTED",
+            "metrics": [{"type": "max", "field": "@timestamp", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {"size": "200", "order": "asc", "orderBy": "1"}
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "user_id.keyword": "User ID",
+                "Max @timestamp": "Last Activity"
+              }
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "alias": "Days Inactive",
+              "binary": {
+                "left": "now",
+                "operator": "-",
+                "right": "Last Activity"
+              },
+              "reduce": {
+                "reducer": "mean"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Days Inactive"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "days"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "green"},
+                      {"value": 30, "color": "yellow"},
+                      {"value": 90, "color": "red"}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Inactive Accounts (>90 Days)",
+        "type": "stat",
+        "description": "Count of users with no activity in 90+ days. ACTION: Disable these accounts immediately per access-control-policy.md (SEC-002). Orphaned accounts = attack vector.",
+        "gridPos": {"h": 5, "w": 6, "x": 12, "y": 12},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "NOT (event_type:LOGIN_SUCCESS OR event_type:ACCESS_GRANTED) AND @timestamp:[now-90d TO now]",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Admin Accounts Count",
+        "type": "stat",
+        "description": "Total admin role assignments. Best practice: <5% of user base. Excessive admin privileges = privilege escalation risk. Review each admin quarterly.",
+        "gridPos": {"h": 5, "w": 6, "x": 18, "y": 12},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "metadata.role:\"admin\"",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Orphaned Accounts (User Departed)",
+        "type": "table",
+        "description": "Users marked as departed in HRIS but still have active OpenClaw access. CRITICAL security gap. Revoke immediately per offboarding procedure.",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 17},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "metadata.employment_status:\"departed\" AND NOT metadata.account_status:\"disabled\"",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "user_id": true,
+                "metadata.departure_date": true,
+                "metadata.role": true,
+                "metadata.last_access": true,
+                "metadata.manager": true
+              },
+              "renameByName": {
+                "user_id": "User ID",
+                "metadata.departure_date": "Departure Date",
+                "metadata.role": "Role",
+                "metadata.last_access": "Last Access",
+                "metadata.manager": "Former Manager"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background-solid"
+            },
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "red"
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Permission Changes This Quarter",
+        "type": "table",
+        "description": "All role changes, permission escalations, and access grants this quarter. Verify each change has business justification and approvals per SEC-005 change management.",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 22},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:(PERMISSION_ESCALATION OR ROLE_CHANGE) AND @timestamp:[now-90d TO now]",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "@timestamp": true,
+                "user_id": true,
+                "metadata.old_role": true,
+                "metadata.new_role": true,
+                "metadata.changed_by": true,
+                "metadata.approval_ticket": true,
+                "metadata.justification": true
+              },
+              "renameByName": {
+                "@timestamp": "Change Date",
+                "user_id": "User",
+                "metadata.old_role": "Old Role",
+                "metadata.new_role": "New Role",
+                "metadata.changed_by": "Changed By",
+                "metadata.approval_ticket": "Ticket",
+                "metadata.justification": "Justification"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "New Role"},
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "admin": {"color": "red"}
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Quarterly Review Progress",
+        "type": "bar",
+        "description": "Access review completion by department. Target: 100% completion by quarter end (Q1=Jan 15, Q2=Apr 15, Q3=Jul 15, Q4=Oct 15). Track: reviewed, approved, modified, revoked.",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 22},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:ACCESS_REVIEW_COMPLETED AND @timestamp:[now-90d TO now]",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "metadata.department.keyword",
+                "id": "2",
+                "settings": {"size": "20", "order": "desc"}
+              },
+              {
+                "type": "terms",
+                "field": "metadata.review_outcome.keyword",
+                "id": "3",
+                "settings": {"size": "10"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "showValue": "always",
+          "groupWidth": 0.7,
+          "barWidth": 0.9,
+          "barRadius": 0,
+          "fullHighlight": false,
+          "legend": {
+            "displayMode": "list",
+            "placement": "right",
+            "showLegend": true
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "stacking": {
+                "mode": "normal",
+                "group": "A"
+              }
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "approved": {"color": "green"},
+                  "modified": {"color": "yellow"},
+                  "revoked": {"color": "orange"}
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Review Completion Rate",
+        "type": "gauge",
+        "description": "Percentage of users reviewed this quarter. SOC 2 CC6.1 requires 100% completion. <100% = audit finding. Escalate incomplete reviews to department managers.",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 32},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:ACCESS_REVIEW_COMPLETED AND @timestamp:[now-90d TO now]",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          },
+          {
+            "query": "user_id:*",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "2"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "binary": {
+                "left": "Cardinality user_id.keyword (1)",
+                "operator": "/",
+                "right": "Cardinality user_id.keyword (2)"
+              },
+              "replaceFields": true
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "unary",
+              "unary": {
+                "operator": "*",
+                "value": 100
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 80, "color": "yellow"},
+                {"value": 100, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "Overdue Reviews",
+        "type": "stat",
+        "description": "Number of users pending access review past quarter deadline. ESCALATE: Notify CISO and department heads. Incomplete reviews = SOC 2 audit finding.",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 32},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "NOT (event_type:ACCESS_REVIEW_COMPLETED AND @timestamp:[now-90d TO now])",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Privileged Access Duration",
+        "type": "table",
+        "description": "Users with admin/agent_operator roles >1 year. REVIEW: Is continued elevated access still necessary? Rotate privileged access annually per SEC-002.",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 32},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "(metadata.role:\"admin\" OR metadata.role:\"agent_operator\") AND @timestamp:[* TO now-365d]",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "user_id": true,
+                "metadata.role": true,
+                "@timestamp": true
+              },
+              "renameByName": {
+                "user_id": "User ID",
+                "metadata.role": "Role",
+                "@timestamp": "Role Assignment Date"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            },
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "orange"
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Separation of Duties Violations",
+        "type": "table",
+        "description": "Users with conflicting role combinations (e.g., developer + production admin). SOC 2 CC6.3 requires separation of duties. Remediate immediately.",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "metadata.roles:(\"admin\" AND \"developer\") OR metadata.roles:(\"approver\" AND \"requester\")",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "user_id": true,
+                "metadata.roles": true,
+                "metadata.department": true,
+                "metadata.violation_type": true
+              },
+              "renameByName": {
+                "user_id": "User ID",
+                "metadata.roles": "Conflicting Roles",
+                "metadata.department": "Department",
+                "metadata.violation_type": "Violation Type"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background-solid"
+            },
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "red"
+            }
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "department",
+          "type": "query",
+          "label": "Department",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"metadata.department.keyword\"}",
+          "multi": true,
+          "includeAll": true,
+          "allValue": "*"
+        },
+        {
+          "name": "role",
+          "type": "custom",
+          "label": "Role Filter",
+          "options": [
+            {"text": "All Roles", "value": "*"},
+            {"text": "Admin Only", "value": "admin"},
+            {"text": "Agent Operator", "value": "agent_operator"},
+            {"text": "User", "value": "user"},
+            {"text": "Guest", "value": "guest"}
+          ],
+          "current": {
+            "text": "All Roles",
+            "value": "*"
+          }
+        },
+        {
+          "name": "quarter",
+          "type": "custom",
+          "label": "Review Quarter",
+          "options": [
+            {"text": "Q1 (Jan-Mar)", "value": "now-90d|now"},
+            {"text": "Q2 (Apr-Jun)", "value": "now-180d|now-90d"},
+            {"text": "Q3 (Jul-Sep)", "value": "now-270d|now-180d"},
+            {"text": "Q4 (Oct-Dec)", "value": "now-365d|now-270d"}
+          ],
+          "current": {
+            "text": "Q1 (Jan-Mar)",
+            "value": "now-90d|now"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Elasticsearch",
+          "name": "Quarter Start",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "event_type:QUARTER_START"
+        },
+        {
+          "datasource": "Elasticsearch",
+          "name": "Review Deadline",
+          "enable": true,
+          "iconColor": "red",
+          "query": "event_type:REVIEW_DEADLINE"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "frameworks": [
+      {
+        "name": "SOC 2",
+        "controls": ["CC6.1 (Logical Access)", "CC6.2 (Prior to Access), "CC6.3 (Removal or Modification)"],
+        "evidence": "CC6.1: User-role matrix provides evidence of access controls. CC6.2: Approval tracking for new access. CC6.3: Quarterly reviews demonstrate timely removal of unnecessary access. 100% review completion required for SOC 2 audit."
+      },
+      {
+        "name": "ISO 27001",
+        "controls": ["A.9.2.1 (User Registration)", "A.9.2.5 (Review of User Access Rights)", "A.9.2.6 (Removal or Adjustment of Access Rights)"],
+        "evidence": "A.9.2.1: User-role matrix shows registration process. A.9.2.5: Quarterly review process with completion tracking. A.9.2.6: Orphaned accounts and inactive users identified for removal."
+      },
+      {
+        "name": "NIST 800-53",
+        "controls": ["AC-2 (Account Management)", "AC-6 (Least Privilege)"],
+        "evidence": "AC-2: Inactive account detection and orphaned account tracking. AC-6: Admin account review ensures least privilege principle."
+      }
+    ],
+    "audit_evidence": [
+      "User-role assignment matrix with timestamps",
+      "Quarterly review completion reports",
+      "Orphaned account remediation actions",
+      "Privileged access justifications",
+      "Permission change audit trail"
+    ]
+  },
+  "procedures": {
+    "quarterly_review": {
+      "description": "Quarterly access review process per SEC-002 access-control-policy.md",
+      "schedule": "Q1=Jan 15, Q2=Apr 15, Q3=Jul 15, Q4=Oct 15",
+      "steps": [
+        "1. Export user-role matrix from this dashboard (CSV)",
+        "2. Distribute to department managers for review",
+        "3. Managers verify each user: APPROVE (no change), MODIFY (reduce permissions), REVOKE (disable account)",
+        "4. Security team processes approved changes within 5 business days",
+        "5. Update Elasticsearch with ACCESS_REVIEW_COMPLETED events",
+        "6. Generate completion report for CISO and auditors",
+        "7. Remediate any orphaned accounts or separation of duties violations immediately"
+      ],
+      "escalation": "Incomplete reviews (yellow/red panels) escalate to CISO 14 days before deadline"
+    },
+    "immediate_actions": {
+      "inactive_accounts": "Disable any account >90 days inactive within 24 hours",
+      "orphaned_accounts": "Revoke within 24 hours of departure date",
+      "separation_of_duties": "Remediate violations within 5 business days",
+      "privileged_access": "Re-approve admin roles annually or revoke"
+    }
+  },
+  "usage": "Used by CISO/Security Team for quarterly access reviews (SOC 2 CC6.1 requirement). QUARTERLY WORKFLOW: Week 1: Export matrix, distribute to managers. Week 2-3: Managers review and provide feedback. Week 4: Process changes, generate completion report. CONTINUOUS MONITORING: Review 'Orphaned Accounts' and 'Inactive Accounts' panels weekly. Immediate action required for any findings. AUDIT PREPARATION: Export all panels as PDF for SOC 2/ISO 27001 audit evidence.",
+  "related_playbooks": [
+    "SEC-002 access-control-policy.md: Defines quarterly review requirement and procedures",
+    "access-review.md procedure: Step-by-step quarterly review process",
+    "playbook-credential-theft.md (IRP-001): Orphaned accounts are credential theft vectors"
+  ]
+}

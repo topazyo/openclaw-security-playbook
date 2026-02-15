@@ -1,0 +1,631 @@
+{
+  "dashboard": {
+    "title": "Anomaly Detection - Behavioral Analysis",
+    "description": "openclaw-telemetry behavioral anomaly detection for identifying compromised accounts, insider threats, and unusual AI agent behavior. ML-based anomaly scoring >0.8 triggers investigation. Updated every 1 minute.",
+    "tags": ["security", "anomaly", "UEBA", "openclaw-telemetry", "behavioral", "ML"],
+    "timezone": "UTC",
+    "refresh": "1m",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "version": 1,
+    "uid": "openclaw-anomaly-detection",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Behavioral Baselines vs Current Activity",
+        "type": "timeseries",
+        "description": "openclaw-telemetry compares current behavior to learned baselines. Deviations >3 standard deviations flagged as anomalies. Metrics: API calls/hour, skill usage patterns, conversation length.",
+        "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "openclaw_telemetry_baseline_api_calls",
+            "refId": "A",
+            "legendFormat": "Baseline API Calls"
+          },
+          {
+            "expr": "openclaw_telemetry_current_api_calls",
+            "refId": "B",
+            "legendFormat": "Current API Calls"
+          },
+          {
+            "expr": "openclaw_telemetry_baseline_skill_usage",
+            "refId": "C",
+            "legendFormat": "Baseline Skill Usage"
+          },
+          {
+            "expr": "openclaw_telemetry_current_skill_usage",
+            "refId": "D",
+            "legendFormat": "Current Skill Usage"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "/Baseline.*/"},
+              "properties": [
+                {"id": "custom.lineStyle", "value": {"dash": [10, 5]}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Anomaly Score Distribution",
+        "type": "heatmap",
+        "description": "Anomaly scores by user and time. Colors: GREEN <0.5 (normal), YELLOW 0.5-0.8 (suspicious), RED >0.8 (high-risk). openclaw-telemetry uses isolation forest + LSTM for scoring.",
+        "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.anomaly_score:*",
+            "metrics": [{"type": "avg", "field": "openclaw.telemetry.anomaly_score", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {"interval": "5m"}
+              },
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "3",
+                "settings": {"size": "20", "order": "desc"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "calculate": true,
+          "color": {
+            "scheme": "RdYlGn",
+            "exponent": 0.5,
+            "steps": 8
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "scaleDistribution": {
+                "type": "linear"
+              }
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.5, "color": "yellow"},
+                {"value": 0.8, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Deviation Scores (Standard Deviations)",
+        "type": "scatter",
+        "description": "Plots users by deviation from behavioral baseline. X-axis: Activity volume deviation, Y-axis: Pattern deviation. Points in RED quadrant (>3σ both axes) = high priority investigation.",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 9},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.deviation_score:*",
+            "metrics": [
+              {"type": "avg", "field": "openclaw.telemetry.volume_deviation", "id": "1"},
+              {"type": "avg", "field": "openclaw.telemetry.pattern_deviation", "id": "2"}
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "3",
+                "settings": {"size": "100", "order": "desc"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "seriesMapping": "auto",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "pointSize": {
+                "fixed": 5
+              }
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 3, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Risk Scores by User",
+        "type": "table",
+        "description": "Users ranked by risk score (0-100). Risk = weighted sum of: anomaly score (40%), deviation score (30%), policy violations (20%), after-hours activity (10%). >80 = CRITICAL.",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 9},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.risk_score:*",
+            "metrics": [{"type": "max", "field": "openclaw.telemetry.risk_score", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {"size": "30", "order": "desc", "orderBy": "1"}
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "user_id.keyword": "User ID",
+                "Max openclaw.telemetry.risk_score": "Risk Score"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [{"field": "Risk Score", "desc": true}]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "gradient-gauge",
+              "minValue": 0,
+              "maxValue": 100
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 50, "color": "yellow"},
+                {"value": 70, "color": "orange"},
+                {"value": 80, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "High-risk user detected",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [80],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "max"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "CRITICAL: User risk score >80. Multiple anomaly indicators present. Review activity timeline immediately and consider account suspension pending investigation.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-security"},
+            {"id": 2, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Anomaly Events Timeline",
+        "type": "table",
+        "description": "Chronological list of detected anomalies with reason codes. REASON CODES: VOL=volume spike, PAT=unusual pattern, TIM=timing anomaly, GEO=geographic, NEW=new behavior.",
+        "gridPos": {"h": 11, "w": 24, "x": 0, "y": 19},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.anomaly_detected:true"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "@timestamp": true,
+                "user_id": true,
+                "openclaw.telemetry.anomaly_score": true,
+                "openclaw.telemetry.anomaly_reason": true,
+                "openclaw.telemetry.anomaly_type": true,
+                "action": true,
+                "resource": true
+              },
+              "renameByName": {
+                "@timestamp": "Time",
+                "user_id": "User",
+                "openclaw.telemetry.anomaly_score": "Score",
+                "openclaw.telemetry.anomaly_reason": "Reason",
+                "openclaw.telemetry.anomaly_type": "Type",
+                "action": "Action",
+                "resource": "Resource"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Score"},
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "gradient-gauge"
+                },
+                {
+                  "id": "min",
+                  "value": 0
+                },
+                {
+                  "id": "max",
+                  "value": 1
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "green"},
+                      {"value": 0.5, "color": "yellow"},
+                      {"value": 0.8, "color": "red"}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Top Anomalous Users (24h)",
+        "type": "bar",
+        "description": "Users with most anomaly detections in last 24 hours. Multiple anomalies = persistent unusual behavior. Single anomaly may be legitimate change.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.anomaly_detected:true AND @timestamp:[now-24h TO now]",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {"size": "15", "order": "desc", "orderBy": "_count"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "showValue": "always"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "orange"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Anomaly Types Distribution",
+        "type": "piechart",
+        "description": "Breakdown by anomaly type. TYPES: Volume Spike (sudden increase), Unusual Pattern (different access sequence), Timing (after-hours), Geographic (new location), New Behavior (first-time action).",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.anomaly_detected:true",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "openclaw.telemetry.anomaly_type.keyword",
+                "id": "2",
+                "settings": {"size": "10", "order": "desc"}
+              }
+            ]
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Model Confidence Score",
+        "type": "gauge",
+        "description": "openclaw-telemetry ML model confidence (0-100%). Low confidence (<80%) = insufficient training data or model drift. Retrain model if sustained low confidence.",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 38},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "openclaw_telemetry_model_confidence",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 70, "color": "yellow"},
+                {"value": 80, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "Training Data Size",
+        "type": "stat",
+        "description": "Number of user-days used for baseline training. Minimum: 30 days per user for accurate anomaly detection. New users require 30-day onboarding period.",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 38},
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "openclaw_telemetry_training_samples",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 30, "color": "yellow"},
+                {"value": 90, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "False Positive Rate",
+        "type": "stat",
+        "description": "Percentage of anomalies marked as false positives by analysts. Target: <10%. High false positive rate reduces trust and alert fatigue. Tune thresholds if >15%.",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 38},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "openclaw.telemetry.anomaly_detected:true",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ]
+          },
+          {
+            "query": "openclaw.telemetry.anomaly_detected:true AND openclaw.telemetry.false_positive:true",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "2"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "binary",
+              "binary": {
+                "left": "Count (2)",
+                "operator": "/",
+                "right": "Count (1)"
+              },
+              "replaceFields": true
+            }
+          },
+          {
+            "id": "calculateField",
+            "options": {
+              "mode": "unary",
+              "unary": {
+                "operator": "*",
+                "value": 100
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 15, "color": "red"}
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "user_id",
+          "type": "query",
+          "label": "User ID",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"user_id.keyword\"}",
+          "multi": true,
+          "includeAll": true,
+          "allValue": "*"
+        },
+        {
+          "name": "anomaly_threshold",
+          "type": "custom",
+          "label": "Anomaly Threshold",
+          "options": [
+            {"text": "High (>0.8)", "value": "0.8"},
+            {"text": "Medium (>0.5)", "value": "0.5"},
+            {"text": "Low (>0.3)", "value": "0.3"}
+          ],
+          "current": {
+            "text": "High (>0.8)",
+            "value": "0.8"
+          }
+        },
+        {
+          "name": "time_range",
+          "type": "interval",
+          "label": "Time Range",
+          "options": [
+            {"text": "Last 1 hour", "value": "now-1h"},
+            {"text": "Last 6 hours", "value": "now-6h"},
+            {"text": "Last 24 hours", "value": "now-24h"},
+            {"text": "Last 7 days", "value": "now-7d"}
+          ],
+          "current": {
+            "text": "Last 6 hours",
+            "value": "now-6h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Elasticsearch",
+          "name": "Credential Incidents",
+          "enable": true,
+          "iconColor": "red",
+          "query": "event_type:INCIDENT_CREATED AND incident.type:\"credential-theft\""
+        },
+        {
+          "datasource": "Elasticsearch",
+          "name": "Policy Violations",
+          "enable": true,
+          "iconColor": "orange",
+          "query": "event_type:POLICY_VIOLATION"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "frameworks": [
+      {
+        "name": "SOC 2",
+        "controls": ["CC7.2 (System Monitoring)", "CC6.1 (Logical Access)"],
+        "evidence": "Continuous behavioral monitoring with ML-based anomaly detection. Provides evidence of unusual access patterns for SOC 2 audits."
+      },
+      {
+        "name": "ISO 27001",
+        "controls": ["A.12.4.1 (Event Logging)", "A.16.1.2 (Reporting Security Events)"],
+        "evidence": "Automated security event detection (A.16.1.2) with comprehensive logging (A.12.4.1). Anomaly events feed incident response process."
+      },
+      {
+        "name": "NIST 800-53",
+        "controls": ["AU-6 (Audit Review)", "SI-4 (System Monitoring)"],
+        "evidence": "Automated audit review using ML (AU-6). Continuous system monitoring for anomalies (SI-4)."
+      }
+    ]
+  },
+  "integration": {
+    "openclaw-telemetry": {
+      "description": "This dashboard visualizes data from openclaw-telemetry behavioral monitoring service. See: docs/guides/07-community-tools-integration.md",
+      "configuration": "configs/examples/with-community-tools.yml (telemetry section)",
+      "metrics_exported": [
+        "openclaw_telemetry_baseline_api_calls",
+        "openclaw_telemetry_current_api_calls",
+        "openclaw_telemetry_model_confidence",
+        "openclaw_telemetry_training_samples"
+      ],
+      "elasticsearch_fields": [
+        "openclaw.telemetry.anomaly_score (float 0.0-1.0)",
+        "openclaw.telemetry.anomaly_detected (boolean)",
+        "openclaw.telemetry.anomaly_reason (text)",
+        "openclaw.telemetry.anomaly_type (keyword: volume_spike|unusual_pattern|timing|geographic|new_behavior)",
+        "openclaw.telemetry.risk_score (integer 0-100)",
+        "openclaw.telemetry.volume_deviation (float, standard deviations)",
+        "openclaw.telemetry.pattern_deviation (float, standard deviations)",
+        "openclaw.telemetry.false_positive (boolean, analyst feedback)"
+      ]
+    }
+  },
+  "usage": "This dashboard is used by Security Analysts for advanced threat hunting and behavioral analysis. DAILY WORKFLOW: (1) Review risk scores table for high-risk users, (2) Investigate anomaly timeline for recent detections, (3) Validate anomalies (mark false positives to improve model), (4) Escalate high-risk users (score >80) to incident response. MODEL MAINTENANCE: Monitor model confidence and false positive rate weekly. Retrain if confidence <80% or FP rate >15%. NEW USER ONBOARDING: Expect elevated anomaly scores for first 30 days until baseline established.",
+  "related_playbooks": [
+    "playbook-credential-theft.md (IRP-001): Activate on geographic anomaly (impossible travel)",
+    "playbook-data-breach.md (IRP-004): Activate on volume spike (possible exfiltration)",
+    "docs/guides/07-community-tools-integration.md: openclaw-telemetry deployment and configuration"
+  ]
+}

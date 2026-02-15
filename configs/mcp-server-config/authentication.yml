@@ -1,0 +1,536 @@
+# MCP Server Authentication Configuration
+# Detailed authentication settings for Model Context Protocol servers
+#
+# Purpose: Configure mTLS, OAuth2, and MFA for MCP server authentication
+# References:
+#   - examples/security-controls/authentication.py
+#   - configs/agent-config/openclaw-agent.yml
+#
+# Compliance:
+#   - SOC 2 CC6.2: Prior to issuing system credentials and granting system access
+#   - ISO 27001 A.9.2.1: User registration and de-registration
+#   - ISO 27001 A.9.4.2: Secure log-on procedures
+#
+# Apply with:
+#   mcp-server --config mcp-server-hardening.yml \
+#              --auth-config authentication.yml
+
+# ============================================================================
+# MUTUAL TLS (mTLS) AUTHENTICATION
+# ============================================================================
+# Most secure authentication method - both client and server verify certificates
+# Use cases: Machine-to-machine communication, service accounts
+mtls:
+  enabled: true
+  
+  # Certificate Authority (CA) configuration
+  ca:
+    # CA certificate bundle (PEM format)
+    cert_file: "/etc/openclaw/ca.crt"
+    
+    # Multiple CAs can be trusted (certificate chain)
+    additional_ca_certs:
+      - "/etc/openclaw/intermediate-ca-1.crt"
+      - "/etc/openclaw/intermediate-ca-2.crt"
+    
+    # CA certificate validation
+    verify_ca_signature: true
+    verify_ca_expiry: true
+  
+  # Client certificate requirements
+  client_cert:
+    # Require client certificate (reject connections without cert)
+    required: true
+    
+    # Certificate chain verification depth
+    # 1 = client cert only, 2 = client + 1 intermediate, 3 = client + 2 intermediates
+    verify_depth: 3
+    
+    # Verify full certificate chain
+    verify_chain: true
+    
+    # OCSP (Online Certificate Status Protocol) validation
+    ocsp:
+      enabled: true
+      responder_url: "https://ocsp.openclaw.ai"
+      cache_timeout_seconds: 3600
+      fail_open: false  # Reject if OCSP check fails
+    
+    # CRL (Certificate Revocation List) checking
+    crl:
+      enabled: true
+      url: "https://ca.openclaw.ai/crl"
+      download_interval_seconds: 3600
+      cache_path: "/var/cache/openclaw/crl"
+      fail_open: false  # Reject if CRL unavailable
+  
+  # Certificate validation rules
+  validation:
+    # Check certificate expiry dates
+    check_expiry: true
+    expiry_warning_days: 30  # Warn when cert expires within 30 days
+    
+    # Check certificate purpose (Extended Key Usage)
+    check_key_usage: true
+    required_key_usages:
+      - "digitalSignature"
+      - "keyEncipherment"
+      - "clientAuth"
+    
+    # Subject Alternative Name (SAN) validation
+    san_validation:
+      enabled: true
+      require_san: true
+      allowed_san_types:
+        - "DNS"
+        - "URI"
+        - "IP"
+    
+    # Common Name (CN) extraction patterns
+    cn_patterns:
+      - "^openclaw-agent-.*$"     # openclaw-agent-prod, openclaw-agent-staging
+      - "^openclaw-gateway-.*$"   # openclaw-gateway-prod
+      - "^openclaw-service-.*$"   # openclaw-service-*
+    
+    # Organization (O) validation
+    allowed_organizations:
+      - "OpenClaw"
+      - "OpenClaw Inc"
+    
+    # Organizational Unit (OU) validation
+    allowed_organizational_units:
+      - "Engineering"
+      - "Security"
+      - "Operations"
+  
+  # Certificate-based identity extraction
+  identity:
+    # Extract user identity from certificate field
+    # Options: CN, SAN_DNS, SAN_URI, SAN_EMAIL, OU, O
+    extraction_method: "CN"
+    
+    # Regular expression to extract username from CN
+    # Example: CN=openclaw-agent-prod → username=agent-prod
+    extraction_regex: "^openclaw-([a-z]+-[a-z]+)$"
+    extraction_group: 1
+    
+    # Map certificate attributes to user claims
+    attribute_mapping:
+      - cert_field: "CN"
+        claim_name: "username"
+      - cert_field: "O"
+        claim_name: "organization"
+      - cert_field: "OU"
+        claim_name: "department"
+      - cert_field: "SAN_EMAIL"
+        claim_name: "email"
+  
+  # Certificate renewal & rotation
+  rotation:
+    # Automatic certificate renewal (requires cert-manager or ACME)
+    auto_renew: true
+    renew_before_expiry_days: 30
+    
+    # Certificate rotation notifications
+    notifications:
+      enabled: true
+      email_recipients:
+        - "security-team@openclaw.ai"
+      slack_webhook: ${SLACK_WEBHOOK_URL}
+
+# ============================================================================
+# OAUTH2 AUTHENTICATION
+# ============================================================================
+# Standard protocol for token-based authentication
+# Use cases: User authentication, third-party integrations
+oauth2:
+  enabled: true
+  
+  # OAuth2 provider configuration
+  provider:
+    name: "Auth0"  # Auth0, Okta, Keycloak, Custom
+    
+    # Provider endpoints (OpenID Connect Discovery)
+    discovery_url: "https://auth.openclaw.ai/.well-known/openid-configuration"
+    
+    # Manual endpoint configuration (if discovery disabled)
+    endpoints:
+      authorization: "https://auth.openclaw.ai/authorize"
+      token: "https://auth.openclaw.ai/oauth/token"
+      userinfo: "https://auth.openclaw.ai/userinfo"
+      jwks: "https://auth.openclaw.ai/.well-known/jwks.json"
+      revocation: "https://auth.openclaw.ai/oauth/revoke"
+      introspection: "https://auth.openclaw.ai/oauth/introspect"
+    
+    # Provider-specific settings
+    issuer: "https://auth.openclaw.ai/"
+    audience: "openclaw-mcp"
+    
+    # Client credentials (service account)
+    client_id: ${OAUTH2_CLIENT_ID}
+    client_secret: ${OAUTH2_CLIENT_SECRET}
+  
+  # Access token validation
+  access_token:
+    # Token format: JWT or opaque
+    format: "JWT"
+    
+    # JWT validation
+    jwt:
+      # Signature verification
+      verify_signature: true
+      
+      # Signing algorithms allowed (asymmetric only)
+      allowed_algorithms:
+        - "RS256"   # RSA with SHA-256 (most common)
+        - "RS384"   # RSA with SHA-384
+        - "RS512"   # RSA with SHA-512
+        - "ES256"   # ECDSA with P-256 and SHA-256
+        - "ES384"   # ECDSA with P-384 and SHA-384
+        - "ES512"   # ECDSA with P-521 and SHA-512
+      
+      # Claims verification
+      verify_issuer: true
+      expected_issuer: "https://auth.openclaw.ai/"
+      
+      verify_audience: true
+      expected_audience:
+        - "openclaw-mcp"
+        - "https://api.openclaw.ai"
+      
+      verify_expiry: true
+      clock_skew_seconds: 60  # Allow 60s clock drift
+      
+      verify_issued_at: true
+      max_age_seconds: 3600  # Reject tokens older than 1 hour
+      
+      # Required claims
+      required_claims:
+        - "sub"    # Subject (user ID)
+        - "iat"    # Issued At
+        - "exp"    # Expiry
+        - "aud"    # Audience
+        - "iss"    # Issuer
+        - "scope"  # Permissions
+      
+      # Custom claims validation
+      custom_claims:
+        - name: "tenant_id"
+          required: true
+          allowed_values:
+            - "openclaw-prod"
+            - "openclaw-staging"
+        
+        - name: "user_type"
+          required: true
+          allowed_values:
+            - "human"
+            - "service_account"
+    
+    # Opaque token introspection (if format: opaque)
+    introspection:
+      enabled: false
+      endpoint: "https://auth.openclaw.ai/oauth/introspect"
+      client_id: ${OAUTH2_CLIENT_ID}
+      client_secret: ${OAUTH2_CLIENT_SECRET}
+      cache_ttl_seconds: 300  # 5 minutes
+  
+  # Refresh token handling
+  refresh_token:
+    enabled: true
+    
+    # Refresh token rotation (security best practice)
+    rotation: true
+    
+    # Refresh token expiry
+    expiry_seconds: 86400  # 24 hours
+    
+    # Revoke refresh tokens on logout
+    revoke_on_logout: true
+  
+  # Scopes & permissions
+  scopes:
+    # Required scopes for all requests
+    required_scopes:
+      - "openid"
+      - "profile"
+    
+    # Resource-specific scopes
+    resource_scopes:
+      mcp_read:
+        description: "Read access to MCP resources"
+        operations:
+          - "GET"
+      
+      mcp_write:
+        description: "Write access to MCP resources"
+        operations:
+          - "POST"
+          - "PUT"
+          - "PATCH"
+      
+      mcp_delete:
+        description: "Delete access to MCP resources"
+        operations:
+          - "DELETE"
+      
+      mcp_admin:
+        description: "Administrative access to MCP server"
+        operations:
+          - "*"
+    
+    # Scope validation
+    enforce_scope_check: true
+    default_scope: "mcp_read"
+  
+  # Token caching (performance optimization)
+  token_cache:
+    enabled: true
+    backend: "redis"
+    redis_url: ${REDIS_URL}
+    redis_db: 2
+    key_prefix: "oauth2:token:"
+    ttl_seconds: 300  # 5 minutes
+    max_entries: 10000
+
+# ============================================================================
+# MULTI-FACTOR AUTHENTICATION (MFA)
+# ============================================================================
+# Additional security layer requiring second factor
+# Compliance: SOC 2 CC6.2, ISO 27001 A.9.4.2
+mfa:
+  enabled: true
+  
+  # MFA requirement policy
+  enforcement:
+    # Require MFA for all users
+    require_for_all: true
+    
+    # Require MFA for specific roles
+    require_for_roles:
+      - "admin"
+      - "security-ops"
+      - "incident-response"
+    
+    # Require MFA for privileged operations
+    require_for_operations:
+      - "DELETE /admin/*"
+      - "POST /config/*"
+      - "PUT /security/*"
+    
+    # Grace period for MFA enrollment
+    grace_period_days: 7
+    grace_period_reminders:
+      - 7   # Day 7 (last day)
+      - 3   # Day 3
+      - 1   # Day 1
+  
+  # TOTP (Time-based One-Time Password)
+  # Example: Google Authenticator, Authy
+  totp:
+    enabled: true
+    
+    # TOTP parameters (RFC 6238)
+    algorithm: "SHA1"
+    digits: 6
+    period_seconds: 30
+    
+    # Issuer name displayed in authenticator app
+    issuer: "OpenClaw MCP"
+    
+    # Allow previous/next TOTP codes (clock skew tolerance)
+    window: 1  # Allow ±1 time window (±30 seconds)
+    
+    # Rate limiting for TOTP verification
+    max_attempts: 5
+    lockout_duration_seconds: 300  # 5 minutes
+  
+  # WebAuthn / FIDO2
+  # Example: YubiKey, Touch ID, Windows Hello
+  webauthn:
+    enabled: true
+    
+    # Relying Party (RP) configuration
+    rp_id: "openclaw.ai"
+    rp_name: "OpenClaw"
+    rp_icon: "https://openclaw.ai/favicon.ico"
+    
+    # Origin validation
+    allowed_origins:
+      - "https://openclaw.ai"
+      - "https://app.openclaw.ai"
+    
+    # Attestation configuration
+    attestation_preference: "direct"  # direct, indirect, none
+    
+    # Authenticator selection criteria
+    authenticator_selection:
+      authenticator_attachment: "cross-platform"  # platform, cross-platform
+      require_resident_key: false
+      user_verification: "required"  # required, preferred, discouraged
+    
+    # Timeout for WebAuthn ceremony
+    timeout_seconds: 60
+    
+    # Supported algorithms
+    supported_algorithms:
+      - -7   # ES256 (ECDSA w/ SHA-256)
+      - -257 # RS256 (RSASSA-PKCS1-v1_5 w/ SHA-256)
+  
+  # SMS-based OTP (DISCOURAGED - less secure)
+  sms:
+    enabled: false  # Disabled due to SIM swapping attacks
+    provider: "twilio"
+    from_number: "+1234567890"
+    message_template: "Your OpenClaw verification code is: {code}"
+    code_length: 6
+    code_expiry_seconds: 300  # 5 minutes
+  
+  # Backup codes (recovery codes)
+  backup_codes:
+    enabled: true
+    count: 10
+    length: 12
+    algorithm: "SHA-256"
+    single_use: true  # Each code can only be used once
+
+# ============================================================================
+# SESSION MANAGEMENT
+# ============================================================================
+# Track authenticated sessions and enforce security policies
+session:
+  # Session storage backend
+  storage:
+    backend: "redis"
+    redis_url: ${REDIS_URL}
+    redis_db: 3
+    key_prefix: "session:"
+  
+  # Session lifetime
+  timeout:
+    # Absolute session timeout (regardless of activity)
+    absolute_timeout_seconds: 28800  # 8 hours
+    
+    # Idle timeout (no activity)
+    idle_timeout_seconds: 1800  # 30 minutes
+    
+    # Sliding window (extend session on activity)
+    sliding_window: true
+  
+  # Session security
+  security:
+    # Regenerate session ID after login (prevent session fixation)
+    regenerate_on_login: true
+    
+    # Bind session to client IP address
+    bind_to_ip: true
+    ip_change_action: "logout"  # logout, require_mfa, warn
+    
+    # Bind session to User-Agent
+    bind_to_user_agent: true
+    
+    # Concurrent session limits
+    max_concurrent_sessions: 3
+    concurrent_session_policy: "oldest"  # oldest, newest, deny
+  
+  # Session monitoring
+  monitoring:
+    # Log all session events
+    log_session_create: true
+    log_session_extend: true
+    log_session_destroy: true
+    log_session_timeout: true
+    
+    # Alert on suspicious activity
+    alert_on_ip_change: true
+    alert_on_geo_anomaly: true
+    alert_on_concurrent_login: true
+
+# ============================================================================
+# PASSWORD POLICY
+# ============================================================================
+# Password requirements for local accounts (if not using OAuth2/mTLS)
+# Note: External authentication (OAuth2) should be preferred
+password_policy:
+  enabled: false  # Disabled if using OAuth2/mTLS only
+  
+  # Password complexity requirements
+  complexity:
+    min_length: 16
+    max_length: 128
+    require_uppercase: true
+    require_lowercase: true
+    require_digits: true
+    require_special_chars: true
+    special_chars: "!@#$%^&*()-_=+[]{}|;:,.<>?"
+  
+  # Password history
+  history:
+    enabled: true
+    remember_count: 12  # Prevent reuse of last 12 passwords
+  
+  # Password expiry
+  expiry:
+    enabled: true
+    max_age_days: 90
+    warning_days: 14  # Warn user 14 days before expiry
+  
+  # Common password blocking
+  blocklist:
+    enabled: true
+    blocklist_file: "/etc/openclaw/password-blocklist.txt"
+    check_leaks: true  # Check against HaveIBeenPwned API
+  
+  # Account lockout (brute force protection)
+  lockout:
+    enabled: true
+    max_failed_attempts: 5
+    lockout_duration_seconds: 900  # 15 minutes
+    reset_after_success: true
+
+# ============================================================================
+# AUDIT LOGGING
+# ============================================================================
+# Log all authentication events for compliance and forensics
+# SOC 2 CC7.2, ISO 27001 A.12.4.1
+audit:
+  enabled: true
+  
+  # Log destinations
+  destinations:
+    - type: "elasticsearch"
+      url: ${ELASTICSEARCH_URL}
+      index: "openclaw-auth-audit-"
+      username: ${ELASTICSEARCH_USERNAME}
+      password: ${ELASTICSEARCH_PASSWORD}
+    
+    - type: "file"
+      path: "/var/log/openclaw/auth-audit.log"
+      rotation:
+        max_size_mb: 100
+        max_files: 50
+        compress: true
+  
+  # Events to log
+  events:
+    log_login_success: true
+    log_login_failure: true
+    log_logout: true
+    log_token_issued: true
+    log_token_refreshed: true
+    log_token_revoked: true
+    log_mfa_enrolled: true
+    log_mfa_verified: true
+    log_mfa_failed: true
+    log_session_created: true
+    log_session_destroyed: true
+    log_session_timeout: true
+    log_certificate_validated: true
+    log_certificate_rejected: true
+  
+  # Log retention
+  retention_days: 2555  # 7 years for SOC 2
+  
+  # Tamper-evident logging
+  tamper_evident: true
+  hash_algorithm: "SHA-256"

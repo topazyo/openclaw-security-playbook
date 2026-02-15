@@ -1,0 +1,686 @@
+{
+  "dashboard": {
+    "title": "User Activity Monitoring - Insider Threat Detection",
+    "description": "Real-time user behavior monitoring for detecting insider threats, unusual access patterns, and privilege misuse. Updated every 5 minutes. Alerts on after-hours activity, privilege escalations, and geographic anomalies.",
+    "tags": ["security", "user-activity", "insider-threat", "UEBA", "anomaly", "access"],
+    "timezone": "UTC",
+    "refresh": "5m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "version": 1,
+    "uid": "openclaw-user-activity",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Top Active Users (24 hours)",
+        "type": "table",
+        "description": "Users with highest activity counts. Investigate spikes: sudden increase may indicate compromised account or data exfiltration.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:* AND outcome:success",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {
+                  "size": "20",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "alias": "Activity Count"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "user_id.keyword": "User ID",
+                "Count": "Total Actions"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background-solid"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 100, "color": "yellow"},
+                {"value": 500, "color": "orange"},
+                {"value": 1000, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Unusual Access Patterns Heatmap",
+        "type": "heatmap",
+        "description": "Access by hour and day. Red boxes indicate unusual after-hours activity (2AM-5AM). Investigate: compromised credentials or malicious insider.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:(ACCESS_GRANTED OR ACCESS_DENIED)",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {
+                  "interval": "1h"
+                }
+              }
+            ]
+          }
+        ],
+        "options": {
+          "calculate": true,
+          "color": {
+            "scheme": "Spectral",
+            "exponent": 0.5
+          },
+          "yAxis": {
+            "decimals": 0
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "After-Hours Activity (10PM - 6AM UTC)",
+        "type": "bar",
+        "description": "User activity outside normal business hours. High after-hours activity may indicate: compromised account, insider threat, or legitimate international users. ALERT: >50 actions after hours triggers investigation.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:* AND @timestamp:[now-24h TO now] AND (hour:[22 TO 23] OR hour:[0 TO 6])",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ]
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "showValue": "always"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 20, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "After-hours activity anomaly",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [50],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "max"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "User has >50 after-hours actions in 24h. Possible compromised account or insider threat. Review activity logs immediately.",
+          "notifications": [
+            {"id": 1, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "title": "Privilege Escalations",
+        "type": "table",
+        "description": "Recent role changes and permission escalations. CRITICAL: Any admin role grants require immediate verification with access-review.md procedure.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:(PERMISSION_ESCALATION OR ROLE_CHANGE)",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {
+                  "interval": "auto"
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "@timestamp": true,
+                "user_id": true,
+                "action": true,
+                "resource": true,
+                "metadata.old_role": true,
+                "metadata.new_role": true
+              },
+              "renameByName": {
+                "@timestamp": "Time",
+                "user_id": "User",
+                "action": "Action",
+                "resource": "Target User",
+                "metadata.old_role": "Old Role",
+                "metadata.new_role": "New Role"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "admin": {"color": "red", "text": "ADMIN"}
+                }
+              }
+            ]
+          }
+        },
+        "alert": {
+          "name": "Admin privilege granted",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "count"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Admin role granted. Requires CISO approval per access-control-policy.md (SEC-002). Verify with requester immediately.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-security"},
+            {"id": 2, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Concurrent Sessions from Different IPs",
+        "type": "table",
+        "description": "Users with active sessions from >3 different IP addresses simultaneously. May indicate: account sharing, compromised credentials, or VPN usage.",
+        "gridPos": {"h": 9, "w": 12, "x": 0, "y": 16},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:LOGIN_SUCCESS AND @timestamp:[now-1h TO now]",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "ip_address.keyword",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {
+                  "size": "20",
+                  "order": "desc",
+                  "orderBy": "1",
+                  "min_doc_count": 3
+                }
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "user_id.keyword": "User ID",
+                "Cardinality ip_address.keyword": "Unique IPs"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 3, "color": "yellow"},
+                {"value": 5, "color": "orange"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Geographic Anomalies (Impossible Travel)",
+        "type": "geomap",
+        "description": "User logins by geographic location. Impossible travel: logins from locations >500km apart within <1 hour. CRITICAL ALERT: Indicates credential compromise.",
+        "gridPos": {"h": 9, "w": 12, "x": 12, "y": 16},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:LOGIN_SUCCESS",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "geohash_grid",
+                "field": "geo.location",
+                "id": "2",
+                "settings": {
+                  "precision": 3
+                }
+              }
+            ]
+          }
+        ],
+        "options": {
+          "view": {
+            "id": "coords",
+            "lat": 40,
+            "lon": -100,
+            "zoom": 4
+          },
+          "basemap": {
+            "type": "default"
+          },
+          "layers": [
+            {
+              "type": "markers",
+              "config": {
+                "showLegend": true,
+                "style": {
+                  "size": {
+                    "fixed": 5,
+                    "max": 15,
+                    "min": 2
+                  },
+                  "color": {
+                    "fixed": "dark-red"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "alert": {
+          "name": "Impossible travel detected",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [500],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "1h", "now"]
+              },
+              "reducer": {
+                "type": "diff_abs"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "CRITICAL: User logged in from locations >500km apart within 1 hour. Credential compromise likely. Activate IRP-001 (playbook-credential-theft.md). Force password reset immediately.",
+          "notifications": [
+            {"id": 1, "uid": "pagerduty-security"},
+            {"id": 2, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Failed Access Attempts by User",
+        "type": "bar",
+        "description": "Users with multiple failed access attempts. >10 failures = potential account enumeration or brute force. >20 failures = lock account per SEC-002.",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:ACCESS_DENIED",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "user_id.keyword",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count",
+                  "min_doc_count": 5
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "orange"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "Excessive access failures",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [20],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "15m", "now"]
+              },
+              "reducer": {
+                "type": "max"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "User has >20 failed access attempts in 15min. Lock account per access-control-policy.md (SEC-002). Potential brute force or account enumeration attack.",
+          "notifications": [
+            {"id": 1, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "Data Export Activity",
+        "type": "timeseries",
+        "description": "Conversation exports, skill downloads, and data retrieval operations. Spike in exports may indicate: legitimate migration, bulk download for analysis, or data exfiltration attempt.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "action:(export OR download OR retrieve) AND outcome:success",
+            "metrics": [{"type": "count", "id": "1"}],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "id": "2",
+                "settings": {
+                  "interval": "10m"
+                }
+              }
+            ],
+            "alias": "Export Operations"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 50, "color": "yellow"},
+                {"value": 100, "color": "red"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "name": "Bulk data export detected",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [100],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "10m", "now"]
+              },
+              "reducer": {
+                "type": "sum"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "5m",
+          "handler": 1,
+          "message": "ALERT: >100 export operations in 10 minutes. Possible data exfiltration. Review user activity and verify legitimate business need. Consider activating IRP-004 (playbook-data-breach.md) if suspicious.",
+          "notifications": [
+            {"id": 1, "uid": "slack-security-alerts"}
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "title": "Inactive Accounts (>90 days no login)",
+        "type": "stat",
+        "description": "User accounts with no recent activity. Orphaned accounts = security risk (ex-employees, contractors). Disable per access-review.md quarterly procedure.",
+        "gridPos": {"h": 4, "w": 12, "x": 0, "y": 33},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:LOGIN_SUCCESS AND @timestamp:[now-90d TO now]",
+            "metrics": [
+              {
+                "type": "cardinality",
+                "field": "user_id.keyword",
+                "id": "1"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "special",
+                "options": {
+                  "match": "null",
+                  "result": {
+                    "text": "0 inactive",
+                    "color": "green"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "User Activity Timeline",
+        "type": "logs",
+        "description": "Detailed user activity log feed for forensic analysis. Click on any event for full JSON payload.",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 33},
+        "datasource": "Elasticsearch",
+        "targets": [
+          {
+            "query": "event_type:* AND user_id:*",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "sortOrder": "Descending"
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "user_id",
+          "type": "query",
+          "label": "User ID",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"user_id.keyword\"}",
+          "multi": true,
+          "includeAll": true,
+          "allValue": "*"
+        },
+        {
+          "name": "time_range",
+          "type": "interval",
+          "label": "Time Range",
+          "auto": true,
+          "auto_count": 30,
+          "auto_min": "10s",
+          "options": [
+            {"text": "Last 1 hour", "value": "now-1h"},
+            {"text": "Last 24 hours", "value": "now-24h"},
+            {"text": "Last 7 days", "value": "now-7d"},
+            {"text": "Last 30 days", "value": "now-30d"}
+          ],
+          "current": {
+            "text": "Last 24 hours",
+            "value": "now-24h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Elasticsearch",
+          "name": "Security Incidents",
+          "enable": true,
+          "iconColor": "red",
+          "query": "event_type:INCIDENT_CREATED"
+        },
+        {
+          "datasource": "Elasticsearch",
+          "name": "Role Changes",
+          "enable": true,
+          "iconColor": "orange",
+          "query": "event_type:ROLE_CHANGE"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "frameworks": [
+      {
+        "name": "SOC 2",
+        "controls": ["CC7.2 (User Activity Monitoring)", "CC6.1 (Logical Access Controls)"],
+        "evidence": "Dashboard provides continuous user activity monitoring for SOC 2 audits. Tracks after-hours access, privilege escalations, and concurrent sessions."
+      },
+      {
+        "name": "ISO 27001",
+        "controls": ["A.9.2.5 (Review of User Access Rights)", "A.12.4.1 (Event Logging)", "A.16.1.7 (Collection of Evidence)"],
+        "evidence": "Supports quarterly access reviews (A.9.2.5) with inactive account detection. Provides forensic evidence collection via activity timeline."
+      },
+      {
+        "name": "NIST 800-53",
+        "controls": ["AC-2 (Account Management)", "AU-6 (Audit Review)", "IA-4 (Identifier Management)"],
+        "evidence": "Real-time account monitoring (AC-2), automated audit review (AU-6), user identifier tracking (IA-4)."
+      }
+    ]
+  },
+  "usage": "This dashboard enables Security Operations Center (SOC) analysts to detect insider threats and compromised accounts. KEY INDICATORS: (1) After-hours activity >50 actions, (2) Concurrent sessions from >3 IPs, (3) Impossible travel (>500km in <1h), (4) Admin role grants, (5) Bulk data exports >100 in 10min. WORKFLOW: Review daily at start of shift. Investigate all RED alerts immediately. Document findings in incident response system. Correlate with openclaw-detect shadow AI alerts.",
+  "related_playbooks": [
+    "playbook-credential-theft.md (IRP-001): Activate on impossible travel or >20 failed logins",
+    "access-review.md procedure: Use 'Inactive Accounts' panel for quarterly review",
+    "playbook-data-breach.md (IRP-004): Activate on bulk data export anomalies"
+  ]
+}

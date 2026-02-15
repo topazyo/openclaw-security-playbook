@@ -1,0 +1,556 @@
+# MCP Server Security Hardening Configuration
+# Model Context Protocol (MCP) server security controls
+#
+# Purpose: Defense-in-depth security for MCP servers
+# References:
+#   - docs/guides/03-network-segmentation.md
+#   - docs/guides/04-runtime-sandboxing.md
+#   - examples/security-controls/authentication.py
+#
+# Compliance:
+#   - SOC 2 CC6.1: Logical and physical access controls
+#   - ISO 27001 A.13.1.1: Network controls
+#   - ISO 27001 A.14.2.1: Secure development policy
+#
+# Apply with:
+#   mcp-server --config mcp-server-hardening.yml
+
+# ============================================================================
+# SERVER IDENTITY
+# ============================================================================
+server:
+  name: "mcp-server-prod"
+  version: "3.2.0"
+  environment: "production"
+  cluster_id: "mcp-cluster-us-east-1"
+  
+  # Binding configuration
+  # NEVER bind to 0.0.0.0 in production (exposes to all interfaces)
+  listen:
+    address: "127.0.0.1"  # Localhost only (use reverse proxy for external access)
+    port: 8443            # Non-standard port (not 443)
+    
+  # Worker configuration
+  workers: 4              # Number of worker processes
+  max_connections: 1000   # Maximum concurrent connections
+  connection_queue_size: 100
+
+# ============================================================================
+# TLS CONFIGURATION
+# ============================================================================
+# ISO 27001 A.13.1.1, A.14.1.2, A.14.1.3
+tls:
+  enabled: true
+  
+  # TLS version enforcement
+  # Only TLS 1.3 allowed (TLS 1.2 and below DISABLED)
+  min_version: "1.3"
+  max_version: "1.3"
+  
+  # Certificate configuration
+  certificates:
+    # Server certificate (PEM format)
+    cert_file: "/etc/openclaw/mcp-server.crt"
+    key_file: "/etc/openclaw/mcp-server.key"
+    
+    # CA bundle for client certificate verification
+    ca_file: "/etc/openclaw/ca.crt"
+    
+    # Certificate validation
+    verify_client_cert: true  # Mutual TLS (mTLS)
+    verify_depth: 3           # Certificate chain depth
+    
+    # OCSP stapling (Online Certificate Status Protocol)
+    ocsp_stapling: true
+    ocsp_cache_timeout_seconds: 3600
+  
+  # Cipher suites (TLS 1.3 only)
+  # Ordered by preference (strongest first)
+  ciphersuites:
+    - "TLS_AES_256_GCM_SHA384"         # AES-256 in GCM mode
+    - "TLS_CHACHA20_POLY1305_SHA256"   # ChaCha20-Poly1305 (fast on mobile)
+  
+  # Elliptic curves for ECDHE key exchange
+  curves:
+    - "X25519"      # Curve25519 (recommended)
+    - "secp384r1"   # NIST P-384
+  
+  # Session resumption (performance optimization)
+  session_cache:
+    enabled: true
+    size: 10000              # Number of cached sessions
+    timeout_seconds: 3600    # 1 hour
+  
+  # HSTS (HTTP Strict Transport Security)
+  hsts:
+    enabled: true
+    max_age_seconds: 31536000  # 1 year
+    include_subdomains: true
+    preload: true
+
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+# SOC 2 CC6.2, ISO 27001 A.9.2.1
+# References: configs/mcp-server-config/authentication.yml
+authentication:
+  # Authentication methods (multiple methods can be enabled)
+  methods:
+    - "mTLS"      # Mutual TLS (client certificates)
+    - "OAuth2"    # OAuth2 bearer tokens
+  
+  # mTLS configuration
+  mtls:
+    enabled: true
+    
+    # Certificate validation rules
+    require_client_cert: true
+    verify_cert_chain: true
+    check_crl: true  # Certificate Revocation List
+    crl_url: "https://ca.openclaw.ai/crl"
+    crl_cache_timeout_seconds: 3600
+    
+    # Allowed certificate attributes
+    allowed_issuers:
+      - "CN=OpenClaw CA,O=OpenClaw,C=US"
+    
+    allowed_subjects:
+      - "CN=openclaw-agent-*"
+      - "CN=openclaw-gateway-*"
+    
+    # Certificate expiry warning threshold
+    expiry_warning_days: 30
+  
+  # OAuth2 configuration  
+  oauth2:
+    enabled: true
+    
+    # OAuth2 provider settings
+    issuer: "https://auth.openclaw.ai"
+    audience: "openclaw-mcp"
+    
+    # Token validation
+    verify_signature: true
+    verify_expiry: true
+    verify_issuer: true
+    verify_audience: true
+    
+    # Allowed signing algorithms (asymmetric only)
+    allowed_algorithms:
+      - "RS256"   # RSA with SHA-256
+      - "ES256"   # ECDSA with SHA-256
+    
+    # JWKS (JSON Web Key Set) configuration
+    jwks_uri: "https://auth.openclaw.ai/.well-known/jwks.json"
+    jwks_cache_timeout_seconds: 3600
+    jwks_refresh_interval_seconds: 600  # 10 minutes
+    
+    # Token requirements
+    require_scope: true
+    required_scopes:
+      - "mcp:read"
+      - "mcp:write"
+    
+    # Token caching (performance optimization)
+    token_cache_enabled: true
+    token_cache_size: 10000
+    token_cache_ttl_seconds: 300  # 5 minutes
+  
+  # API Key authentication (fallback for service accounts)
+  api_key:
+    enabled: false  # Disabled by default (less secure than mTLS/OAuth2)
+    header_name: "X-OpenClaw-API-Key"
+    key_prefix: "oc_"
+    hash_algorithm: "SHA-256"
+
+# ============================================================================
+# AUTHORIZATION (RBAC)
+# ============================================================================
+# SOC 2 CC6.3, ISO 27001 A.9.2.3
+authorization:
+  enabled: true
+  
+  # Role-Based Access Control
+  rbac:
+    enabled: true
+    
+    # Default role for authenticated users
+    default_role: "guest"
+    
+    # Role definitions
+    roles:
+      guest:
+        description: "Read-only access to public resources"
+        permissions:
+          - "mcp:read:public"
+      
+      user:
+        description: "Standard user with read-write access"
+        permissions:
+          - "mcp:read:*"
+          - "mcp:write:user_data"
+      
+      developer:
+        description: "Developer with skill execution privileges"
+        permissions:
+          - "mcp:read:*"
+          - "mcp:write:*"
+          - "mcp:execute:skills"
+      
+      admin:
+        description: "Administrator with full access"
+        permissions:
+          - "mcp:*"
+    
+    # Role assignment sources
+    role_sources:
+      # Extract role from JWT claims
+      - type: "jwt_claim"
+        claim_name: "roles"
+      
+      # Extract role from client certificate CN
+      - type: "cert_cn"
+        pattern: "CN=openclaw-([a-z]+)-.*"  # Extracts role from CN
+      
+      # Static role assignments
+      - type: "static"
+        mappings:
+          "CN=openclaw-agent-prod": "user"
+          "CN=openclaw-gateway-prod": "developer"
+  
+  # Attribute-Based Access Control (ABAC)
+  abac:
+    enabled: false
+    policy_file: "/etc/openclaw/abac-policies.rego"  # OPA Rego policies
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+# SOC 2 CC6.1, ISO 27001 A.14.1.3
+rate_limiting:
+  enabled: true
+  
+  # Algorithm: token_bucket, leaky_bucket, fixed_window, sliding_window
+  algorithm: "token_bucket"
+  
+  # Global rate limits (across all clients)
+  global:
+    requests_per_minute: 10000
+    burst_size: 500
+  
+  # Per-IP rate limits
+  per_ip:
+    requests_per_minute: 100
+    burst_size: 50
+    
+    # Penalty for exceeding limits (temporary ban)
+    penalty_enabled: true
+    penalty_duration_seconds: 300  # 5 minutes
+  
+  # Per-user rate limits (authenticated users)
+  per_user:
+    requests_per_minute: 200
+    burst_size: 100
+  
+  # Redis configuration for distributed rate limiting
+  redis:
+    enabled: true
+    url: ${REDIS_URL}
+    db: 1
+    key_prefix: "mcp:ratelimit:"
+    key_ttl_seconds: 120
+  
+  # Rate limit response
+  response:
+    http_status_code: 429  # Too Many Requests
+    retry_after_seconds: 60
+    include_retry_after_header: true
+    custom_message: "Rate limit exceeded. Please retry after {retry_after} seconds."
+
+# ============================================================================
+# FIREWALL & NETWORK SECURITY
+# ============================================================================
+# ISO 27001 A.13.1.1, A.13.1.3
+# References: configs/mcp-server-config/firewall-rules.yml
+firewall:
+  # IP allowlist (only these IPs can connect)
+  allowlist:
+    enabled: true
+    ips:
+      # Internal networks (RFC 1918)
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+      
+      # Cloud provider IPs (AWS, GCP, Azure)
+      - "52.94.76.0/22"     # AWS us-east-1
+      - "35.190.0.0/16"     # GCP us-east1
+      - "20.190.0.0/16"     # Azure eastus
+    
+    # Allowlist enforcement
+    reject_unlisted: true
+    rejection_status_code: 403
+  
+  # IP blocklist (malicious IPs)
+  blocklist:
+    enabled: true
+    
+    # Static blocklist
+    ips:
+      - "198.51.100.0/24"   # Example malicious range
+    
+    # Dynamic blocklist sources
+    sources:
+      - type: "abuseipdb"
+        api_key: ${ABUSEIPDB_API_KEY}
+        confidence_threshold: 75
+        refresh_interval_seconds: 3600
+      
+      - type: "tor_exit_nodes"
+        url: "https://check.torproject.org/torbulkexitlist"
+        refresh_interval_seconds: 3600
+    
+    # Blocklist enforcement
+    rejection_status_code: 403
+    log_blocked_requests: true
+  
+  # Geo-blocking (country-level blocking)
+  geo_blocking:
+    enabled: true
+    
+    # Allowed countries (ISO 3166-1 alpha-2 codes)
+    allowed_countries:
+      - "US"  # United States
+      - "CA"  # Canada
+      - "GB"  # United Kingdom
+      - "DE"  # Germany
+      - "FR"  # France
+      - "JP"  # Japan
+      - "AU"  # Australia
+    
+    # Blocked countries (high-risk regions)
+    blocked_countries:
+      - "CN"  # China
+      - "RU"  # Russia
+      - "KP"  # North Korea
+      - "IR"  # Iran
+      - "SY"  # Syria
+    
+    # Fallback action for unknown geolocations
+    fallback_action: "block"
+    
+    # GeoIP database
+    geoip_database: "/var/lib/geoip/GeoLite2-Country.mmdb"
+    geoip_update_interval_days: 7
+
+# ============================================================================
+# DOS PROTECTION
+# ============================================================================
+# ISO 27001 A.14.1.3, A.17.2.1
+dos_protection:
+  # Connection limits
+  max_connections_per_ip: 10
+  max_connections_global: 1000
+  
+  # Connection timeouts
+  connection_timeout_seconds: 30
+  idle_timeout_seconds: 60
+  request_timeout_seconds: 30
+  
+  # SYN flood protection (TCP)
+  syn_cookies: true
+  tcp_fastopen: false  # Disabled due to security concerns
+  
+  # Slowloris protection (slow HTTP attacks)
+  slowloris_protection:
+    enabled: true
+    header_timeout_seconds: 10
+    body_timeout_seconds: 30
+  
+  # Request size limits
+  max_request_size_bytes: 10485760  # 10 MB
+  max_header_size_bytes: 8192       # 8 KB
+  max_uri_length: 2048
+  
+  # Connection queue protection
+  backlog_size: 100
+  reject_when_queue_full: true
+
+# ============================================================================
+# HTTP SECURITY HEADERS
+# ============================================================================
+# OWASP security headers for defense-in-depth
+http_headers:
+  # HSTS (HTTP Strict Transport Security)
+  strict_transport_security:
+    enabled: true
+    value: "max-age=31536000; includeSubDomains; preload"
+  
+  # Content Security Policy
+  content_security_policy:
+    enabled: true
+    value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+  
+  # X-Frame-Options (clickjacking protection)
+  x_frame_options:
+    enabled: true
+    value: "DENY"
+  
+  # X-Content-Type-Options (MIME sniffing protection)
+  x_content_type_options:
+    enabled: true
+    value: "nosniff"
+  
+  # X-XSS-Protection (legacy XSS protection)
+  x_xss_protection:
+    enabled: true
+    value: "1; mode=block"
+  
+  # Referrer-Policy
+  referrer_policy:
+    enabled: true
+    value: "strict-origin-when-cross-origin"
+  
+  # Permissions-Policy (formerly Feature-Policy)
+  permissions_policy:
+    enabled: true
+    value: "geolocation=(), microphone=(), camera=()"
+  
+  # Cache-Control (disable caching for sensitive data)
+  cache_control:
+    enabled: true
+    value: "no-store, no-cache, must-revalidate, proxy-revalidate"
+
+# ============================================================================
+# LOGGING & MONITORING
+# ============================================================================
+# SOC 2 CC7.2, ISO 27001 A.12.4.1
+logging:
+  # Log level: DEBUG, INFO, WARN, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Log format: json, text
+  format: "json"
+  
+  # Log destinations
+  destinations:
+    - type: "stdout"
+      enabled: true
+    
+    - type: "file"
+      enabled: true
+      path: "/var/log/openclaw/mcp-server.log"
+      rotation:
+        max_size_mb: 100
+        max_files: 10
+        compress: true
+    
+    - type: "syslog"
+      enabled: true
+      address: "localhost:514"
+      protocol: "udp"
+      tag: "mcp-server"
+    
+    - type: "elasticsearch"
+      enabled: true
+      url: ${ELASTICSEARCH_URL}
+      index: "openclaw-mcp-logs-"
+      username: ${ELASTICSEARCH_USERNAME}
+      password: ${ELASTICSEARCH_PASSWORD}
+  
+  # Log fields (ECS compatible)
+  fields:
+    - "timestamp"
+    - "level"
+    - "server_id"
+    - "client_ip"
+    - "user_id"
+    - "request_id"
+    - "method"
+    - "path"
+    - "status_code"
+    - "duration_ms"
+    - "bytes_sent"
+    - "bytes_received"
+    - "user_agent"
+    - "tls_version"
+    - "tls_cipher"
+  
+  # PII redaction
+  redact_pii: true
+  redact_patterns:
+    - "password"
+    - "api_key"
+    - "token"
+    - "secret"
+    - "ssn"
+    - "credit_card"
+  
+  # Security event logging
+  log_authentication_attempts: true
+  log_authorization_failures: true
+  log_rate_limit_exceeded: true
+  log_blocked_ips: true
+  log_tls_errors: true
+  log_certificate_expiry_warnings: true
+
+# ============================================================================
+# METRICS & HEALTH CHECKS
+# ============================================================================
+metrics:
+  # Prometheus metrics endpoint
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    
+    # Metrics to expose
+    metrics:
+      - "mcp_requests_total"
+      - "mcp_request_duration_seconds"
+      - "mcp_connections_active"
+      - "mcp_authentication_attempts_total"
+      - "mcp_authentication_failures_total"
+      - "mcp_rate_limit_exceeded_total"
+      - "mcp_blocked_ips_total"
+      - "mcp_tls_handshakes_total"
+      - "mcp_tls_errors_total"
+  
+  # Health check endpoint
+  health_check:
+    enabled: true
+    port: 8080
+    path: "/health"
+    
+    # Health check responses
+    healthy_status_code: 200
+    unhealthy_status_code: 503
+    
+    # Dependency checks
+    check_dependencies:
+      - name: "redis"
+        type: "tcp"
+        host: ${REDIS_HOST}
+        port: 6379
+        timeout_seconds: 2
+      
+      - name: "elasticsearch"
+        type: "http"
+        url: ${ELASTICSEARCH_URL}
+        timeout_seconds: 5
+
+# ============================================================================
+# GRACEFUL SHUTDOWN
+# ============================================================================
+shutdown:
+  # Graceful shutdown timeout
+  timeout_seconds: 30
+  
+  # Drain connections before shutdown
+  drain_connections: true
+  drain_timeout_seconds: 15
+  
+  # Signal handling
+  signals:
+    - "SIGTERM"  # Graceful shutdown
+    - "SIGINT"   # Interrupt (Ctrl+C)

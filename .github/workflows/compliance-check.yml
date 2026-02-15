@@ -1,0 +1,200 @@
+name: Compliance Check
+
+on:
+  pull_request:
+    paths:
+      - 'configs/**'
+      - 'docs/policies/**'
+      - 'configs/organization-policies/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  policy-validation:
+    name: Validate Security Policies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Validate SEC-002 (Data Classification)
+        run: |
+          python tools/policy-validator.py --policy SEC-002
+
+      - name: Validate SEC-003 (Vulnerability Management)
+        run: |
+          python tools/policy-validator.py --policy SEC-003
+
+      - name: Validate SEC-004 (Access Control)
+        run: |
+          python tools/policy-validator.py --policy SEC-004
+
+      - name: Validate SEC-005 (Incident Response)
+        run: |
+          python tools/policy-validator.py --policy SEC-005
+
+  config-syntax:
+    name: Configuration Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install yamllint
+        run: |
+          pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          yamllint -c .yamllint configs/
+
+      - name: Validate agent config
+        run: |
+          python -c "import yaml; yaml.safe_load(open('configs/templates/clawdbot.secure.yml'))"
+
+      - name: Validate MCP server config
+        run: |
+          python -c "import yaml; yaml.safe_load(open('configs/templates/gateway.hardened.yml'))"
+
+  security-tests:
+    name: Run Security Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run policy compliance tests
+        run: |
+          pytest tests/security/test_policy_compliance.py --junit-xml=test-results-policy.xml -v
+
+      - name: Run vulnerability scanning tests
+        run: |
+          pytest tests/security/test_vulnerability_scanning.py --junit-xml=test-results-vuln.xml -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results-*.xml
+          retention-days: 30
+
+  compliance-report:
+    name: Generate Compliance Report
+    runs-on: ubuntu-latest
+    needs: [policy-validation, security-tests]
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate SOC 2 report
+        run: |
+          python tools/compliance-reporter.py --framework SOC2 --output soc2-report.json
+
+      - name: Generate ISO 27001 report
+        run: |
+          python tools/compliance-reporter.py --framework ISO27001 --output iso27001-report.json
+
+      - name: Upload compliance reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-reports
+          path: |
+            soc2-report.json
+            iso27001-report.json
+          retention-days: 365
+
+      - name: Calculate compliance percentage
+        id: compliance
+        run: |
+          COMPLIANCE=$(python -c "import json; report = json.load(open('soc2-report.json')); print(report['compliance_percentage'])")
+          echo "percentage=$COMPLIANCE" >> $GITHUB_OUTPUT
+
+      - name: Comment compliance status on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '## 📋 Compliance Check Results\n\n';
+            
+            // SOC 2 report
+            const soc2 = JSON.parse(fs.readFileSync('soc2-report.json', 'utf8'));
+            comment += `### SOC 2 Type II\n`;
+            comment += `- **Compliance**: ${soc2.compliance_percentage}%\n`;
+            comment += `- **Implemented**: ${soc2.implemented_count}/${soc2.implemented_count + soc2.pending_count} controls\n`;
+            if (soc2.pending_count > 0) {
+              comment += `- ⚠️ **${soc2.pending_count}** controls pending\n`;
+            } else {
+              comment += `- ✅ All controls implemented\n`;
+            }
+            comment += '\n';
+            
+            // ISO 27001 report
+            const iso = JSON.parse(fs.readFileSync('iso27001-report.json', 'utf8'));
+            comment += `### ISO 27001:2022\n`;
+            comment += `- **Compliance**: ${iso.compliance_percentage}%\n`;
+            comment += `- **Implemented**: ${iso.implemented_count}/${iso.implemented_count + iso.pending_count} controls\n`;
+            if (iso.pending_count > 0) {
+              comment += `- ⚠️ **${iso.pending_count}** controls pending\n`;
+            } else {
+              comment += `- ✅ All controls implemented\n`;
+            }
+            
+            comment += '\n---\n';
+            comment += '📊 [View detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n';
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+
+      - name: Fail if compliance below 95%
+        run: |
+          COMPLIANCE=${{ steps.compliance.outputs.percentage }}
+          if (( $(echo "$COMPLIANCE < 95" | bc -l) )); then
+            echo "❌ Compliance percentage ($COMPLIANCE%) is below required threshold (95%)"
+            exit 1
+          else
+            echo "✅ Compliance percentage ($COMPLIANCE%) meets threshold"
+          fi

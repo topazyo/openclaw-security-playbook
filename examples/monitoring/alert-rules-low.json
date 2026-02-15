@@ -1,0 +1,184 @@
+{
+  "alert_rules": {
+    "category": "Informational / Low Priority",
+    "description": "Non-urgent notifications and scheduled reports. No SLA required. For situational awareness, trend analysis, and executive reporting. Email delivery only.",
+    "notification_channels": {
+      "email": {
+        "smtp_server": "${SMTP_SERVER}",
+        "from": "security-reports@openclaw.ai",
+        "reply_to": "security-team@openclaw.ai"
+      }
+    },
+    "scheduled_reports": [
+      {
+        "id": "low-001",
+        "name": "Daily Security Digest",
+        "severity": "Informational",
+        "description": "Morning summary of security events from previous 24 hours. Provides situational awareness for security team without requiring immediate action.",
+        "schedule": {
+          "type": "cron",
+          "expression": "0 9 * * *",
+          "timezone": "UTC",
+          "description": "Every day at 9 AM UTC"
+        },
+        "data_sources": {
+          "elasticsearch": {
+            "index": "openclaw-logs-*",
+            "time_range": "[now-24h TO now]",
+            "queries": [
+              {
+                "name": "login_failures",
+                "query": "event_type:LOGIN_FAILURE",
+                "threshold_normal": "<10"
+              },
+              {
+                "name": "policy_violations",
+                "query": "event_type:POLICY_VIOLATION",
+                "threshold_normal": "<5"
+              },
+              {
+                "name": "skill_executions",
+                "query": "event_type:SKILL_EXECUTE",
+                "aggregations": ["count", "top_skills", "top_users"]
+              },
+              {
+                "name": "data_exports",
+                "query": "event_type:(FILE_DOWNLOAD OR DATA_EXPORT)",
+                "aggregations": ["count", "volume_mb", "top_users"]
+              },
+              {
+                "name": "config_changes",
+                "query": "event_type:CONFIG_CHANGE",
+                "aggregations": ["count", "by_service"]
+              }
+            ]
+          },
+          "prometheus": {
+            "metrics": [
+              "openclaw_uptime_percent",
+              "openclaw_error_rate",
+              "openclaw_request_latency_p95"
+            ]
+          }
+        },
+        "recipients": ["security-team@openclaw.ai"],
+        "email_template": {
+          "subject": "Daily Security Digest - {{date}}",
+          "body": "# OpenClaw Security Daily Digest\n**Date:** {{date}}\n**Report Period:** {{time_range}}\n\n---\n\n## 📊 Activity Summary\n\n### Failed Login Attempts: {{login_failures_count}}\n{{#if login_failures_count > 10}}\n⚠️ **Above normal threshold** (baseline: <10)\n{{else}}\n✅ Within normal range\n{{/if}}\n\n**Top Sources:**\n{{#each top_failure_ips}}\n- {{ip}} ({{country}}): {{count}} failures\n{{/each}}\n\n### Policy Violations: {{policy_violations_count}}\n{{#if policy_violations_count > 5}}\n⚠️ **Above normal threshold** (baseline: <5)\n{{else}}\n✅ Within normal range\n{{/if}}\n\n**Breakdown by Policy:**\n{{#each violation_types}}\n- {{policy_name}}: {{count}}\n{{/each}}\n\n### AI Agent Activity\n\n**Skill Executions:** {{skill_executions_count}}\n\n**Top Skills:**\n{{#each top_skills}}\n1. {{skill_name}}: {{count}} executions\n{{/each}}\n\n**Most Active Users:**\n{{#each top_users}}\n1. {{user_id}}: {{count}} skill executions\n{{/each}}\n\n### Data Access\n\n**Data Exports/Downloads:** {{data_exports_count}}\n**Total Volume:** {{data_exports_volume_mb}} MB\n\n{{#if data_exports_volume_mb > 1000}}\nℹ️ **High volume day** (>1GB) - Review dashboard-user-activity.json Panel 8\n{{/if}}\n\n### Configuration Changes: {{config_changes_count}}\n\n**By Service:**\n{{#each config_changes_by_service}}\n- {{service}}: {{count}} changes\n{{/each}}\n\n---\n\n## 🖥️ System Health\n\n- **Uptime:** {{uptime_percent}}% (SLA: 99.9%)\n- **Error Rate:** {{error_rate}}% (Target: <1%)\n- **API Latency (p95):** {{latency_p95_ms}}ms (Target: <500ms)\n\n{{#if uptime_percent < 99.9}}\n⚠️ **SLA breach** - Review dashboard-system-health.json\n{{else}}\n✅ All systems healthy\n{{/if}}\n\n---\n\n## 🔍 Items Requiring Attention\n\n{{#if review_items}}\n{{#each review_items}}\n- {{item}}\n{{/each}}\n{{else}}\n✅ No items requiring follow-up\n{{/if}}\n\n---\n\n## 📈 Quick Links\n\n- [Security Overview Dashboard]({{dashboard_security_overview}})\n- [User Activity Dashboard]({{dashboard_user_activity}})\n- [System Health Dashboard]({{dashboard_system_health}})\n- [Incident Response Dashboard]({{dashboard_incident_response}})\n\n---\n\n*Automated daily report from OpenClaw Security Monitoring*\n*Next report: {{next_report_time}}*\n"
+        }
+      },
+      {
+        "id": "low-002",
+        "name": "Weekly Security Summary",
+        "severity": "Informational",
+        "description": "Comprehensive weekly report with trends, metrics, and highlights. Sent Friday end-of-day for executive review and team retrospective.",
+        "schedule": {
+          "type": "cron",
+          "expression": "0 17 * * 5",
+          "timezone": "UTC",
+          "description": "Every Friday at 5 PM UTC"
+        },
+        "data_sources": {
+          "elasticsearch": {
+            "time_range": "[now-7d TO now]",
+            "aggregations": "all_security_events"
+          },
+          "prometheus": {
+            "time_range": "7d",
+            "metrics": "all_health_metrics"
+          }
+        },
+        "recipients": [
+          "security-team@openclaw.ai",
+          "ops-team@openclaw.ai",
+          "CISO@openclaw.ai"
+        ],
+        "email_template": {
+          "subject": "Weekly Security Summary - Week {{week_number}}",
+          "body": "# Weekly Security Summary\n**Week:** {{week_start}} to {{week_end}}\n**Week Number:** {{week_number}}/52\n\n---\n\n## Executive Summary\n\n{{summary_text}}\n\n**Key Highlights:**\n{{#each highlights}}\n- {{highlight}}\n{{/each}}\n\n---\n\n## 📊 Incident Summary\n\n**Total Incidents:** {{total_incidents}} ({{week_over_week_change}})\n\n### By Severity:\n- **P0 Critical:** {{p0_count}} (SLA: 30min)\n- **P1 High:** {{p1_count}} (SLA: 1h)\n- **P2 Medium:** {{p2_count}} (SLA: 8h)\n- **P3 Low:** {{p3_count}} (SLA: 72h)\n\n### By Type:\n{{#each incident_types}}\n- {{type}}: {{count}}\n{{/each}}\n\n### Incident Metrics:\n- **MTTR (Mean Time To Resolve):** {{mttr_hours}}h (Target: <4h)\n- **SLA Compliance:** {{sla_compliance_percent}}% (Target: 100%)\n- **Incidents Past SLA:** {{overdue_count}}\n\n{{#if mttr_hours > 4}}\n⚠️ **MTTR above target** - Review incident response efficiency\n{{/if}}\n\n---\n\n## 👥 User Activity Trends\n\n**Active Users:** {{active_users_count}}\n**Top 10 Users by Activity:**\n{{#each top_users}}\n{{index}}. {{user_id}}: {{activity_count}}\n{{/each}}\n\n**After-Hours Activity:**\n- Events 10PM-6AM: {{after_hours_count}}\n- Users active after-hours: {{after_hours_users}}\n\n{{#if after_hours_count > 100}}\nℹ️ **High after-hours activity** - Verify legitimate (on-call, incidents, deployments)\n{{/if}}\n\n**Geographic Distribution:**\n{{#each top_countries}}\n- {{country}}: {{user_count}} users, {{activity_count}} activities\n{{/each}}\n\n---\n\n## 🔍 Anomaly Detection (openclaw-telemetry)\n\n**Anomalies Detected:** {{anomalies_count}}\n**High-Risk Users (score >0.8):** {{high_risk_users}}\n\n{{#if high_risk_users > 0}}\n**Users Requiring Review:**\n{{#each high_risk_user_list}}\n- {{user_id}}: Risk Score {{risk_score}}/100 - {{anomaly_reason}}\n{{/each}}\n{{/if}}\n\n**Model Performance:**\n- Confidence: {{model_confidence}}% (Target: >80%)\n- False Positive Rate: {{false_positive_rate}}% (Target: <10%)\n- Training Samples: {{training_samples}}\n\n{{#if model_confidence < 80}}\n⚠️ **Model confidence low** - Consider retraining with more data\n{{/if}}\n\n---\n\n## 🖥️ System Health\n\n**Uptime:** {{weekly_uptime}}% (SLA: 99.9%)\n**Services Monitored:** {{services_count}}\n\n**Availability by Service:**\n{{#each services}}\n- {{service}}: {{uptime}}%\n{{/each}}\n\n**Performance Metrics:**\n- **Average Error Rate:** {{avg_error_rate}}%\n- **p95 Latency:** {{p95_latency}}ms\n- **Peak CPU Usage:** {{peak_cpu}}%\n- **Peak Memory Usage:** {{peak_memory}}%\n\n**Deployments This Week:** {{deployments_count}}\n\n---\n\n## 🔐 Compliance & Governance\n\n**Training Completion:** {{training_completion}}% (Target: 100%)\n- Users trained this week: {{users_trained_this_week}}\n- Training overdue: {{training_overdue_count}}\n\n**Access Reviews:**\n- Pending reviews: {{pending_reviews}}\n- Completed this week: {{completed_reviews}}\n- Next quarterly deadline: {{next_review_deadline}}\n\n**Vulnerability Management:**\n- Critical vulns: {{critical_vulns}} (SLA: 7 days)\n- High vulns: {{high_vulns}} (SLA: 30 days)\n- Patched this week: {{patched_this_week}}\n- Overdue patches: {{overdue_patches}}\n\n---\n\n## 📈 Week-over-Week Trends\n\n{{#each metrics}}\n**{{metric_name}}:**\n- This week: {{current_value}}\n- Last week: {{previous_value}}\n- Change: {{change_percent}}% {{trend_arrow}}\n\n{{/each}}\n\n---\n\n## 🎯 Action Items for Next Week\n\n{{#each action_items}}\n- [ ] {{action}}\n{{/each}}\n\n---\n\n## 📅 Upcoming\n\n{{#each upcoming_events}}\n- **{{date}}:** {{event}}\n{{/each}}\n\n---\n\n*Weekly report generated from OpenClaw Security Monitoring*\n*Questions? Reply to this email or contact security-team@openclaw.ai*\n"
+        },
+        "attachments": [
+          {
+            "type": "pdf",
+            "name": "weekly-security-summary-week-{{week_number}}.pdf",
+            "source": "dashboard-executive-summary.json"
+          }
+        ]
+      },
+      {
+        "id": "low-003",
+        "name": "Monthly Executive Report",
+        "severity": "Informational",
+        "description": "Comprehensive monthly report for CISO, executives, and board. Includes KPIs, compliance status, major incidents, initiatives, and budget. Sent first Monday of month.",
+        "schedule": {
+          "type": "cron",
+          "expression": "0 9 1-7 * 1",
+          "timezone": "UTC",
+          "description": "First Monday of each month at 9 AM UTC"
+        },
+        "data_sources": {
+          "elasticsearch": {
+            "time_range": "[now-30d TO now]"
+          },
+          "prometheus": {
+            "time_range": "30d"
+          },
+          "aggregations": "executive_kpis"
+        },
+        "recipients": [
+          "CISO@openclaw.ai",
+          "CEO@openclaw.ai",
+          "CFO@openclaw.ai",
+          "board@openclaw.ai"
+        ],
+        "email_template": {
+          "subject": "Monthly Executive Security Report - {{month}} {{year}}",
+          "body": "# Executive Security Report\n**Period:** {{month}} {{year}}\n**Prepared For:** Executive Leadership & Board of Directors\n**Prepared By:** CISO\n**Date:** {{report_date}}\n\n---\n\n## Executive Summary\n\n{{executive_summary_narrative}}\n\n**Overall Security Posture:** {{posture_rating}} / 100\n({{posture_change}} from last month)\n\n---\n\n## 🎯 Key Performance Indicators\n\n### Incidents\n- **Total Incidents:** {{total_incidents}}\n  - P0 Critical: {{p0_count}}\n  - P1 High: {{p1_count}}\n  - P2 Medium: {{p2_count}}\n  - P3 Low: {{p3_count}}\n- **Month-over-Month:** {{incidents_mom_change}}%\n- **Year-over-Year:** {{incidents_yoy_change}}%\n- **MTTR:** {{mttr_hours}}h (Target: <4h) {{mttr_trend}}\n\n### Compliance\n- **SOC 2:** {{soc2_compliance}}% ({{soc2_implemented}}/36 controls)\n- **ISO 27001:** {{iso27001_compliance}}% ({{iso27001_implemented}}/93 controls)\n- **GDPR:** {{gdpr_compliance}}% compliant\n- **Training Completion:** {{training_completion}}% (Target: 100%)\n\n### System Health\n- **Uptime:** {{monthly_uptime}}% (SLA: 99.9%)\n- **SLA Breaches:** {{sla_breaches}}\n- **Error Rate:** {{error_rate}}% (Target: <1%)\n\n### Vulnerabilities\n- **Critical:** {{critical_vulns}} ({{critical_patched}} patched)\n- **High:** {{high_vulns}} ({{high_patched}} patched)\n- **Patch Compliance:** {{patch_compliance}}%\n\n---\n\n## 📊 Major Incidents & Response\n\n{{#if major_incidents}}\n{{#each major_incidents}}\n### {{incident_id}}: {{title}}\n- **Severity:** {{severity}}\n- **Date:** {{date}}\n- **Impact:** {{impact}}\n- **Root Cause:** {{root_cause}}\n- **Resolution:** {{resolution}}\n- **Lessons Learned:** {{lessons_learned}}\n- **Preventive Actions:** {{preventive_actions}}\n\n{{/each}}\n{{else}}\n✅ No major incidents (P0/P1) this month\n{{/if}}\n\n---\n\n## 🚀 Security Initiatives & Progress\n\n{{#each initiatives}}\n### {{initiative_name}}\n- **Owner:** {{owner}}\n- **Progress:** {{completion}}%\n- **Status:** {{status}}\n- **Target Date:** {{target_date}}\n- **Budget:** {{budget_spent}}/{{budget_allocated}}\n- **Key Milestones:**\n  {{#each milestones}}\n  - {{milestone}} ({{status}})\n  {{/each}}\n{{/each}}\n\n---\n\n## 💰 Security Budget\n\n**Annual Budget:** ${{annual_budget}}\n**YTD Spend:** ${{ytd_spend}} ({{budget_utilization}}%)\n\n**Breakdown:**\n- Tools & Software: ${{tools_spend}} ({{tools_percent}}%)\n- Personnel: ${{personnel_spend}} ({{personnel_percent}}%)\n- Training: ${{training_spend}} ({{training_percent}}%)\n- Audits & Consulting: ${{consulting_spend}} ({{consulting_percent}}%)\n- Incident Response: ${{incident_spend}} ({{incident_percent}}%)\n\n{{#if budget_utilization > 100}}\n⚠️ **Over budget** - Review spending priorities\n{{else if budget_utilization < 80}}\nℹ️ **Under budget** - Consider accelerating initiatives\n{{/if}}\n\n---\n\n## 📋 Compliance & Audit Status\n\n### SOC 2 Certification\n- **Status:** {{soc2_status}}\n- **Last Audit:** {{last_audit_date}}\n- **Next Audit:** {{next_audit_date}}\n- **Findings:** {{soc2_findings}}\n- **Remediation Status:** {{soc2_remediation_status}}\n\n### ISO 27001 Certification\n- **Status:** {{iso27001_status}}\n- **Certification Date:** {{iso27001_cert_date}}\n- **Next Review:** {{iso27001_next_review}}\n\n### GDPR Compliance\n- **Breach Notifications:** {{gdpr_breaches}} (72-hour requirement)\n- **Data Subject Requests:** {{dsar_count}} (30-day SLA)\n- **DPO:** {{dpo_name}}\n\n---\n\n## 🎓 Training & Awareness\n\n- **Employees Trained:** {{employees_trained}}/{{total_employees}} ({{training_completion}}%)\n- **Training Completion by Department:**\n  {{#each training_by_dept}}\n  - {{department}}: {{completion}}%\n  {{/each}}\n- **Phishing Simulations:** {{phishing_simulations}}\n  - Click Rate: {{phishing_click_rate}}% (Target: <5%)\n  - Report Rate: {{phishing_report_rate}}% (Target: >70%)\n\n---\n\n## 🔮 Outlook & Priorities (Next Month)\n\n{{#each next_month_priorities}}\n### {{priority}}\n{{description}}\n{{/each}}\n\n---\n\n## 📅 Upcoming Board Presentation\n\n**Date:** {{board_presentation_date}}\n**Topics:**\n{{#each board_topics}}\n- {{topic}}\n{{/each}}\n\n---\n\n**Prepared by:** {{ciso_name}}, Chief Information Security Officer\n**Contact:** {{ciso_email}}\n\n*For detailed metrics and dashboards, visit: {{dashboard_executive_summary_link}}*\n*Confidential - For Executive & Board Use Only*\n"
+        },
+        "attachments": [
+          {
+            "type": "pdf",
+            "name": "executive-security-report-{{month}}-{{year}}.pdf",
+            "source": "dashboard-executive-summary.json",
+            "include_charts": true
+          },
+          {
+            "type": "pdf",
+            "name": "compliance-evidence-{{month}}-{{year}}.pdf",
+            "source": "dashboard-compliance.json"
+          }
+        ],
+        "distribution": {
+          "confidentiality": "Executive & Board Only",
+          "retention": "7 years (SOC 2 requirement)"
+        }
+      }
+    ],
+    "ad_hoc_reports": {
+      "description": "On-demand reports available via CLI: openclaw-security-cli.py report generate --type [incident|compliance|user_activity|vulnerabilities]",
+      "available_reports": [
+        {
+          "name": "Incident Response Report",
+          "command": "openclaw-security-cli.py report generate --type incident --id {{incident_id}}",
+          "output": "PDF with timeline, actions taken, evidence, root cause, lessons learned"
+        },
+        {
+          "name": "User Activity Report",
+          "command": "openclaw-security-cli.py report generate --type user_activity --user {{user_id}} --days 30",
+          "output": "CSV with all user activities for forensic analysis"
+        },
+        {
+          "name": "Compliance Audit Package",
+          "command": "openclaw-security-cli.py report generate --type compliance --framework soc2",
+          "output": "ZIP with evidence for all SOC 2 controls (dashboards, logs, policies)"
+        }
+      ]
+    },
+    "retention_policy": {
+      "daily_digests": "30 days",
+      "weekly_summaries": "1 year",
+      "monthly_executive_reports": "7 years (SOC 2 CC7.2)",
+      "ad_hoc_reports": "As needed per incident retention policy"
+    }
+  }
+}

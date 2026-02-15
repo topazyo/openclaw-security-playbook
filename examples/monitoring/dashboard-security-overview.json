@@ -1,0 +1,1012 @@
+{
+  "dashboard": {
+    "title": "OpenClaw Security Overview",
+    "description": "High-level security posture for SOC team",
+    "version": "8.12.0",
+    "author": "OpenClaw Security Team",
+    "created": "2026-02-14T00:00:00Z",
+    "tags": ["security", "soc", "monitoring"],
+    "timezone": "UTC",
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Failed Login Attempts",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "action:\"login\" AND outcome:\"failure\"",
+            "alias": "Failed Logins",
+            "metrics": [
+              {
+                "type": "count",
+                "field": "@timestamp"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "5m"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "display": true,
+            "placement": "bottom"
+          }
+        },
+        "alert": {
+          "name": "High Failed Login Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Failed login attempts exceed threshold (>10 per hour). Possible credential stuffing attack. See playbook-credential-theft.md (IRP-001).",
+          "noDataState": "no_data",
+          "notifications": [
+            {
+              "uid": "pagerduty-security"
+            },
+            {
+              "uid": "slack-security-alerts"
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Policy Violations",
+        "type": "bargauge",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "policy_violation:true",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "violation_type.keyword",
+                "settings": {
+                  "size": 10,
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 50
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "prompt_injection"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rate_limit_exceeded"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "orange",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      },
+      {
+        "id": 3,
+        "title": "Blocked Skills",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "action:\"skill_blocked\" OR openclaw_shield.action:\"block\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "skill_name.keyword",
+                "settings": {
+                  "size": 20,
+                  "order": "desc",
+                  "orderBy": "_count"
+                },
+                "id": "2"
+              },
+              {
+                "type": "terms",
+                "field": "block_reason.keyword",
+                "settings": {
+                  "size": 5
+                },
+                "id": "3"
+              },
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "settings": {
+                  "interval": "auto",
+                  "min_doc_count": 1
+                },
+                "id": "4"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "skill_name": 0,
+                "block_reason": 1,
+                "@timestamp": 2,
+                "Count": 3
+              },
+              "renameByName": {
+                "skill_name": "Skill Name",
+                "block_reason": "Block Reason",
+                "@timestamp": "Last Occurrence",
+                "Count": "Block Count"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Block Count"
+              },
+              "properties": [
+                {
+                  "id": "custom.align",
+                  "value": "right"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Block Count",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "title": "Active Incidents",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 6,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "incident.status:\"active\" OR incident.status:\"investigating\" OR incident.status:\"contained\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "incident.severity.keyword",
+                "settings": {
+                  "size": 4,
+                  "order": "desc"
+                }
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P0-Critical"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "dark-red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P1-High"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P2-Medium"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "yellow",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P3-Low"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "green",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "links": [
+          {
+            "title": "Incident Response Dashboard",
+            "url": "/d/incident-response"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Top Security Alerts (24h)",
+        "type": "table",
+        "gridPos": {
+          "x": 6,
+          "y": 16,
+          "w": 18,
+          "h": 6
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "alert:true OR severity:(high OR critical)",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "alert_type.keyword",
+                "settings": {
+                  "size": 15,
+                  "order": "desc",
+                  "orderBy": "_count"
+                },
+                "id": "2"
+              },
+              {
+                "type": "max",
+                "field": "@timestamp",
+                "id": "3"
+              }
+            ]
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "alert_type": 0,
+                "Count": 1,
+                "Max @timestamp": 2
+              },
+              "renameByName": {
+                "alert_type": "Alert Type",
+                "Count": "Occurrences",
+                "Max @timestamp": "Last Occurrence"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "Occurrences",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Occurrences"
+              },
+              "properties": [
+                {
+                  "id": "custom.align",
+                  "value": "right"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Last Occurrence"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeFromNow"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": []
+        }
+      },
+      {
+        "id": 6,
+        "title": "Anomaly Detection Events",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 22,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "openclaw_telemetry.anomaly_score:>0.8",
+            "alias": "High Anomaly Score (>0.8)",
+            "metrics": [
+              {
+                "type": "count",
+                "field": "@timestamp"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "10m"
+              }
+            ]
+          },
+          {
+            "datasource": "Elasticsearch",
+            "query": "openclaw_telemetry.anomaly_score:>0.5 AND openclaw_telemetry.anomaly_score:<=0.8",
+            "alias": "Medium Anomaly Score (0.5-0.8)",
+            "metrics": [
+              {
+                "type": "count",
+                "field": "@timestamp"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "date_histogram",
+                "field": "@timestamp",
+                "interval": "10m"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "High Anomaly Score (>0.8)"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Medium Anomaly Score (0.5-0.8)"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "yellow",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "display": true,
+            "placement": "bottom"
+          }
+        },
+        "links": [
+          {
+            "title": "Anomaly Detection Dashboard",
+            "url": "/d/anomaly-detection"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Credential Exposure Attempts",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 22,
+          "w": 6,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "alert_type:\"credential_exposure\" OR openclaw_shield.rule:\"credential_exfiltration\"",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["sum"]
+          }
+        },
+        "alert": {
+          "name": "Credential Exposure Attempt",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "sum"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Credential exposure attempt detected. Activate playbook-credential-theft.md (IRP-001) immediately.",
+          "noDataState": "no_data",
+          "notifications": [
+            {
+              "uid": "pagerduty-p0-critical"
+            }
+          ]
+        },
+        "links": [
+          {
+            "title": "IRP-001: Credential Theft Response",
+            "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-credential-theft.md"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Rate Limit Violations",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 22,
+          "w": 6,
+          "h": 8
+        },
+        "targets": [
+          {
+            "datasource": "Elasticsearch",
+            "query": "rate_limit.exceeded:true",
+            "alias": "",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 100
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "justifyMode": "center",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["sum"]
+          }
+        },
+        "alert": {
+          "name": "Excessive Rate Limiting",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1000],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "sum"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Excessive rate limit violations (>1000 in 5 minutes). Possible DDoS attack. Consider activating playbook-denial-of-service.md (IRP-007).",
+          "noDataState": "no_data",
+          "notifications": [
+            {
+              "uid": "slack-security-alerts"
+            }
+          ]
+        },
+        "links": [
+          {
+            "title": "IRP-007: DDoS Response",
+            "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-denial-of-service.md"
+          }
+        ]
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "event_type:\"deployment\"",
+          "textField": "deployment.version",
+          "tagsField": "deployment.service"
+        },
+        {
+          "name": "Security Incidents",
+          "datasource": "Elasticsearch",
+          "enable": true,
+          "iconColor": "red",
+          "query": "incident.created:true",
+          "textField": "incident.id",
+          "tagsField": "incident.severity"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "severity",
+          "type": "custom",
+          "label": "Severity",
+          "query": "P0-Critical,P1-High,P2-Medium,P3-Low",
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          },
+          "multi": true,
+          "includeAll": true
+        },
+        {
+          "name": "user_id",
+          "type": "query",
+          "label": "User ID",
+          "datasource": "Elasticsearch",
+          "query": "{\"find\": \"terms\", \"field\": \"user_id.keyword\", \"query\": \"*\"}",
+          "current": {
+            "value": "$__all",
+            "text": "All"
+          },
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "Incident Response Dashboard",
+        "url": "/d/incident-response",
+        "type": "dashboards",
+        "icon": "external link"
+      },
+      {
+        "title": "Compliance Dashboard",
+        "url": "/d/compliance",
+        "type": "dashboards",
+        "icon": "external link"
+      },
+      {
+        "title": "User Activity Dashboard",
+        "url": "/d/user-activity",
+        "type": "dashboards",
+        "icon": "external link"
+      }
+    ]
+  },
+  "overwrite": true,
+  "message": "OpenClaw Security Overview Dashboard - SOC team operational visibility",
+  "folderId": 0,
+  "folderUid": "security",
+  "references": {
+    "playbooks": [
+      "examples/incident-response/playbook-credential-theft.md",
+      "examples/incident-response/playbook-prompt-injection.md",
+      "examples/incident-response/playbook-skill-compromise.md",
+      "examples/incident-response/playbook-denial-of-service.md"
+    ],
+    "policies": [
+      "docs/policies/access-control-policy.md",
+      "docs/policies/incident-response-policy.md"
+    ],
+    "guides": [
+      "docs/guides/07-community-tools-integration.md"
+    ]
+  },
+  "usage": {
+    "audience": "SOC Team, Security Engineers, Incident Responders",
+    "update_frequency": "Real-time (1-minute refresh)",
+    "data_retention": "90 days hot, 365 days warm, 7 years cold (compliance)",
+    "sla": "99.9% dashboard availability, <5s query response time"
+  },
+  "compliance": {
+    "soc2": "CC7.2 (System Monitoring and Alerting)",
+    "iso27001": "A.12.4.1 (Event Logging), A.16.1.2 (Reporting Information Security Events)",
+    "gdpr": "Article 32 (Security Monitoring)"
+  }
+}
