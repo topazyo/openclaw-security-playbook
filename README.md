@@ -835,11 +835,6 @@ openclaw-security-playbook/
 - **Prompt Injection Taxonomy:** https://arxiv.org/abs/2302.12173
 - **Supply Chain Security for AI:** [Relevant academic papers]
 
-### Community
-- **GitHub Discussions:** [Link to discussions]
-- **Security Mailing List:** security@company.com
-- **Slack/Discord:** #openclaw-security
-
 ---
 
 ## 📜 License
