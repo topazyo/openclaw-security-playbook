@@ -13,6 +13,6 @@ This directory contains automation scripts for various security tasks.
 
 All scripts include built-in help:
 
-\`\`\`bash
+```bash
 ./scripts/monitoring/anomaly_detector.py --help
-\`\`\`
+```
