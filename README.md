@@ -1,4 +1,4 @@
-# ClawdBot Security Playbook
+# OpenClaw Security Playbook
 
 > **Production-Ready Security Hardening for AI Agents**  
 > Prevent credential exfiltration, prompt injection, and supply chain attacks
