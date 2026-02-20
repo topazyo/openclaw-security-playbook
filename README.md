@@ -65,11 +65,12 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 
 This playbook provides a **complete, production-ready security framework** with 90+ files:
 
-### 📚 Documentation (18 files)
+### 📚 Documentation (20 files)
 - **Policies:** 4 security policies (data classification, vulnerability management, access control, incident response)
 - **Procedures:** 4 operational procedures (incident response, vulnerability management, access review, backup/recovery)
-- **Guides:** 7 implementation guides (quick start through community tools integration)
+- **Guides:** 8 implementation guides (quick start through detection & hunting)
 - **Checklists:** 3 operational checklists (security review, onboarding, production deployment)
+- **Threat Model:** MITRE ATLAS attack chain mapping with 5 kill chains and framework cross-references
 
 ### 💻 Implementation Examples (32 files)
 - **Security Controls:** 5 Python implementations (input validation, rate limiting, authentication, encryption, logging)
@@ -77,9 +78,17 @@ This playbook provides a **complete, production-ready security framework** with 
 - **Monitoring:** 8 Grafana dashboards + 3 alert rule sets
 - **Compliance:** 2 compliance mapping files (SOC 2, ISO 27001)
 
-### 🤖 Automation Scripts (11 files)
+### 🔍 Detection Rules (18 files)
+- **IOCs:** Domain, port, process, and file path indicators + YARA rules for credential theft, malicious skills, and SOUL.md injection
+- **Sigma:** 4 platform-agnostic rules (credential harvest, gateway exposure, skill child process, SOUL.md modification)
+- **MDE (KQL):** Discovery, behavioral hunting (5 hunts), and kill chain detection (5 chains) for Microsoft Defender for Endpoint
+- **Splunk (SPL):** Discovery and behavioral hunting queries
+- **Telemetry Schema:** JSONL event format for openclaw-telemetry integration
+
+### 🤖 Automation Scripts (15 files)
 - **Discovery:** OS vulnerability scanning, dependency checking, IoC scanning
 - **Incident Response:** Auto-containment, forensics collection, notification management, ticket creation, timeline generation
+- **Forensics:** Evidence preservation, attack timeline reconstruction, credential scope assessment, hash chain verification
 - **Supply Chain:** Skill integrity monitoring, manifest validation
 - **Verification:** Security posture assessment
 
@@ -112,7 +121,7 @@ This playbook provides a **complete, production-ready security framework** with 
 - **security-scan.yml:** Trivy, Bandit, npm audit, pip-audit, Gitleaks, SBOM generation
 - **compliance-check.yml:** Policy validation, YAML linting, security tests, compliance reports
 
-**Total: 90+ files providing enterprise-grade AI agent security**
+**Total: 110+ files providing enterprise-grade AI agent security**
 
 ---
 
@@ -170,8 +179,9 @@ For detailed instructions, see: **[Quick Start Guide →](docs/guides/01-quick-s
 | **[05. Supply Chain Security](docs/guides/05-supply-chain-security.md)** | Skill integrity, cryptographic verification, monitoring | 40 min | Intermediate |
 | **[06. Incident Response](docs/guides/06-incident-response.md)** | 4 response playbooks, evidence collection, PIR process | 60 min | Advanced |
 | **[07. Community Tools](docs/guides/07-community-tools-integration.md)** | openclaw-telemetry, openclaw-shield, openclaw-detect | 90 min | Advanced |
+| **[08. Detection & Hunting](docs/guides/07-detection-and-hunting.md)** | 3-tier detection model, Sigma/KQL/SPL rules, forensic toolkit | 60 min | Advanced |
 
-**Total Reading Time:** ~6 hours | **Implementation Time:** ~8 hours for complete hardening
+**Total Reading Time:** ~7 hours | **Implementation Time:** ~10 hours for complete hardening
 
 ---
 
@@ -199,6 +209,10 @@ Ready-to-use security automation:
 | **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
 | **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
 | **[backup-restore.sh](configs/examples/backup-restore.sh)** | Backup and restore | `./backup-restore.sh backup` |
+| **[collect_evidence.sh](scripts/forensics/collect_evidence.sh)** | Incident evidence preservation | `./collect_evidence.sh [--containment]` |
+| **[build_timeline.sh](scripts/forensics/build_timeline.sh)** | Attack timeline reconstruction | `./build_timeline.sh --incident-dir ~/openclaw-incident-*` |
+| **[check_credential_scope.sh](scripts/forensics/check_credential_scope.sh)** | Credential exposure assessment | `./check_credential_scope.sh [YYYY-MM-DD]` |
+| **[verify_hash_chain.py](scripts/forensics/verify_hash_chain.py)** | Telemetry tamper detection | `python verify_hash_chain.py --input telemetry.jsonl` |
 
 ---
 
@@ -258,12 +272,31 @@ Ready-to-use security automation:
 2. [Network Segmentation](docs/guides/03-network-segmentation.md) - Authentication bypass
 3. [Credential Isolation](docs/guides/02-credential-isolation.md) - Backup file persistence
 4. [Community Tools](docs/guides/07-community-tools-integration.md) - Detection techniques
+5. [Detection & Hunting](docs/guides/07-detection-and-hunting.md) - 3-tier detection, kill chain queries
+6. [ATLAS Threat Mapping](docs/threat-model/ATLAS-mapping.md) - MITRE ATLAS kill chains
 
 **Focus Areas:**
 - Prompt injection attack vectors
 - Indirect prompt injection via external data
 - Supply chain attack scenarios
 - Container escape attempts
+- MITRE ATLAS kill chain mapping (5 chains documented)
+- Detection rule authoring (Sigma, KQL, SPL)
+
+---
+
+### For SOC / Detection Engineers
+
+**Goal:** Deploy detection rules and build hunting workflows
+
+1. **Start here:** [Detection & Hunting Guide](docs/guides/07-detection-and-hunting.md) (60 min)
+2. **Deploy Tier 1:** Import discovery queries from `detections/edr/` for your EDR platform
+3. **Convert Sigma rules:** `sigma convert -t <backend> detections/sigma/openclaw-*.yml`
+4. **Deploy Tier 2-3:** Import behavioral hunting and kill chain queries after openclaw-telemetry is running
+5. **Forensics toolkit:** Review `scripts/forensics/` for evidence collection and timeline building
+6. **Threat mapping:** [ATLAS Mapping](docs/threat-model/ATLAS-mapping.md) for kill chain taxonomy
+
+**Time Investment:** 2-3 hours → Full detection coverage
 
 ---
 
@@ -388,9 +421,18 @@ External Request
 - **Tool Allowlisting:** Restrict which tools can be executed
 - **Behavioral Monitoring:** Anomaly detection for unusual agent behavior (openclaw-telemetry)
 
-### ✅ Incident Response
+### ✅ Detection & Hunting
+- **3-Tier Detection Model:** Discovery → Behavioral Hunting → Kill Chain Detection
+- **Platform Coverage:** Sigma (platform-agnostic), MDE KQL, Splunk SPL, YARA
+- **5 Kill Chain Detections:** Prompt injection to RCE, data theft, malicious skill, staged payload, token theft
+- **MITRE ATLAS Mapping:** Full taxonomy with OWASP LLM and NIST CSF cross-references
+
+### ✅ Incident Response & Forensics
 - **4 Response Playbooks:** Credential exfiltration, prompt injection, unauthorized access, malicious skills
-- **Evidence Collection:** Automated forensics and chain of custody
+- **Evidence Collection:** Automated forensics and chain of custody (`collect_evidence.sh`)
+- **Attack Timeline:** Chronological reconstruction with risk-scored events (`build_timeline.sh`)
+- **Hash Chain Verification:** Tamper detection for openclaw-telemetry logs (`verify_hash_chain.py`)
+- **Credential Scoping:** Post-incident credential exposure assessment (`check_credential_scope.sh`)
 - **Communication Templates:** Pre-written notifications for stakeholders
 - **Post-Incident Review:** Structured PIR process with action items
 
@@ -529,9 +571,12 @@ This playbook provides complete compliance coverage:
 When a security incident occurs:
 
 1. **Immediate Response:** Follow [Incident Response Guide](docs/guides/06-incident-response.md)
-2. **Evidence Collection:** Run `./scripts/verification/evidence_collection.sh`
-3. **Containment:** Execute playbook for specific incident type
-4. **Communication:** Use templates in incident response guide
+2. **Evidence Collection:** Run `./scripts/forensics/collect_evidence.sh`
+3. **Timeline Reconstruction:** Run `./scripts/forensics/build_timeline.sh --incident-dir ~/openclaw-incident-*`
+4. **Credential Scoping:** Run `./scripts/forensics/check_credential_scope.sh`
+5. **Tamper Detection:** Run `python scripts/forensics/verify_hash_chain.py --input ~/.openclaw/logs/telemetry.jsonl`
+6. **Containment:** Execute playbook for specific incident type
+7. **Communication:** Use templates in incident response guide
 
 ### Response Playbooks
 
@@ -591,7 +636,8 @@ We welcome contributions! This is living documentation that improves with commun
 - ✅ **High Priority:**
   - Windows-specific procedures (currently partial coverage)
   - AWS ECS / Azure Container Instances configurations
-  - Splunk / Datadog integration examples
+  - CrowdStrike, Cortex XDR, and SentinelOne detection queries (MDE and Splunk covered)
+  - Datadog / Elastic SIEM integration examples
   - Compliance mapping details (SOC2, ISO 27001)
 
 - ⏳ **Medium Priority:**
@@ -625,6 +671,9 @@ openclaw-security-playbook/
 │   │   ├── security-layers.md        # Defense-in-depth architecture
 │   │   └── zero-trust-design.md      # Zero-trust implementation guide
 │   │
+│   ├── threat-model/                  # Threat mapping and taxonomy
+│   │   └── ATLAS-mapping.md          # MITRE ATLAS kill chains and framework cross-refs
+│   │
 │   ├── policies/                      # Security policies and standards
 │   │   ├── access-control-policy.md  # IAM and access management
 │   │   ├── data-classification.md    # Data handling and classification
@@ -647,6 +696,26 @@ openclaw-security-playbook/
 │       ├── iso27001-controls.md      # ISO 27001:2022 implementation
 │       ├── gdpr-compliance.md        # GDPR data protection
 │       └── audit-configuration.md    # Audit logging and monitoring
+│
+├── detections/                        # Detection rules and hunting queries
+│   ├── README.md                      # Detection content overview and telemetry schema
+│   ├── ioc/                           # Indicators of compromise
+│   │   ├── ioc-openclaw.txt          # Domains, ports, processes, file paths
+│   │   └── ioc-openclaw.yar          # YARA rules (credential theft, malicious skills, SOUL.md injection)
+│   ├── edr/                           # EDR platform queries
+│   │   └── mde/                       # Microsoft Defender for Endpoint
+│   │       ├── openclaw-discovery.kql        # Tier 1: Fleet-wide discovery
+│   │       ├── openclaw-behavioral-hunting.kql # Tier 2: Behavioral anomaly hunts
+│   │       └── openclaw-kill-chains.kql      # Tier 3: ATLAS kill chain detection
+│   ├── siem/                          # SIEM platform queries
+│   │   └── splunk/                    # Splunk SPL queries
+│   │       ├── openclaw-discovery.spl        # Tier 1: Process and network discovery
+│   │       └── openclaw-behavioral-hunting.spl # Tier 2: Behavioral hunts
+│   └── sigma/                         # Platform-agnostic Sigma rules
+│       ├── openclaw-credential-harvest.yml   # Credential path reads
+│       ├── openclaw-gateway-exposure.yml     # Internet-exposed gateway
+│       ├── openclaw-skill-child-process.yml  # Skill spawning shell
+│       └── openclaw-soul-md-modification.yml # SOUL.md persistence writes
 │
 ├── examples/                          # Real-world examples and scenarios
 │   ├── attack-scenarios/              # Known attack patterns
@@ -713,6 +782,12 @@ openclaw-security-playbook/
 │   │   ├── log-aggregation.py        # Centralized logging setup
 │   │   ├── anomaly-detection.py      # Behavioral anomaly detection
 │   │   └── alert-manager.py          # Alert routing and escalation
+│   │
+│   ├── forensics/                     # Post-incident forensic tools
+│   │   ├── collect_evidence.sh       # Volatile state + log preservation
+│   │   ├── build_timeline.sh         # Chronological attack timeline (TSV)
+│   │   ├── check_credential_scope.sh # Credential exposure assessment
+│   │   └── verify_hash_chain.py      # Telemetry tamper detection
 │   │
 │   └── incident-response/             # IR automation
 │       ├── auto-containment.py       # Automated threat containment
@@ -899,6 +974,6 @@ If this playbook helped secure your AI agents, please star the repository to hel
 
 Made with 🔒 for AI Agent Security
 
-**Version 2.0.0** | **Last Updated:** January 2024 | **90+ Files** | **100% SOC 2/ISO 27001 Compliant**
+**Version 3.0.0** | **Last Updated:** February 2026 | **110+ Files** | **100% SOC 2/ISO 27001 Compliant**
 
 </div>
