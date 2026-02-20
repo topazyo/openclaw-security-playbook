@@ -1,3 +1,4 @@
+﻿---
 # MCP Server Firewall Rules Configuration
 # Network-level access control for Model Context Protocol servers
 #
@@ -22,86 +23,86 @@
 # Default action: DENY all except explicitly allowed
 ip_allowlist:
   enabled: true
-  
+
   # Default action for non-listed IPs
   default_action: "DENY"
-  
+
   # Internal networks (RFC 1918 private addresses)
   internal_networks:
     - cidr: "10.0.0.0/8"
       description: "Internal VPC (10.0.0.0 - 10.255.255.255)"
       priority: 100
-      
+
     - cidr: "172.16.0.0/12"
       description: "Private network (172.16.0.0 - 172.31.255.255)"
       priority: 100
-      
+
     - cidr: "192.168.0.0/16"
       description: "Local network (192.168.0.0 - 192.168.255.255)"
       priority: 100
-  
+
   # Cloud provider IP ranges (update periodically)
   cloud_providers:
     # AWS IP ranges (us-east-1)
     - cidr: "52.94.76.0/22"
       description: "AWS us-east-1 EC2"
       priority: 90
-      
+
     - cidr: "54.240.0.0/12"
       description: "AWS CloudFront edge locations"
       priority: 90
-    
+
     # Google Cloud Platform (us-east1)
     - cidr: "35.190.0.0/16"
       description: "GCP us-east1"
       priority: 90
-      
+
     # Microsoft Azure (eastus)
     - cidr: "20.190.0.0/16"
       description: "Azure East US"
       priority: 90
-  
+
   # Trusted partner organizations
   partners:
     - cidr: "203.0.113.0/24"
       description: "Partner Corp office network"
       priority: 80
       requires_mtls: true
-      
+
     - cidr: "198.51.100.0/24"
       description: "Security vendor (penetration testing)"
       priority: 80
       requires_mtls: true
       expires: "2027-01-01T00:00:00Z"  # Temporary access
-  
+
   # VPN endpoints
   vpn:
     - cidr: "10.100.0.0/24"
       description: "Corporate VPN (WireGuard)"
       priority: 90
-      
+
     - cidr: "10.101.0.0/24"
       description: "Remote workforce VPN (Tailscale)"
       priority: 90
-  
+
   # Management and monitoring
   monitoring:
     - cidr: "10.200.1.0/24"
       description: "Prometheus monitoring servers"
       priority: 95
       allowed_ports: [9090]
-      
+
     - cidr: "10.200.2.0/24"
       description: "Elasticsearch logging cluster"
       priority: 95
       allowed_ports: [9200, 9300]
-  
+
   # CDN and load balancers
   infrastructure:
     - cidr: "10.250.0.0/24"
       description: "Internal load balancers"
       priority: 100
-      
+
     - cidr: "10.251.0.0/24"
       description: "API Gateway instances"
       priority: 100
@@ -113,19 +114,19 @@ ip_allowlist:
 # These IPs are explicitly denied regardless of allowlist
 ip_blocklist:
   enabled: true
-  
+
   # Static blocklist (manually maintained)
   static:
     - cidr: "198.51.100.0/24"
-      description: "Known botnet C&C servers"  
+      description: "Known botnet C&C servers"
       reason: "malicious_activity"
       added_date: "2026-01-15"
-      
+
     - cidr: "203.0.113.100/32"
       description: "Brute force attacker"
       reason: "brute_force"
       added_date: "2026-02-10"
-  
+
   # Dynamic blocklist sources (threat intelligence feeds)
   dynamic:
     # AbuseIPDB integration
@@ -143,50 +144,50 @@ ip_blocklist:
         - 20  # Exploited Host
         - 21  # Web App Attack
         - 22  # SSH Brute Force
-    
+
     # Tor exit nodes (optional - block if not serving Tor users)
     - source: "tor_exit_nodes"
       enabled: true
       url: "https://check.torproject.org/torbulkexitlist"
       refresh_interval_seconds: 3600
       reason: "anonymization_network"
-    
+
     # Spamhaus DROP/EDROP lists
     - source: "spamhaus_drop"
       enabled: true
       url: "https://www.spamhaus.org/drop/drop.txt"
       refresh_interval_seconds: 86400  # Daily
       reason: "hijacked_netblocks"
-    
+
     - source: "spamhaus_edrop"
       enabled: true
       url: "https://www.spamhaus.org/drop/edrop.txt"
       refresh_interval_seconds: 86400
       reason: "hostile_networks"
-    
+
     # Emerging Threats compromised IPs
     - source: "emerging_threats"
       enabled: true
       url: "https://rules.emergingthreats.net/blockrules/compromised-ips.txt"
       refresh_interval_seconds: 3600
       reason: "compromised_host"
-  
+
   # Automatically block IPs after repeated violations
   auto_block:
     enabled: true
-    
+
     # Failed authentication threshold
     auth_failures:
       threshold: 5
       window_seconds: 300  # 5 minutes
       block_duration_seconds: 3600  # 1 hour
-    
+
     # Rate limit violations
     rate_limit:
       threshold: 10
       window_seconds: 600  # 10 minutes
       block_duration_seconds: 1800  # 30 minutes
-    
+
     # Invalid requests (malformed, suspicious)
     invalid_requests:
       threshold: 20
@@ -199,17 +200,17 @@ ip_blocklist:
 # Block/allow traffic based on geographic origin
 geo_blocking:
   enabled: true
-  
+
   # GeoIP database configuration
   geoip_database:
     provider: "MaxMind"
     database_path: "/var/lib/geoip/GeoLite2-Country.mmdb"
     update_interval_days: 7
     update_source: "https://download.maxmind.com/app/geoip_download"
-  
+
   # Policy: allowlist or blocklist
   policy: "allowlist"  # Only allow specified countries
-  
+
   # Allowed countries (ISO 3166-1 alpha-2 codes)
   allowed_countries:
     - "US"  # United States
@@ -225,7 +226,7 @@ geo_blocking:
     - "AU"  # Australia
     - "NZ"  # New Zealand
     - "SG"  # Singapore
-  
+
   # Explicitly blocked countries (high-risk regions)
   blocked_countries:
     - "CN"  # China (state-sponsored attacks)
@@ -234,10 +235,10 @@ geo_blocking:
     - "IR"  # Iran (state-sponsored)
     - "SY"  # Syria (conflict zone)
     - "BY"  # Belarus (cybercrime)
-  
+
   # Fallback action for unknown geolocation
   fallback_action: "BLOCK"  # Block if country cannot be determined
-  
+
   # Exceptions (allow specific IPs from blocked countries)
   exceptions:
     - ip: "203.0.113.50"
@@ -253,7 +254,7 @@ geo_blocking:
 port_access:
   # Default policy: DENY all except explicitly allowed
   default_action: "DENY"
-  
+
   # Allowed ports and services
   allowed:
     # HTTPS (MCP server)
@@ -265,7 +266,7 @@ port_access:
       rate_limit:
         requests_per_minute: 100
         burst_size: 50
-    
+
     # Prometheus metrics (internal only)
     - port: 9090
       protocol: "TCP"
@@ -273,7 +274,7 @@ port_access:
       source_networks:
         - "10.200.1.0/24"  # Monitoring servers only
       requires_mtls: true
-    
+
     # Health check endpoint (internal only)
     - port: 8080
       protocol: "TCP"
@@ -281,34 +282,34 @@ port_access:
       source_networks:
         - "10.250.0.0/24"  # Load balancers only
       requires_mtls: false  # Health checks don't need mTLS
-  
+
   # Explicitly blocked ports (common attack vectors)
   blocked:
     - port: 22
       protocol: "TCP"
       description: "SSH (use bastion host instead)"
       reason: "direct_ssh_disabled"
-    
+
     - port: 3306
       protocol: "TCP"
       description: "MySQL (no direct database access)"
       reason: "database_isolation"
-    
+
     - port: 5432
       protocol: "TCP"
       description: "PostgreSQL (no direct database access)"
       reason: "database_isolation"
-    
+
     - port: 6379
       protocol: "TCP"
       description: "Redis (no direct cache access)"
       reason: "cache_isolation"
-    
+
     - port: 27017
       protocol: "TCP"
       description: "MongoDB (no direct database access)"
       reason: "database_isolation"
-    
+
     - port: 9200
       protocol: "TCP"
       description: "Elasticsearch (use API gateway)"
@@ -320,15 +321,15 @@ port_access:
 # Prevent DoS attacks and resource exhaustion
 rate_limiting:
   enabled: true
-  
+
   # Algorithm: token_bucket, leaky_bucket, fixed_window, sliding_window
   algorithm: "token_bucket"
-  
+
   # Global rate limit (all IPs combined)
   global:
     requests_per_minute: 10000
     burst_size: 500
-  
+
   # Per-IP rate limits (tiered based on trust level)
   per_ip:
     # Default tier (unknown IPs)
@@ -336,7 +337,7 @@ rate_limiting:
       requests_per_minute: 100
       burst_size: 50
       penalty_duration_seconds: 300
-    
+
     # Trusted tier (internal networks)
     trusted:
       networks:
@@ -346,7 +347,7 @@ rate_limiting:
       requests_per_minute: 500
       burst_size: 250
       penalty_duration_seconds: 60
-    
+
     # VIP tier (high-priority partners)
     vip:
       networks:
@@ -354,14 +355,14 @@ rate_limiting:
       requests_per_minute: 1000
       burst_size: 500
       penalty_duration_seconds: 30
-    
+
     # Suspicious tier (flagged by threat intel)
     suspicious:
       # Automatically assigned by threat intel feeds
       requests_per_minute: 10
       burst_size: 5
       penalty_duration_seconds: 3600  # 1 hour
-  
+
   # Rate limit response
   response:
     http_status_code: 429  # Too Many Requests
@@ -384,19 +385,19 @@ ddos_protection:
     syn_cookies: true
     tcp_max_syn_backlog: 4096
     tcp_synack_retries: 2
-  
+
   # Connection limits
   connection_limits:
     max_connections_per_ip: 10
     max_connections_global: 1000
-    
+
     # Connection rate limiting (new connections per second)
     max_new_connections_per_second: 10
-    
+
     # Connection timeout
     connection_timeout_seconds: 30
     idle_timeout_seconds: 60
-  
+
   # HTTP-specific DDoS protection
   http:
     # Slowloris protection (slow HTTP attacks)
@@ -404,14 +405,14 @@ ddos_protection:
       enabled: true
       header_timeout_seconds: 10
       body_timeout_seconds: 30
-    
+
     # HTTP flood protection
     request_limits:
       max_request_size_bytes: 10485760  # 10 MB
       max_header_size_bytes: 8192       # 8 KB
       max_uri_length: 2048
       max_headers_count: 50
-  
+
   # Challenge-response for suspicious traffic
   challenge_response:
     enabled: false  # Disabled for API-only service (no browser support)
@@ -431,7 +432,7 @@ protocol_filtering:
     reject_tlsv1_0: true
     reject_tlsv1_1: true
     reject_tlsv1_2: true  # Only allow TLS 1.3
-  
+
   # HTTP method filtering
   http_methods:
     allowed:
@@ -442,12 +443,12 @@ protocol_filtering:
       - "DELETE"
       - "HEAD"
       - "OPTIONS"
-    
+
     blocked:
       - "TRACE"    # Can be used for XSS
       - "CONNECT"  # Used for HTTP tunneling
       - "TRACK"    # Microsoft IIS variant of TRACE
-  
+
   # User-Agent filtering
   user_agent:
     # Block known bad user agents
@@ -465,7 +466,7 @@ protocol_filtering:
       - ".*bot.*"             # Generic bots (adjust as needed)
       - ".*crawler.*"         # Generic crawlers
       - ".*scraper.*"         # Web scrapers
-    
+
     # Require User-Agent header
     require_user_agent: true
     reject_empty: true
@@ -476,7 +477,7 @@ protocol_filtering:
 # Track all firewall events for security analysis
 logging:
   enabled: true
-  
+
   # Log destinations
   destinations:
     - type: "elasticsearch"
@@ -484,14 +485,14 @@ logging:
       index: "openclaw-firewall-logs-"
       username: ${ELASTICSEARCH_USERNAME}
       password: ${ELASTICSEARCH_PASSWORD}
-    
+
     - type: "file"
       path: "/var/log/openclaw/firewall.log"
       rotation:
         max_size_mb: 100
         max_files: 20
         compress: true
-  
+
   # Events to log
   events:
     log_allowed_connections: false  # Too verbose for production
@@ -500,7 +501,7 @@ logging:
     log_geo_blocking: true
     log_auto_block: true
     log_ddos_mitigation: true
-  
+
   # Sample rate (reduce log volume)
   sampling:
     allowed_connections: 0.01  # Log 1% of allowed connections
@@ -512,7 +513,7 @@ logging:
 # Real-time alerts for security events
 alerting:
   enabled: true
-  
+
   # Alert thresholds
   thresholds:
     # High rate of blocked connections from single IP
@@ -524,7 +525,7 @@ alerting:
       destinations:
         - "pagerduty"
         - "slack"
-    
+
     # DDoS attack detected
     - name: "ddos_attack"
       metric: "connections_per_second"
@@ -535,7 +536,7 @@ alerting:
         - "pagerduty"
         - "slack"
         - "email"
-    
+
     # Geo-blocking spike (possible coordinated attack)
     - name: "geo_blocking_spike"
       metric: "geo_blocked_requests"
@@ -544,17 +545,17 @@ alerting:
       severity: "medium"
       destinations:
         - "slack"
-  
+
   # Notification destinations
   destinations:
     pagerduty:
       integration_key: ${PAGERDUTY_INTEGRATION_KEY}
       routing_key: ${PAGERDUTY_ROUTING_KEY}
-    
+
     slack:
       webhook_url: ${SLACK_WEBHOOK_URL}
       channel: "#security-incidents"
-    
+
     email:
       recipients:
         - "security-team@openclaw.ai"

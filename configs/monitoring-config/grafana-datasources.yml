@@ -1,3 +1,4 @@
+﻿---
 # Grafana Datasources Configuration
 # Grafana v10.0+ required
 #
@@ -19,7 +20,7 @@ apiVersion: 1
 # DATASOURCES
 # ============================================================================
 datasources:
-  
+
   # --------------------------------------------------------------------------
   # ELASTICSEARCH (LOGS)
   # --------------------------------------------------------------------------
@@ -27,33 +28,33 @@ datasources:
   - name: "OpenClaw Logs (Elasticsearch)"
     type: "elasticsearch"
     access: "proxy"  # Grafana proxies queries (secure)
-    
+
     # Elasticsearch cluster URL
     url: ${ELASTICSEARCH_URL}
-    
+
     # Database/index pattern
     database: "openclaw-logs-*"
-    
+
     # Elasticsearch version
     esVersion: "8.12.0"
-    
+
     # Time field
     timeField: "@timestamp"
-    
+
     # Interval (auto, hourly, daily, weekly, monthly, yearly)
     interval: "Daily"
-    
+
     # Default time interval for queries
     timeInterval: "15s"
-    
+
     # Basic authentication
     basicAuth: true
     basicAuthUser: ${ELASTICSEARCH_USERNAME}
-    
+
     # Secure fields (encrypted)
     secureJsonData:
       basicAuthPassword: ${ELASTICSEARCH_PASSWORD}
-    
+
     # JSON data (datasource-specific settings)
     jsonData:
       # Elasticsearch cluster settings
@@ -61,40 +62,40 @@ datasources:
       timeField: "@timestamp"
       interval: "Daily"
       timeInterval: "15s"
-      
+
       # Log fields
       logMessageField: "message"
       logLevelField: "log.level"
-      
+
       # Index settings
       includeFrozen: false
       maxConcurrentShardRequests: 5
-      
+
       # TLS configuration
       tlsAuth: true
       tlsAuthWithCACert: true
       tlsSkipVerify: false
       serverName: "elk.openclaw.ai"
-    
+
     # TLS certificate (secure field)
-    secureJsonData:
-      tlsCACert: ${ELASTICSEARCH_CA_CERT}
-    
+    # secureJsonData:
+    #   tlsCACert: ${ELASTICSEARCH_CA_CERT}
+
     # Default datasource (used when no datasource specified)
     isDefault: false
-    
+
     # Read-only mode
     readOnly: false
-    
+
     # Editable in UI
     editable: false
-    
+
     # Organization ID
     orgId: 1
-    
+
     # Version (increment on updates)
     version: 3
-  
+
   # --------------------------------------------------------------------------
   # ELASTICSEARCH (SECURITY EVENTS)
   # --------------------------------------------------------------------------
@@ -102,18 +103,18 @@ datasources:
   - name: "OpenClaw Security Events"
     type: "elasticsearch"
     access: "proxy"
-    
+
     url: ${ELASTICSEARCH_URL}
     database: "openclaw-security-*"
     esVersion: "8.12.0"
     timeField: "@timestamp"
     interval: "Hourly"
-    
+
     basicAuth: true
     basicAuthUser: ${ELASTICSEARCH_USERNAME}
     secureJsonData:
       basicAuthPassword: ${ELASTICSEARCH_PASSWORD}
-    
+
     jsonData:
       esVersion: 8
       timeField: "@timestamp"
@@ -124,15 +125,15 @@ datasources:
       tlsAuth: true
       tlsAuthWithCACert: true
       tlsSkipVerify: false
-    
-    secureJsonData:
-      tlsCACert: ${ELASTICSEARCH_CA_CERT}
-    
+
+    # secureJsonData:
+    #   tlsCACert: ${ELASTICSEARCH_CA_CERT}
+
     isDefault: false
     editable: false
     orgId: 1
     version: 2
-  
+
   # --------------------------------------------------------------------------
   # ELASTICSEARCH (VULNERABILITIES)
   # --------------------------------------------------------------------------
@@ -140,18 +141,18 @@ datasources:
   - name: "OpenClaw Vulnerabilities"
     type: "elasticsearch"
     access: "proxy"
-    
+
     url: ${ELASTICSEARCH_URL}
     database: "openclaw-vulnerabilities-*"
     esVersion: "8.12.0"
     timeField: "scan_date"
     interval: "Daily"
-    
+
     basicAuth: true
     basicAuthUser: ${ELASTICSEARCH_USERNAME}
     secureJsonData:
       basicAuthPassword: ${ELASTICSEARCH_PASSWORD}
-    
+
     jsonData:
       esVersion: 8
       timeField: "scan_date"
@@ -161,15 +162,15 @@ datasources:
       maxConcurrentShardRequests: 3
       tlsAuth: true
       tlsAuthWithCACert: true
-    
-    secureJsonData:
-      tlsCACert: ${ELASTICSEARCH_CA_CERT}
-    
+
+    # secureJsonData:
+    #   tlsCACert: ${ELASTICSEARCH_CA_CERT}
+
     isDefault: false
     editable: false
     orgId: 1
     version: 2
-  
+
   # --------------------------------------------------------------------------
   # PROMETHEUS (METRICS)
   # --------------------------------------------------------------------------
@@ -177,59 +178,59 @@ datasources:
   - name: "OpenClaw Metrics (Prometheus)"
     type: "prometheus"
     access: "proxy"
-    
+
     # Prometheus server URL
     url: "http://prometheus.openclaw.ai:9090"
-    
+
     # JSON data (datasource-specific settings)
     jsonData:
       # HTTP method for queries
       httpMethod: "POST"
-      
+
       # Timeout for queries
       queryTimeout: "60s"
-      
+
       # Time interval (minimum step for range queries)
       timeInterval: "15s"
-      
+
       # Custom query parameters
       customQueryParameters: ""
-      
+
       # Prometheus type (prometheus, cortex, mimir, thanos)
       prometheusType: "prometheus"
-      
+
       # Prometheus version
       prometheusVersion: "2.45.0"
-      
+
       # Cache level (0 = none, 1 = low, 2 = medium, 3 = high)
       cacheLevel: "medium"
-      
+
       # Incremental querying (query only new data)
       incrementalQuerying: true
-      
+
       # Exemplars enabled (view traces from metrics)
       exemplarTraceIdDestinations:
         - name: "traceID"
           datasourceUid: "jaeger-tracing"
-      
+
       # Disable metrics lookup (performance optimization)
       disableMetricsLookup: false
-    
+
     # Default datasource (primary datasource)
     isDefault: true
-    
+
     # Read-only mode
     readOnly: false
-    
+
     # Editable in UI
     editable: false
-    
+
     # Organization ID
     orgId: 1
-    
+
     # Version
     version: 4
-  
+
   # --------------------------------------------------------------------------
   # JAEGER (DISTRIBUTED TRACING)
   # --------------------------------------------------------------------------
@@ -237,10 +238,10 @@ datasources:
   - name: "OpenClaw Tracing (Jaeger)"
     type: "jaeger"
     access: "proxy"
-    
+
     # Jaeger query URL
     url: "http://jaeger.openclaw.ai:16686"
-    
+
     # JSON data
     jsonData:
       # Trace to logs integration
@@ -249,7 +250,7 @@ datasources:
         filterByTraceID: true
         filterBySpanID: false
         tags: ["service.name", "http.status_code"]
-      
+
       # Trace to metrics integration
       tracesToMetrics:
         datasourceUid: "openclaw-metrics-prometheus"
@@ -257,50 +258,55 @@ datasources:
           - name: "Request Rate"
             query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"
           - name: "Error Rate"
-            query: "sum(rate(traces_spanmetrics_calls_total{status_code=\"STATUS_CODE_ERROR\",$$__tags}[5m]))"
+            query: |
+              sum(rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR",$$__tags}[5m]))
           - name: "Duration"
-            query: "histogram_quantile(0.95, sum(rate(traces_spanmetrics_duration_bucket{$$__tags}[5m])) by (le))"
-      
+            query: |
+              histogram_quantile(0.95,
+                sum(rate(traces_spanmetrics_duration_bucket{$$__tags}[5m])) by (le)
+              )
+
       # Node graph integration
       nodeGraph:
         enabled: true
-    
+
     isDefault: false
     editable: false
     orgId: 1
     version: 2
-  
+
   # --------------------------------------------------------------------------
   # LOKI (LOG AGGREGATION)
   # --------------------------------------------------------------------------
-  # Alternative log aggregation (optional, lightweight alternative to Elasticsearch)
+  # Alternative log aggregation (optional, lightweight alternative to
+  # Elasticsearch)
   - name: "OpenClaw Logs (Loki)"
     type: "loki"
     access: "proxy"
-    
+
     # Loki server URL
     url: "http://loki.openclaw.ai:3100"
-    
+
     # JSON data
     jsonData:
       # Maximum lines per query
       maxLines: 1000
-      
+
       # Timeout
       timeout: "60s"
-      
+
       # Derived fields (extract fields from log lines)
       derivedFields:
         - name: "trace_id"
           matcherRegex: "trace_id=(\\w+)"
           url: "http://jaeger.openclaw.ai:16686/trace/$${__value.raw}"
           datasourceUid: "jaeger-tracing"
-    
+
     isDefault: false
     editable: false
     orgId: 1
     version: 1
-  
+
   # --------------------------------------------------------------------------
   # CLOUDWATCH (AWS LOGS)
   # --------------------------------------------------------------------------
@@ -308,32 +314,32 @@ datasources:
   - name: "AWS CloudWatch"
     type: "cloudwatch"
     access: "proxy"
-    
+
     # JSON data
     jsonData:
       # AWS authentication method (keys, credentials, arn)
       authType: "arn"
-      
+
       # IAM role ARN for cross-account access
       assumeRoleArn: "arn:aws:iam::123456789012:role/grafana-cloudwatch"
-      
+
       # Default region
       defaultRegion: "us-east-1"
-      
+
       # Custom metrics namespaces
       customMetricsNamespaces: "OpenClaw/Metrics"
-      
+
       # Log groups (comma-separated)
       logGroups:
         - "/aws/openclaw/agent"
         - "/aws/openclaw/gateway"
         - "/aws/openclaw/mcp-server"
-    
+
     isDefault: false
     editable: false
     orgId: 1
     version: 1
-  
+
   # --------------------------------------------------------------------------
   # POSTGRES (DATABASE METRICS)
   # --------------------------------------------------------------------------
@@ -341,40 +347,40 @@ datasources:
   - name: "OpenClaw Database"
     type: "postgres"
     access: "proxy"
-    
+
     # PostgreSQL connection URL
     url: "db.openclaw.ai:5432"
-    
+
     # Database name
     database: "openclaw"
-    
+
     # Username
     user: "grafana_readonly"
-    
+
     # Secure fields
     secureJsonData:
       password: ${POSTGRES_PASSWORD}
-    
+
     # JSON data
     jsonData:
       # SSL mode (disable, require, verify-ca, verify-full)
       sslmode: "require"
-      
+
       # Max open connections
       maxOpenConns: 10
-      
+
       # Max idle connections
       maxIdleConns: 2
-      
+
       # Connection max lifetime
       connMaxLifetime: 300  # 5 minutes
-      
+
       # Postgres version
       postgresVersion: 1500  # 15.x
-      
+
       # Time series queries
       timescaledb: false
-    
+
     isDefault: false
     editable: false
     orgId: 1

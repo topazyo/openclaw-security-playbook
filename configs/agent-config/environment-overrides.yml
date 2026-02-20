@@ -1,3 +1,4 @@
+---
 # Environment-Specific Configuration Overrides
 # Merges with openclaw-agent.yml base configuration
 #
@@ -13,7 +14,6 @@
 #   - development: Local development, relaxed security
 #   - staging: Pre-production testing, production-like security
 #   - production: Live environment, maximum security
-
 # ============================================================================
 # DEVELOPMENT ENVIRONMENT
 # ============================================================================
@@ -34,7 +34,6 @@ development:
       max_task_duration_seconds: 600  # 10 minutes for debugging
       memory_limit_mb: 4096  # More memory for profiling
       cpu_limit_cores: 4.0
-  
   security_controls:
     # Relaxed rate limits for testing
     rate_limiting:
@@ -47,7 +46,6 @@ development:
       per_ip_limits:
         requests_per_minute: 2000
         burst_size: 400
-    
     # Simplified authentication for dev
     authentication:
       method: "API_Key"  # Easier than mTLS for local dev
@@ -61,13 +59,11 @@ development:
       token_expiry_seconds: 7200  # 2 hours for dev sessions
       mfa_required: false  # Disabled for local dev
       max_concurrent_sessions: 10  # Multiple browser tabs
-    
     # Dev logging configuration
     logging:
       level: "DEBUG"  # Verbose logging for troubleshooting
       redact_pii: false  # See actual data during dev
       tamper_evident: false  # Not needed for local dev
-  
   # Local MCP server
   mcp_server:
     host: "localhost"
@@ -78,7 +74,6 @@ development:
       ca_cert_path: "/etc/openclaw/dev-ca.crt"
     connect_timeout_seconds: 30  # Longer for debugging
     request_timeout_seconds: 120
-  
   # Local monitoring stack
   monitoring:
     elasticsearch:
@@ -86,27 +81,22 @@ development:
       username: "elastic"
       password: "changeme"
       tls_enabled: false  # No TLS for local Elasticsearch
-    
     prometheus:
       enabled: true
       port: 9091  # Non-standard port to avoid conflicts
-    
     health_check:
       interval_seconds: 60  # Less frequent checks
-    
     tracing:
       enabled: true  # Enable tracing for dev debugging
       provider: "jaeger"
       endpoint: "http://localhost:14268/api/traces"
       sample_rate: 1.0  # 100% sampling for dev
-  
   # Development compliance settings
   compliance:
     soc2_enabled: false
     iso27001_enabled: false
     gdpr_enabled: false
     pci_dss_enabled: false
-  
   # Permissive skill settings
   skills:
     auto_install: true  # Convenience for dev
@@ -117,18 +107,16 @@ development:
       allowed_domains: []   # No restrictions
     filesystem_restrictions:
       read_only: false  # Read-write for dev
-  
   # No backups in dev environment
   backup:
     enabled: false
-  
   # Feature flags for dev
   feature_flags:
     experimental_features_enabled: true
     beta_features_enabled: true
     circuit_breaker:
       enabled: false  # Disable to test failure scenarios
-
+---
 # ============================================================================
 # STAGING ENVIRONMENT
 # ============================================================================
@@ -148,7 +136,6 @@ staging:
       max_task_duration_seconds: 450  # Slightly longer for testing
       memory_limit_mb: 2560
       cpu_limit_cores: 2.5
-  
   security_controls:
     # Slightly relaxed rate limits for testing
     rate_limiting:
@@ -162,7 +149,6 @@ staging:
       per_ip_limits:
         requests_per_minute: 300
         burst_size: 60
-    
     # Production-like authentication
     authentication:
       method: "mTLS"
@@ -184,14 +170,12 @@ staging:
       token_expiry_seconds: 3600
       mfa_required: true  # Test MFA in staging
       max_concurrent_sessions: 3
-    
     # Info-level logging (not debug)
     logging:
       level: "INFO"
       redact_pii: true  # Production-like PII handling
       tamper_evident: true
       retention_days: 365  # 1 year retention in staging
-  
   # Staging MCP server
   mcp_server:
     host: ${MCP_SERVER_HOST_STAGING}
@@ -205,7 +189,6 @@ staging:
       min_version: "1.3"
     connect_timeout_seconds: 15  # Slightly longer for testing
     request_timeout_seconds: 45
-  
   # Staging monitoring stack
   monitoring:
     elasticsearch:
@@ -215,20 +198,16 @@ staging:
       index_prefix: "openclaw-staging-logs-"
       tls_enabled: true
       verify_certs: true
-    
     prometheus:
       enabled: true
       port: 9090
-    
     health_check:
       interval_seconds: 30
-    
     tracing:
       enabled: true  # Enabled for testing
       provider: "jaeger"
       endpoint: "http://jaeger-staging.openclaw.ai:14268/api/traces"
       sample_rate: 0.5  # 50% sampling
-  
   # Staging compliance (mirrors production)
   compliance:
     soc2_enabled: true
@@ -249,7 +228,6 @@ staging:
       - "A.12.4.1"
       - "A.14.1.2"
       - "A.16.1.4"
-  
   # Staging skill settings (production-like)
   skills:
     auto_install: false
@@ -263,7 +241,6 @@ staging:
         - "*.staging.openclaw.ai"
     filesystem_restrictions:
       read_only: true
-  
   # Staging backups (shorter retention)
   backup:
     enabled: true
@@ -280,7 +257,6 @@ staging:
     verify_backups: true
     rto_hours: 8
     rpo_minutes: 30
-  
   # Feature flags for staging
   feature_flags:
     experimental_features_enabled: false
@@ -290,7 +266,7 @@ staging:
       failure_threshold: 5
       timeout_seconds: 10
       reset_timeout_seconds: 60
-
+---
 # ============================================================================
 # PRODUCTION ENVIRONMENT
 # ============================================================================
@@ -312,7 +288,6 @@ production:
       max_task_duration_seconds: 300  # 5 minutes
       memory_limit_mb: 2048
       cpu_limit_cores: 2.0
-  
   security_controls:
     # Strict rate limits
     rate_limiting:
@@ -328,7 +303,6 @@ production:
         burst_size: 40
       http_status_code: 429
       retry_after_seconds: 60
-    
     # Maximum authentication security
     authentication:
       method: "mTLS"  # Most secure method
@@ -349,7 +323,6 @@ production:
       max_concurrent_sessions: 3
       session_timeout_seconds: 3600
       idle_timeout_seconds: 1800  # 30 minutes idle timeout
-    
     # Strict authorization
     authorization:
       enabled: true
@@ -359,7 +332,6 @@ production:
         - "admin"
         - "security-ops"
         - "incident-response"
-    
     # Production logging
     logging:
       level: "INFO"  # No debug logs in production
@@ -382,7 +354,6 @@ production:
       log_data_access: true
       log_configuration_changes: true
       log_errors: true
-  
   # Production MCP server
   mcp_server:
     host: ${MCP_SERVER_HOST_PROD}
@@ -403,7 +374,6 @@ production:
     retry_enabled: true
     retry_max_attempts: 3
     retry_backoff_seconds: 1
-  
   # Production monitoring
   monitoring:
     elasticsearch:
@@ -416,7 +386,6 @@ production:
       tls_enabled: true
       verify_certs: true
       ca_cert_path: "/etc/openclaw/prod-ca.crt"
-    
     prometheus:
       enabled: true
       port: 9090
@@ -431,17 +400,14 @@ production:
         - "rate_limit_exceeded_total"
         - "encryption_operations_total"
         - "encryption_operation_duration_seconds"
-    
     health_check:
       enabled: true
       port: 8080
       path: "/health"
       interval_seconds: 30
-    
     tracing:
       enabled: false  # Disabled in prod (performance overhead)
       sample_rate: 0.01  # 1% if enabled
-  
   # Full compliance in production
   compliance:
     soc2_enabled: true
@@ -449,26 +415,25 @@ production:
     gdpr_enabled: true
     pci_dss_enabled: false  # Enable if processing payments
     soc2_controls:
-      - "CC6.1"  # Logical and physical access controls
-      - "CC6.2"  # Authentication and authorization
-      - "CC6.3"  # Privileged access management
-      - "CC7.1"  # Threat detection and monitoring
-      - "CC7.2"  # Event logging and analysis
-      - "CC7.3"  # Incident response
+      - "CC6.1"  #  Logical and physical access controls
+      - "CC6.2"  #  Authentication and authorization
+      - "CC6.3"  #  Privileged access management
+      - "CC7.1"  #  Threat detection and monitoring
+      - "CC7.2"  #  Event logging and analysis
+      - "CC7.3"  #  Incident response
     iso27001_controls:
-      - "A.9.2.1"   # User registration and de-registration
-      - "A.9.2.3"   # Management of privileged access rights
-      - "A.10.1.1"  # Cryptographic controls
-      - "A.12.4.1"  # Event logging
-      - "A.14.1.2"  # Securing application services
-      - "A.16.1.4"  # Assessment of information security events
+      - "A.9.2.1"   #  User registration and de-registration
+      - "A.9.2.3"   #  Management of privileged access rights
+      - "A.10.1.1"  #  Cryptographic controls
+      - "A.12.4.1"  #  Event logging
+      - "A.14.1.2"  #  Securing application services
+      - "A.16.1.4"  #  Assessment of information security events
     gdpr_settings:
       data_retention_days: 2555  # 7 years
       right_to_erasure: true
       data_portability: true
       breach_notification_hours: 72  # Article 33
       consent_required: true
-  
   # Strict skill security in production
   skills:
     auto_install: false  # Never auto-install in prod
@@ -485,11 +450,11 @@ production:
         - "api.openclaw.ai"
         - "*.openclaw.ai"
       blocked_ports:
-        - 22    # SSH
-        - 3306  # MySQL
-        - 5432  # PostgreSQL
-        - 6379  # Redis
-        - 27017 # MongoDB
+        - 22    #  SSH
+        - 3306  #  MySQL
+        - 5432  #  PostgreSQL
+        - 6379  #  Redis
+        - 27017  #  MongoDB
     filesystem_restrictions:
       read_only: true
       allowed_paths:
@@ -500,7 +465,6 @@ production:
         - "/root"
         - "/home"
         - "/var/log"
-  
   # Production backup configuration
   backup:
     enabled: true
@@ -520,7 +484,6 @@ production:
     verify_schedule: "0 3 * * 0"  # Weekly Sunday 3 AM UTC
     rto_hours: 4   # 4-hour recovery time objective
     rpo_minutes: 15  # 15-minute recovery point objective
-  
   # Conservative feature flags in production
   feature_flags:
     experimental_features_enabled: false  # Never in prod
