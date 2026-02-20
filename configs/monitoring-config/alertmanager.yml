@@ -1,3 +1,4 @@
+﻿---
 # Alertmanager Configuration for OpenClaw Security Monitoring
 # Alertmanager v0.26+ required
 #
@@ -17,20 +18,20 @@
 # GLOBAL CONFIGURATION
 # ============================================================================
 global:
-  # Resolve timeout (time after which an alert is considered resolved if not firing)
+  # Resolve timeout (time after which an alert is considered resolved)
   resolve_timeout: 5m
-  
+
   # External URLs for notifications
   pagerduty_url: "https://events.pagerduty.com/v2/enqueue"
   slack_api_url: "https://slack.com/api/chat.postMessage"
-  
+
   # SMTP configuration (email notifications)
   smtp_from: "alerts@openclaw.ai"
   smtp_smarthost: "smtp.openclaw.ai:587"
   smtp_auth_username: ${SMTP_USERNAME}
   smtp_auth_password: ${SMTP_PASSWORD}
   smtp_require_tls: true
-  
+
   # HTTP client configuration
   http_config:
     follow_redirects: true
@@ -52,7 +53,7 @@ templates:
 route:
   # Root route (default receiver for all alerts)
   receiver: "default-email"
-  
+
   # Grouping configuration
   # Alerts with same labels are grouped together
   group_by:
@@ -60,186 +61,186 @@ route:
     - "cluster"
     - "service"
     - "severity"
-  
+
   # Group wait (wait before sending first notification for a group)
   group_wait: 10s
-  
-  # Group interval (wait before sending notification about new alerts in existing group)
+
+  # Group interval (wait before sending notification about new alerts)
   group_interval: 5m
-  
+
   # Repeat interval (wait before resending notification for unresolved alerts)
   repeat_interval: 4h
-  
+
   # Child routes (more specific routing rules)
   routes:
-    
+
     # -------------------------------------------------------------------------
     # CRITICAL ALERTS (P0)
     # -------------------------------------------------------------------------
     # Immediate paging + Slack + Email to CISO
     - match:
         severity: "critical"
-      
+
       receiver: "pagerduty-critical"
-      
+
       group_by:
         - "alertname"
         - "instance"
-      
+
       group_wait: 0s        # Immediate notification
       group_interval: 1m    # Fast updates
       repeat_interval: 30m  # Frequent reminders
-      
+
       # Continue routing to other receivers
       continue: true
-    
+
     # Also send critical alerts to Slack
     - match:
         severity: "critical"
-      
+
       receiver: "slack-critical"
-      
+
       group_by:
         - "alertname"
         - "instance"
-      
+
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1h
-      
+
       continue: true
-    
+
     # Email CISO for critical incidents
     - match:
         severity: "critical"
-      
+
       match_re:
         alertname: ".*DataBreach.*|.*CredentialExfiltration.*|.*RCE.*"
-      
+
       receiver: "email-ciso"
-      
+
       group_wait: 0s
       group_interval: 5m
       repeat_interval: 2h
-    
+
     # -------------------------------------------------------------------------
     # HIGH ALERTS (P1)
     # -------------------------------------------------------------------------
     # Slack + Email to security team
     - match:
         severity: "high"
-      
+
       receiver: "slack-high"
-      
+
       group_by:
         - "alertname"
         - "service"
-      
+
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 2h
-      
+
       continue: true
-    
+
     - match:
         severity: "high"
-      
+
       receiver: "email-security-team"
-      
+
       group_interval: 10m
       repeat_interval: 4h
-    
+
     # -------------------------------------------------------------------------
     # MEDIUM ALERTS (P2)
     # -------------------------------------------------------------------------
     # Email security team only
     - match:
         severity: "medium"
-      
+
       receiver: "email-security-team"
-      
+
       group_wait: 5m
       group_interval: 15m
       repeat_interval: 12h
-    
+
     # -------------------------------------------------------------------------
     # LOW/WARNING ALERTS (P3)
     # -------------------------------------------------------------------------
     # Email ops team (low priority)
     - match:
         severity: "warning"
-      
+
       receiver: "email-ops-team"
-      
+
       group_wait: 10m
       group_interval: 30m
       repeat_interval: 24h
-    
+
     # -------------------------------------------------------------------------
     # AUTHENTICATION FAILURES
     # -------------------------------------------------------------------------
     # Special handling for auth alerts
     - match_re:
         alertname: ".*AuthFailure.*|.*BruteForce.*|.*SuspiciousLogin.*"
-      
+
       receiver: "slack-security"
-      
+
       group_by:
         - "alertname"
         - "user"
         - "source_ip"
-      
+
       group_wait: 1m
       group_interval: 5m
       repeat_interval: 1h
-    
+
     # -------------------------------------------------------------------------
     # VULNERABILITY SCANS
     # -------------------------------------------------------------------------
     # Daily summary, not real-time
     - match_re:
         alertname: ".*Vulnerability.*|.*CVE.*"
-      
+
       receiver: "email-security-team"
-      
+
       group_by:
         - "severity"
-      
+
       group_wait: 1h      # Wait for more vulns to group
       group_interval: 24h  # Daily batches
       repeat_interval: 168h  # Weekly reminders
-    
+
     # -------------------------------------------------------------------------
     # MAINTENANCE WINDOWS
     # -------------------------------------------------------------------------
     # Suppress alerts during maintenance
     - match:
         alertname: "MaintenanceMode"
-      
+
       receiver: "null"  # Discard alerts
-      
+
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1m
-    
+
     # -------------------------------------------------------------------------
     # TESTING/DEVELOPMENT
     # -------------------------------------------------------------------------
     # Route dev/staging alerts separately
     - match:
         environment: "development"
-      
+
       receiver: "slack-dev"
-      
+
       group_wait: 5m
       group_interval: 30m
       repeat_interval: 24h
-    
+
     - match:
         environment: "staging"
-      
+
       receiver: "slack-staging"
-      
+
       group_wait: 2m
       group_interval: 15m
       repeat_interval: 12h
@@ -250,49 +251,49 @@ route:
 # Suppress alerts based on presence of other alerts
 # Example: If node is down, suppress all service alerts on that node
 inhibit_rules:
-  
+
   # Node down inhibits all alerts from that node
   - source_match:
       alertname: "NodeDown"
-    
+
     target_match_re:
       alertname: ".*"
-    
+
     equal:
       - "instance"
       - "node"
-  
+
   # Critical alert inhibits lower severity alerts for same service
   - source_match:
       severity: "critical"
-    
+
     target_match_re:
       severity: "high|medium|warning"
-    
+
     equal:
       - "alertname"
       - "service"
       - "instance"
-  
+
   # High alert inhibits medium/warning for same service
   - source_match:
       severity: "high"
-    
+
     target_match_re:
       severity: "medium|warning"
-    
+
     equal:
       - "alertname"
       - "service"
       - "instance"
-  
+
   # Maintenance mode inhibits all alerts for affected services
   - source_match:
       alertname: "MaintenanceMode"
-    
+
     target_match_re:
       alertname: ".*"
-    
+
     equal:
       - "service"
       - "cluster"
@@ -302,7 +303,7 @@ inhibit_rules:
 # ============================================================================
 # Notification destinations and configurations
 receivers:
-  
+
   # --------------------------------------------------------------------------
   # DEFAULT RECEIVER (EMAIL)
   # --------------------------------------------------------------------------
@@ -314,30 +315,31 @@ receivers:
         auth_username: ${SMTP_USERNAME}
         auth_password: ${SMTP_PASSWORD}
         require_tls: true
-        
+
         # Email template
         headers:
-          Subject: "[OpenClaw] {{ .GroupLabels.alertname }} ({{ .GroupLabels.severity }})"
-        
+          Subject: |
+            [OpenClaw]
+            {{ .GroupLabels.alertname }} ({{ .GroupLabels.severity }})
         html: '{{ template "email.default.html" . }}'
         text: '{{ template "email.default.txt" . }}'
-  
+
   # --------------------------------------------------------------------------
   # PAGERDUTY (CRITICAL ALERTS)
   # --------------------------------------------------------------------------
   - name: "pagerduty-critical"
     pagerduty_configs:
       - service_key: ${PAGERDUTY_SERVICE_KEY}
-        
+
         # Routing key (alternative to service_key)
         routing_key: ${PAGERDUTY_ROUTING_KEY}
-        
+
         # Severity mapping
         severity: "error"
-        
+
         # Alert details
         description: "{{ .GroupLabels.alertname }}: {{ .GroupLabels.instance }}"
-        
+
         # Custom details (sent to PagerDuty)
         details:
           firing: "{{ .Alerts.Firing | len }}"
@@ -345,38 +347,41 @@ receivers:
           alertname: "{{ .GroupLabels.alertname }}"
           severity: "{{ .GroupLabels.severity }}"
           cluster: "{{ .GroupLabels.cluster }}"
-          summary: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
-          description: "{{ range .Alerts }}{{ .Annotations.description }}{{ end }}"
-        
+          # summary: |
+          #   {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          description: |
+            {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+
         # Links
         links:
-          - href: "https://grafana.openclaw.ai/d/{{ .GroupLabels.dashboard_uid }}"
+          - href: |
+              https://grafana.openclaw.ai/d/{{ .GroupLabels.dashboard_uid }}
             text: "View Dashboard"
           - href: "https://prometheus.openclaw.ai/alerts"
             text: "View Alerts"
-        
+
         # Client details
         client: "OpenClaw Alertmanager"
         client_url: "https://alertmanager.openclaw.ai"
-  
+
   # --------------------------------------------------------------------------
   # SLACK (CRITICAL CHANNEL)
   # --------------------------------------------------------------------------
   - name: "slack-critical"
     slack_configs:
       - api_url: ${SLACK_WEBHOOK_URL}
-        
+
         # Channel
         channel: "#security-incidents"
-        
+
         # Username and icon
         username: "OpenClaw Alerts"
         icon_emoji: ":fire:"
-        
+
         # Message title
         title: ":fire: CRITICAL: {{ .GroupLabels.alertname }}"
         title_link: "https://prometheus.openclaw.ai/alerts"
-        
+
         # Message text
         text: |-
           {{ range .Alerts }}
@@ -386,29 +391,31 @@ receivers:
           *Summary:* {{ .Annotations.summary }}
           *Description:* {{ .Annotations.description }}
           *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
-          {{ if .Resolved }}*Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}{{ end }}
+          {{ if .Resolved }}*Resolved:* \
+            {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}{{ end }}
           {{ end }}
-        
+
         # Color (good, warning, danger, or hex)
         color: "danger"
-        
+
         # Actions (buttons)
         actions:
           - type: "button"
             text: "View Dashboard"
             url: "https://grafana.openclaw.ai"
-          
+
           - type: "button"
             text: "Runbook"
-            url: "https://docs.openclaw.ai/runbooks/{{ .GroupLabels.alertname }}"
-          
+            url: |
+              https://docs.openclaw.ai/runbooks/{{ .GroupLabels.alertname }}
+
           - type: "button"
             text: "Silence"
             url: "https://alertmanager.openclaw.ai/#/silences/new"
-        
+
         # Send resolved notifications
         send_resolved: true
-  
+
   # --------------------------------------------------------------------------
   # SLACK (HIGH SEVERITY)
   # --------------------------------------------------------------------------
@@ -420,7 +427,7 @@ receivers:
         icon_emoji: ":warning:"
         title: ":warning: HIGH: {{ .GroupLabels.alertname }}"
         title_link: "https://prometheus.openclaw.ai/alerts"
-        
+
         text: |-
           {{ range .Alerts }}
           *Alert:* {{ .Labels.alertname }}
@@ -428,10 +435,10 @@ receivers:
           *Instance:* {{ .Labels.instance }}
           *Summary:* {{ .Annotations.summary }}
           {{ end }}
-        
+
         color: "warning"
         send_resolved: true
-  
+
   # --------------------------------------------------------------------------
   # SLACK (SECURITY TEAM)
   # --------------------------------------------------------------------------
@@ -442,19 +449,21 @@ receivers:
         username: "OpenClaw Security"
         icon_emoji: ":shield:"
         title: ":shield: {{ .GroupLabels.alertname }}"
-        
+
         text: |-
           {{ range .Alerts }}
           *Alert:* {{ .Labels.alertname }}
           *Instance:* {{ .Labels.instance }}
-          {{ if .Labels.user }}*User:* {{ .Labels.user }}{{ end }}
-          {{ if .Labels.source_ip }}*Source IP:* {{ .Labels.source_ip }}{{ end }}
+          {{ if .Labels.user }}*User:* \
+            {{ .Labels.user }}{{ end }}
+          {{ if .Labels.source_ip }}*Source IP:* \
+            {{ .Labels.source_ip }}{{ end }}
           *Summary:* {{ .Annotations.summary }}
           {{ end }}
-        
+
         color: "#FF9800"  # Orange
         send_resolved: true
-  
+
   # --------------------------------------------------------------------------
   # SLACK (DEVELOPMENT)
   # --------------------------------------------------------------------------
@@ -465,12 +474,12 @@ receivers:
         username: "OpenClaw Dev Alerts"
         icon_emoji: ":hammer_and_wrench:"
         title: "DEV: {{ .GroupLabels.alertname }}"
-        
+
         text: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
-        
+
         color: "good"
         send_resolved: false  # Don't spam with resolved alerts in dev
-  
+
   # --------------------------------------------------------------------------
   # SLACK (STAGING)
   # --------------------------------------------------------------------------
@@ -481,12 +490,12 @@ receivers:
         username: "OpenClaw Staging Alerts"
         icon_emoji: ":construction:"
         title: "STAGING: {{ .GroupLabels.alertname }}"
-        
+
         text: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
-        
+
         color: "#2196F3"  # Blue
         send_resolved: true
-  
+
   # --------------------------------------------------------------------------
   # EMAIL (CISO)
   # --------------------------------------------------------------------------
@@ -494,14 +503,14 @@ receivers:
     email_configs:
       - to: "ciso@openclaw.ai"
         from: "alerts@openclaw.ai"
-        
+
         headers:
           Subject: "[CRITICAL] Security Incident: {{ .GroupLabels.alertname }}"
           Priority: "urgent"
-        
+
         html: '{{ template "email.ciso.html" . }}'
         text: '{{ template "email.ciso.txt" . }}'
-  
+
   # --------------------------------------------------------------------------
   # EMAIL (SECURITY TEAM)
   # --------------------------------------------------------------------------
@@ -509,13 +518,14 @@ receivers:
     email_configs:
       - to: "security-team@openclaw.ai"
         from: "alerts@openclaw.ai"
-        
+
         headers:
-          Subject: "[{{ .GroupLabels.severity | toUpper }}] {{ .GroupLabels.alertname }}"
-        
+          Subject: |
+            [{{ .GroupLabels.severity | toUpper }}] {{ .GroupLabels.alertname }}
+
         html: '{{ template "email.default.html" . }}'
         text: '{{ template "email.default.txt" . }}'
-  
+
   # --------------------------------------------------------------------------
   # EMAIL (OPS TEAM)
   # --------------------------------------------------------------------------
@@ -523,32 +533,34 @@ receivers:
     email_configs:
       - to: "ops-team@openclaw.ai"
         from: "alerts@openclaw.ai"
-        
+
         headers:
-          Subject: "[{{ .GroupLabels.severity | toUpper }}] {{ .GroupLabels.alertname }}"
-        
+          Subject: |
+            [{{ .GroupLabels.severity | toUpper }}] {{ .GroupLabels.alertname }}
+            [{{ .GroupLabels.severity | toUpper }}] {{ .GroupLabels.alertname }}
+
         html: '{{ template "email.default.html" . }}'
-  
+
   # --------------------------------------------------------------------------
   # WEBHOOK (CUSTOM INTEGRATIONS)
   # --------------------------------------------------------------------------
   - name: "webhook-custom"
     webhook_configs:
       - url: "https://webhook.openclaw.ai/alertmanager"
-        
+
         # HTTP client configuration
         http_config:
           follow_redirects: true
           tls_config:
             insecure_skip_verify: false
             ca_file: "/etc/openclaw/ca.crt"
-        
+
         # Send resolved notifications
         send_resolved: true
-        
+
         # Max alerts per message
         max_alerts: 100
-  
+
   # --------------------------------------------------------------------------
   # NULL RECEIVER (DISCARDS ALERTS)
   # --------------------------------------------------------------------------

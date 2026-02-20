@@ -62,32 +62,32 @@ spec:
         runAsUser: 1000
         fsGroup: 1000
       containers:
-      - name: clawdbot
-        image: anthropic/clawdbot:2.0.0
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        resources:
-          requests:
-            cpu: 500m
-            memory: 1Gi
-          limits:
-            cpu: 2000m
-            memory: 2Gi
-        ports:
-        - containerPort: 18789
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 18789
-          initialDelaySeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 18789
+        - name: clawdbot
+          image: anthropic/clawdbot:2.0.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          ports:
+            - containerPort: 18789
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 18789
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 18789
 
 ---
 # Service
@@ -100,8 +100,8 @@ spec:
   selector:
     app: clawdbot
   ports:
-  - port: 18789
-    targetPort: 18789
+    - port: 18789
+      targetPort: 18789
 
 ---
 # NetworkPolicy
@@ -115,10 +115,10 @@ spec:
     matchLabels:
       app: clawdbot
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: ingress-nginx
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
