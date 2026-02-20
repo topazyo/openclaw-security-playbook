@@ -36,3 +36,4 @@ temp/
 
 # Local AI agent instructions (do not sync to GitHub)
 .github/copilot-instructions.md
+AGENTS.md

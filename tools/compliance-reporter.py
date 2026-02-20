@@ -11,7 +11,7 @@ class ComplianceReporter:
     def generate_report(self, framework="SOC2"):
         """Generate compliance report for specified framework."""
         if framework == "SOC2":
-            return self _generate_soc2_report()
+            return self._generate_soc2_report()
         elif framework == "ISO27001":
             return self._generate_iso27001_report()
         elif framework == "GDPR":

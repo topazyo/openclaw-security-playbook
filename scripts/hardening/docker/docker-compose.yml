@@ -71,6 +71,8 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - GATEWAY_PORT=8443
+      # Container-internal bind; safe because host
+      # port mapping restricts to 127.0.0.1
       - GATEWAY_HOST=0.0.0.0
       - ENABLE_METRICS=true
       - ENABLE_TRACING=true
@@ -85,8 +87,8 @@ services:
 
     # Port Mapping (only expose what's needed)
     ports:
-      - "8443:8443"  # Gateway HTTPS
-      - "9090:9090"  # Metrics (Prometheus)
+      - "127.0.0.1:8443:8443"  # Gateway HTTPS
+      - "127.0.0.1:9090:9090"  # Metrics (Prometheus)
 
     # Networks
     networks:
@@ -382,7 +384,7 @@ services:
       - '--web.enable-lifecycle'
 
     ports:
-      - "9091:9090"
+      - "127.0.0.1:9091:9090"
 
     networks:
       - monitoring
@@ -446,7 +448,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=false
 
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
     networks:
       - monitoring
@@ -504,6 +506,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=500m
 
+    # Container-internal bind; no host port mapping
     command: ["server", "--listen", "0.0.0.0:8080"]
 
     networks:
