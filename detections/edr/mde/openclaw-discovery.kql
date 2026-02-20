@@ -1,0 +1,60 @@
+// OpenClaw / Moltbot / Clawdbot — Full Discovery Query
+// Deploy as: Custom Detection Rule, run every 1 hour
+// Alert severity: Medium (escalate to High if 0.0.0.0:18789 found)
+// Part of: https://github.com/topazyo/openclaw-security-playbook
+
+let ProcessIOCs =
+DeviceProcessEvents
+| where Timestamp > ago(1h)
+| where ProcessCommandLine has "openclaw.mjs"
+    or ProcessCommandLine has "openclaw-openclaw-gateway"
+    or ProcessCommandLine has "openclaw-orchestrator"
+    or ProcessCommandLine has "openclaw gateway"
+    or ProcessCommandLine has "openclaw status"
+    or ProcessCommandLine has "openclaw onboard"
+    or ProcessCommandLine has "127.0.0.1:18789"
+    or ProcessCommandLine has "ws://127.0.0.1:18789"
+    or ProcessCommandLine has "molt.bot"
+    or ProcessCommandLine has "clawd.bot"
+| project Timestamp, DeviceName,
+    AccountName = InitiatingProcessAccountName,
+    EventType = "Process",
+    FileName,
+    CommandLine = ProcessCommandLine,
+    RemotePort = 0,
+    RemoteIP = "";
+
+let NetworkDomainIOCs =
+DeviceNetworkEvents
+| where Timestamp > ago(1h)
+| where RemoteUrl has "openclaw.ai"
+    or RemoteUrl has "molt.bot"
+    or RemoteUrl has "clawd.bot"
+    or RemoteUrl has "clawhub"
+    or RemoteUrl has "moltbotai.chat"
+| project Timestamp, DeviceName,
+    AccountName = InitiatingProcessAccountName,
+    EventType = "Network_Domain",
+    DomainOrUrl = RemoteUrl,
+    FileName = InitiatingProcessFileName,
+    CommandLine = InitiatingProcessCommandLine,
+    RemotePort,
+    RemoteIP;
+
+let Port18789 =
+DeviceNetworkEvents
+| where Timestamp > ago(1h)
+| where RemotePort == 18789
+| project Timestamp, DeviceName,
+    AccountName = InitiatingProcessAccountName,
+    EventType = "Port18789",
+    DomainOrUrl = RemoteUrl,
+    FileName = InitiatingProcessFileName,
+    CommandLine = InitiatingProcessCommandLine,
+    RemotePort,
+    RemoteIP;
+
+union ProcessIOCs, NetworkDomainIOCs, Port18789
+| order by Timestamp desc
+| project Timestamp, DeviceName, AccountName,
+    EventType, DomainOrUrl, FileName, CommandLine, RemoteIP

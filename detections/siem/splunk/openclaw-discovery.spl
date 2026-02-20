@@ -1,0 +1,23 @@
+| tstats count min(_time) as firstTime max(_time) as lastTime
+    FROM datamodel=Endpoint.Processes
+    WHERE
+        Processes.process="*openclaw.mjs*" OR
+        Processes.process="*openclaw-openclaw-gateway*" OR
+        Processes.process="*openclaw gateway*" OR
+        Processes.process="*openclaw status*" OR
+        Processes.process="*openclaw onboard*" OR
+        Processes.process="*127.0.0.1:18789*" OR
+        Processes.process="*ws://127.0.0.1:18789*" OR
+        Processes.process="*molt.bot*" OR
+        Processes.process="*clawd.bot*"
+    BY Processes.dest Processes.user Processes.process Processes.process_name
+| `drop_dm_object_name(Processes)`
+| `security_content_ctime(firstTime)`
+| `security_content_ctime(lastTime)`
+| eval risk_score=case(
+    match(process, "0\.0\.0\.0:18789"), 100,
+    match(process, "openclaw"), 60,
+    true(), 40
+  )
+| sort - risk_score
+| table firstTime lastTime dest user process process_name risk_score

@@ -1,0 +1,34 @@
+title: OpenClaw SOUL.md Modified by Non-Agent Process
+id: c3d4e5f6-a7b8-9012-cdef-123456789012
+status: stable
+description: >
+  Detects modifications to SOUL.md by any process other than the OpenClaw gateway.
+  SOUL.md is injected into every agent session as behavioral context. Unauthorized
+  modification creates cross-session persistence (ATLAS T-PERSIST-005).
+  Any write from a shell, download manager, or Python interpreter is a high-confidence
+  indicator of compromise or malicious skill payload execution.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+  - https://cloudsecops.hashnode.dev/openclaw-detecting-compromise
+author: openclaw-security-playbook
+date: 2026/02/18
+tags:
+  - attack.persistence
+  - attack.t1546
+  - atlas.aml.ta0005
+  - atlas.t-persist-005
+logsource:
+  category: file_event
+  product: linux
+detection:
+  selection_file:
+    TargetFilename|endswith: '/SOUL.md'
+    EventType: 'FileModified'
+  filter_legitimate:
+    Image|endswith:
+      - '/openclaw.mjs'
+  condition: selection_file and not filter_legitimate
+falsepositives:
+  - User manually editing SOUL.md via text editor (low risk if user-initiated)
+  - Setup scripts initializing SOUL.md on first run
+level: high

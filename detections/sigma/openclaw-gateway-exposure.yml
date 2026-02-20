@@ -1,0 +1,32 @@
+title: OpenClaw Gateway Exposed on All Network Interfaces
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: stable
+description: >
+  Detects OpenClaw/Moltbot/Clawdbot gateway process binding to 0.0.0.0:18789,
+  exposing the administrative control panel and credential store to the network.
+  Over 1,200 instances were found exposed this way by BrandDefense in January 2026.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+  - https://cloudsecops.hashnode.dev/openclaw-detecting-compromise
+author: openclaw-security-playbook
+date: 2026/02/18
+tags:
+  - attack.initial_access
+  - attack.t1133
+  - atlas.aml.ta0002
+logsource:
+  category: network_connection
+  product: linux
+detection:
+  selection:
+    Image|endswith:
+      - '/openclaw.mjs'
+      - '/node'
+    DestinationPort: 18789
+    DestinationIp:
+      - '0.0.0.0'
+      - '::'
+  condition: selection
+falsepositives:
+  - Intentional exposure behind firewall (document risk acceptance)
+level: critical

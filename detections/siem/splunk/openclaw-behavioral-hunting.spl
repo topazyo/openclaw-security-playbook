@@ -1,0 +1,26 @@
+| Comment: Hunt 1 — Credential path reads from telemetry
+index=main sourcetype=openclaw_telemetry event_type="tool_executed"
+| where tool_name="file_read"
+| where match(tool_path, "\.ssh|\.aws|\.moltbot|\.clawdbot|id_rsa|id_ed25519|\.bak|credentials")
+| table _time host user session_id tool_name tool_path
+| sort - _time
+
+| Comment: Hunt 2 — Off-hours high-risk tool execution (uncomment to run)
+`comment("
+index=main sourcetype=openclaw_telemetry event_type=tool_executed
+| eval hour=strftime(_time, "%H")
+| eval day_of_week=strftime(_time, "%u")
+| where (hour < "08" OR hour >= "19") OR (day_of_week >= "6")
+| where tool_name IN ("exec", "shell", "python_repl", "email_send", "browser_action")
+| table _time host user session_id tool_name hour day_of_week
+")`
+
+| Comment: Hunt 3 — Burst execution (>10 tool calls per session per minute)
+`comment("
+index=main sourcetype=openclaw_telemetry event_type=tool_executed
+| bin _time span=1m
+| stats count as tool_calls, values(tool_name) as tools_used
+    by _time session_id host
+| where tool_calls > 10
+| sort - tool_calls
+")`

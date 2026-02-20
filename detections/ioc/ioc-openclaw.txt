@@ -1,0 +1,118 @@
+# OpenClaw / Moltbot / Clawdbot — Indicators of Compromise
+# Last updated: 2026-02-18
+# Source: BrandDefense, OX Security, Hudson Rock, SecurityJoes analysis
+# Part of: https://github.com/topazyo/openclaw-security-playbook
+
+##############################################################################
+# DOMAINS
+##############################################################################
+
+# Core infrastructure
+openclaw.ai
+docs.openclaw.ai
+clawhub.openclaw.ai
+molt.bot
+docs.molt.bot
+clawd.bot
+docs.clawd.bot
+moltbotai.chat
+moltbook.ai
+clawhub.ai
+
+# Authentication / skill registry
+auth.clawdhub.com
+api.clawdhub.com
+
+##############################################################################
+# PORTS
+##############################################################################
+
+# Gateway WebSocket + HTTP control panel (default, may be changed)
+18789/tcp
+
+##############################################################################
+# NETWORK — URIS AND PATTERNS
+##############################################################################
+
+# Localhost gateway (safe configuration — flag if seen on 0.0.0.0)
+127.0.0.1:18789
+ws://127.0.0.1:18789
+
+# CRITICAL: Internet-exposed gateway variants
+0.0.0.0:18789
+:::18789
+
+##############################################################################
+# PROCESS NAMES AND COMMAND LINE PATTERNS
+##############################################################################
+
+# Process names
+openclaw.mjs
+openclaw-openclaw-gateway
+openclaw-orchestrator
+molty
+clawdbot
+
+# Command line patterns
+openclaw gateway
+openclaw status
+openclaw onboard
+openclaw doctor
+openclaw security audit
+openclaw orchestrator
+ws://127.0.0.1:18789
+127.0.0.1:18789
+
+##############################################################################
+# FILESYSTEM PATHS
+##############################################################################
+
+# Installation directories
+~/.openclaw/
+~/.moltbot/
+~/.clawdbot/
+
+# Credential stores — PRIMARY TARGETS
+~/.moltbot/moltbot.json
+~/.clawdbot/clawdbot.json
+
+# Credential backup files — HIGH VALUE INFOSTEALER TARGETS
+# Adapted targeting confirmed: RedLine, Lumma, Vidar (Hudson Rock, Jan 31 2026)
+~/.moltbot/moltbot.json.bak
+~/.moltbot/moltbot.json.bak.1
+~/.moltbot/moltbot.json.bak.2
+~/.moltbot/moltbot.json.bak.3
+~/.moltbot/moltbot.json.bak.4
+~/.clawdbot/clawdbot.json.bak
+~/.clawdbot/clawdbot.json.bak.1
+~/.clawdbot/clawdbot.json.bak.2
+~/.clawdbot/clawdbot.json.bak.3
+~/.clawdbot/clawdbot.json.bak.4
+
+# Persistence / identity files — monitor for unauthorized writes
+~/.openclaw/SOUL.md
+~/.moltbot/SOUL.md
+~/.clawdbot/SOUL.md
+
+# Skills directory
+~/.openclaw/skills/
+~/.moltbot/skills/
+~/.clawdbot/skills/
+
+# Telemetry logs
+~/.openclaw/logs/telemetry.jsonl
+
+# Windows paths
+%USERPROFILE%\openclaw\
+%USERPROFILE%\.local\bin\openclaw.cmd
+%APPDATA%\openclaw\
+%APPDATA%\moltbot\
+
+##############################################################################
+# INFOSTEALER ENUMERATION PATTERNS
+# (Glob patterns seen in RedLine/Lumma/Vidar samples post-Jan 27 2026)
+##############################################################################
+
+*/.moltbot/*.bak*
+*/.clawdbot/*.bak*
+*/.openclaw/*.bak*
