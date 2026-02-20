@@ -1,0 +1,103 @@
+// OpenClaw Behavioral Hunting Queries — Tier 2
+// Requires: openclaw-telemetry deployed + CEF forwarding to Microsoft Sentinel
+// Run as: Scheduled hunting queries (daily), or on-demand during investigations
+// Part of: https://github.com/topazyo/openclaw-security-playbook
+
+// ============================================================
+// HUNT 1: Credential Path Reads
+// ============================================================
+let CredentialPathReads =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend tool_name = extract("tool_name=([^,]+)", 1, AdditionalExtensions)
+| extend tool_path = extract("tool_path=([^,]+)", 1, AdditionalExtensions)
+| where tool_name == "file_read"
+    and tool_path matches regex @"(\.ssh|\.aws|\.moltbot|\.clawdbot|id_rsa|id_ed25519|\.bak|\.env|credentials)"
+| project TimeGenerated, DeviceName, SourceUserName, tool_name, tool_path;
+
+// ============================================================
+// HUNT 2: Exfiltration Sequence (file_read -> email_send in same session)
+// ============================================================
+let SensitiveReads =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend tool_name = extract("tool_name=([^,]+)", 1, AdditionalExtensions)
+| extend tool_path = extract("tool_path=([^,]+)", 1, AdditionalExtensions)
+| extend session_id = extract("session_id=([^,]+)", 1, AdditionalExtensions)
+| where tool_name == "file_read"
+    and tool_path matches regex @"(\.ssh|\.aws|\.bak|\.env|credentials)"
+| project ReadTime = TimeGenerated, DeviceName, session_id, tool_path;
+
+let EmailSends =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend tool_name = extract("tool_name=([^,]+)", 1, AdditionalExtensions)
+| extend session_id = extract("session_id=([^,]+)", 1, AdditionalExtensions)
+| extend recipients = extract("recipients=([^,]+)", 1, AdditionalExtensions)
+| where tool_name == "email_send"
+| project SendTime = TimeGenerated, DeviceName, session_id, recipients;
+
+let ExfilSequence =
+SensitiveReads
+| join kind=inner EmailSends on session_id
+| where abs(datetime_diff('second', ReadTime, SendTime)) < 60
+| project ReadTime, SendTime, DeviceName, session_id,
+    sensitive_path = tool_path, email_recipients = recipients;
+
+// ============================================================
+// HUNT 3: Off-Hours Tool Execution
+// ============================================================
+let OffHoursExec =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend HourOfDay = hourofday(TimeGenerated)
+| extend DayOfWeek = dayofweek(TimeGenerated)
+| extend tool_name = extract("tool_name=([^,]+)", 1, AdditionalExtensions)
+| where HourOfDay < 8 or HourOfDay >= 19
+    or DayOfWeek == 0d or DayOfWeek == 6d
+| where tool_name in ("exec", "shell", "python_repl",
+    "file_read", "file_write", "email_send", "browser_action")
+| project TimeGenerated, DeviceName, SourceUserName,
+    tool_name, HourOfDay, DayOfWeek;
+
+// ============================================================
+// HUNT 4: Burst Tool Execution (>10 calls/minute in same session)
+// ============================================================
+let BurstExec =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend session_id = extract("session_id=([^,]+)", 1, AdditionalExtensions)
+| summarize
+    tool_call_count = count(),
+    tools_used = make_set(extract("tool_name=([^,]+)", 1, AdditionalExtensions)),
+    first_call = min(TimeGenerated),
+    last_call = max(TimeGenerated)
+    by session_id, DeviceName, bin(TimeGenerated, 1m)
+| where tool_call_count > 10
+| project first_call, last_call, DeviceName, session_id, tool_call_count, tools_used;
+
+// ============================================================
+// HUNT 5: SOUL.md Modification by Non-Agent Process
+// ============================================================
+let SoulMdWrite =
+DeviceFileEvents
+| where Timestamp > ago(7d)
+| where FileName == "SOUL.md" or FolderPath endswith "SOUL.md"
+| where ActionType in ("FileModified", "FileCreated")
+| where InitiatingProcessFileName !in~ ("openclaw.mjs", "node", "node.exe")
+| project Timestamp, DeviceName, AccountName,
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine,
+    FolderPath, ActionType;
+
+// Run individual hunts:
+// CredentialPathReads | order by TimeGenerated desc
+// ExfilSequence | order by ReadTime desc
+// OffHoursExec | order by TimeGenerated desc
+// BurstExec | order by tool_call_count desc
+// SoulMdWrite | order by Timestamp desc

@@ -1,0 +1,74 @@
+// OpenClaw Kill Chain Detection — Tier 3
+// Maps to ATLAS kill chains from trust.openclaw.ai/trust/threatmodel
+// Requires: openclaw-telemetry deployed + CEF forwarding to Microsoft Sentinel
+// Part of: https://github.com/topazyo/openclaw-security-playbook
+
+// ============================================================
+// KILL CHAIN 1: Prompt Injection to RCE
+// ATLAS: T-ACCESS-006 -> T-EXEC-001 -> T-EVADE-003 -> T-EXEC-004 -> T-IMPACT-001
+// Signal: High-risk tool executed <5min after inbound message from external channel
+// ============================================================
+let HighRiskToolExec =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "tool_executed"
+| extend tool_name = extract("tool_name=([^,]+)", 1, AdditionalExtensions)
+| extend session_id = extract("session_id=([^,]+)", 1, AdditionalExtensions)
+| where tool_name in ("exec", "shell", "python_repl")
+| project ExecTime = TimeGenerated, DeviceName, session_id, tool_name;
+
+let InboundMessages =
+CommonSecurityLog
+| where DeviceProduct == "openclaw-telemetry"
+| where DeviceEventClassID == "message_received"
+| extend channel = extract("channel=([^,]+)", 1, AdditionalExtensions)
+| extend session_id = extract("session_id=([^,]+)", 1, AdditionalExtensions)
+| where channel in ("email", "slack", "twitter", "discord", "whatsapp", "telegram")
+| project MsgTime = TimeGenerated, DeviceName, session_id, channel;
+
+HighRiskToolExec
+| join kind=inner InboundMessages on session_id
+| where ExecTime > MsgTime
+    and datetime_diff('second', ExecTime, MsgTime) < 300
+| project MsgTime, ExecTime, DeviceName, session_id, channel, tool_name
+| extend SecondsToExec = datetime_diff('second', ExecTime, MsgTime)
+| order by ExecTime desc
+
+// ============================================================
+// KILL CHAIN 3: Malicious Skill — Skill Process Spawning Shell
+// ATLAS: T-RECON-003 -> T-EVADE-001 -> T-ACCESS-004 -> T-EXEC-005 -> T-PERSIST-001 -> T-EXFIL-003
+// Signal: openclaw/node spawning shell or interpreter as direct child
+// ============================================================
+// DeviceProcessEvents
+// | where Timestamp > ago(30d)
+// | where InitiatingProcessFileName in~ ("openclaw.mjs", "node.exe", "node")
+//     or InitiatingProcessCommandLine has "openclaw"
+// | where FileName in~ ("cmd.exe", "powershell.exe", "bash", "sh",
+//     "python.exe", "python3", "curl.exe", "curl", "wget",
+//     "certutil.exe", "bitsadmin.exe", "regsvr32.exe")
+// | project Timestamp, DeviceName,
+//     AccountName = InitiatingProcessAccountName,
+//     ParentProcess = InitiatingProcessFileName,
+//     ChildProcess = FileName,
+//     ChildCommandLine = ProcessCommandLine
+// | order by Timestamp desc
+
+// ============================================================
+// KILL CHAIN 5: Token Theft Persistent Access
+// ATLAS: T-ACCESS-003 -> T-PERSIST-004 -> T-DISC-002 -> T-EXFIL-002
+// Signal: Same token hash used across 5+ sessions from multiple channels
+// ============================================================
+// CommonSecurityLog
+// | where DeviceProduct == "openclaw-telemetry"
+// | where DeviceEventClassID == "session_start"
+// | extend token_hash = extract("token_hash=([^,]+)", 1, AdditionalExtensions)
+// | extend source_channel = extract("channel=([^,]+)", 1, AdditionalExtensions)
+// | summarize
+//     session_count = count(),
+//     channels = make_set(source_channel),
+//     first_seen = min(TimeGenerated),
+//     last_seen = max(TimeGenerated)
+//     by token_hash, DeviceName
+// | where session_count > 5
+//     and array_length(channels) > 2
+// | order by session_count desc

@@ -1,0 +1,43 @@
+title: OpenClaw Skill Spawning Shell or Interpreter Child Process
+id: d4e5f6a7-b8c9-0123-defa-234567890123
+status: stable
+description: >
+  Detects the OpenClaw agent or Node runtime spawning a system shell or interpreter
+  as a child process. Indicates a skill is executing system-level commands,
+  consistent with the Malicious Skill Full Kill Chain (ATLAS T-EXEC-005).
+  Legitimate OpenClaw operation does not require spawning bash, sh, powershell, or
+  Python as direct child processes of the gateway.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+  - https://cloudsecops.hashnode.dev/openclaw-detecting-compromise
+author: openclaw-security-playbook
+date: 2026/02/18
+tags:
+  - attack.execution
+  - attack.t1059
+  - atlas.aml.ta0003
+  - atlas.t-exec-005
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_parent:
+    ParentImage|endswith:
+      - '/openclaw.mjs'
+      - '/node'
+  selection_child:
+    Image|endswith:
+      - '/bash'
+      - '/sh'
+      - '/zsh'
+      - '/python'
+      - '/python3'
+      - '/curl'
+      - '/wget'
+  filter_known_safe:
+    CommandLine|contains: 'pip install'
+  condition: selection_parent and selection_child and not filter_known_safe
+falsepositives:
+  - Skills that legitimately shell out (document and add to filter)
+  - Development environments with debug logging enabled
+level: high
