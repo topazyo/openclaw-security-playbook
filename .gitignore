@@ -37,3 +37,9 @@ temp/
 # Local AI agent instructions (do not sync to GitHub)
 .github/copilot-instructions.md
 AGENTS.md
+
+# VIBE audit and implementation reports (local analysis only, do not sync to GitHub)
+VIBE_*.md
+PROGRESS_REPORTS/
+SHELL_SCRIPT_PERFORMANCE_AUDIT.md
+PERFORMANCE_AUDIT_REPORT.md
