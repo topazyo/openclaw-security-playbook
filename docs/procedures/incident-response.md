@@ -87,7 +87,7 @@ Is this informational OR
 | Production API key found on GitHub | P0 | [Playbook 1: Credential Exfiltration](../../examples/incident-response/playbook-credential-theft.md) |
 | Malicious skill installed, exfiltrating data | P0 | [Playbook 3: Malicious Skill](../../examples/incident-response/playbook-skill-compromise.md) |
 | Successful prompt injection attack | P1 | [Playbook 2: Prompt Injection](../../examples/incident-response/playbook-prompt-injection.md) |
-| MCP server compromised (contained) | P1 | [Playbook 5: MCP Server Compromise](../../examples/incident-response/playbook-mcp-compromise.md) |
+| MCP server compromised (contained) | P1 | [Scenario 003: MCP Server Compromise](../../examples/scenarios/scenario-003-mcp-server-compromise.md) |
 | Plaintext credentials in config file | P2 | Fix: Rotate + migrate to keychain |
 | Outdated Docker image (no known exploits) | P3 | Recommendation: Update during next maintenance |
 
@@ -225,7 +225,7 @@ curl -X POST https://api.pagerduty.com/incidents \
 
 | Incident Type | Containment Command |
 |---------------|---------------------|
-| **Credential Theft** | `./scripts/incident-response/rotate-credentials.sh --key-id abc123 --emergency` |
+| **Credential Exfiltration** | `./scripts/incident-response/rotate-credentials.sh --key-id abc123 --emergency` |
 | **Malicious Skill** | `./scripts/incident-response/quarantine-skill.sh --skill-name evil-tool` |
 | **Container Escape** | `docker kill <container-id>; docker network disconnect <network> <container>` |
 | **DoS Attack** | `./scripts/incident-response/block-ip.sh --ip 203.0.113.45 --duration 24h` |
@@ -541,8 +541,8 @@ Incident-specific response procedures:
 | **Playbook 2** | Prompt Injection | P1 | [playbook-prompt-injection.md](../../examples/incident-response/playbook-prompt-injection.md) |
 | **Playbook 3** | Malicious Skill | P0/P1 | [playbook-skill-compromise.md](../../examples/incident-response/playbook-skill-compromise.md) |
 | **Playbook 4** | Data Breach | P0 | [playbook-data-breach.md](../../examples/incident-response/playbook-data-breach.md) |
-| **Playbook 5** | MCP Server Compromise | P1 | [playbook-mcp-compromise.md](../../examples/incident-response/playbook-mcp-compromise.md) |
-| **Playbook 6** | Container Escape | P0 | [playbook-container-escape.md](../../examples/incident-response/playbook-container-escape.md) |
+| **Playbook 5** | MCP Server Compromise | P1 | [scenario-003-mcp-server-compromise.md](../../examples/scenarios/scenario-003-mcp-server-compromise.md) |
+| **Playbook 6** | Container Escape | P0 | [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md) |
 | **Playbook 7** | DoS Attack | P1/P2 | [playbook-denial-of-service.md](../../examples/incident-response/playbook-denial-of-service.md) |
 
 **See also**: [Real-World Scenarios](../../examples/scenarios/) for detailed attack demonstrations

@@ -4,7 +4,7 @@
 **Version**: 1.0.0  
 **Last Updated**: 2026-02-14  
 **Owner**: Operations Team + Security Team  
-**Related Policy**: [Business Continuity Policy](../policies/business-continuity-policy.md)
+**Related Policy**: [Operations Policy](../../configs/organization-policies/operations-policy.json)
 
 This runbook defines backup and disaster recovery procedures for ClawdBot/OpenClaw deployments to ensure business continuity.
 
@@ -492,7 +492,7 @@ gpg --decrypt /tmp/monthly-backup-2026-01-01.tar.gz.gpg | tar -xzf - -C /data/
 
 ### DR Runbook
 
-**See**: [Disaster Recovery Runbook](./disaster-recovery-runbook.md) (detailed procedures)
+**See**: [Disaster Recovery Section](./backup-recovery.md#disaster-recovery) (detailed procedures)
 
 **Quick Reference**:
 ```bash
@@ -664,6 +664,6 @@ gpg --decrypt /tmp/monthly-backup-2026-01-01.tar.gz.gpg | tar -xzf - -C /data/
 **Emergency**: ops-oncall@company.com (PagerDuty, 24/7)
 
 **Related Documentation**:
-- [Disaster Recovery Runbook](./disaster-recovery-runbook.md)
+- [Disaster Recovery Section](./backup-recovery.md#disaster-recovery)
 - [Incident Response Procedure](./incident-response.md)
-- [Business Continuity Policy](../policies/business-continuity-policy.md)
+- [Operations Policy](../../configs/organization-policies/operations-policy.json)

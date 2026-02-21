@@ -1,0 +1,295 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openclaw.ai/schemas/skill-enforcement-policy-v1.json",
+  "title": "OpenClaw Skill Enforcement Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "last_updated",
+    "description",
+    "enforcement_level",
+    "validation",
+    "source_validation",
+    "pattern_scanning",
+    "permissions",
+    "quarantine",
+    "monitoring",
+    "logging",
+    "notifications",
+    "exceptions",
+    "compliance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "last_updated": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "description": { "type": "string", "minLength": 1 },
+    "enforcement_level": {
+      "type": "object",
+      "required": ["default", "production", "development", "testing"],
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/definitions/action" },
+        "production": { "$ref": "#/definitions/action" },
+        "development": { "$ref": "#/definitions/action" },
+        "testing": { "$ref": "#/definitions/action" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["manifest", "integrity", "signature"],
+      "additionalProperties": false,
+      "properties": {
+        "manifest": {
+          "type": "object",
+          "required": ["required", "schema_validation", "fail_on_missing", "fail_on_invalid"],
+          "additionalProperties": false,
+          "properties": {
+            "required": { "type": "boolean" },
+            "schema_validation": { "type": "boolean" },
+            "fail_on_missing": { "type": "boolean" },
+            "fail_on_invalid": { "type": "boolean" }
+          }
+        },
+        "integrity": {
+          "type": "object",
+          "required": ["required", "algorithm", "fail_on_mismatch", "allow_unsigned"],
+          "additionalProperties": false,
+          "properties": {
+            "required": { "type": "boolean" },
+            "algorithm": { "type": "string", "minLength": 1 },
+            "fail_on_mismatch": { "type": "boolean" },
+            "allow_unsigned": { "type": "boolean" }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "required": ["required", "verify_pgp", "trusted_keys", "fail_on_invalid"],
+          "additionalProperties": false,
+          "properties": {
+            "required": { "type": "boolean" },
+            "verify_pgp": { "type": "boolean" },
+            "trusted_keys": { "type": "array", "items": { "type": "string" } },
+            "fail_on_invalid": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "source_validation": {
+      "type": "object",
+      "required": ["check_allowlist", "block_untrusted", "warn_untrusted", "require_https", "check_certificate"],
+      "additionalProperties": false,
+      "properties": {
+        "check_allowlist": { "type": "boolean" },
+        "block_untrusted": { "type": "boolean" },
+        "warn_untrusted": { "type": "boolean" },
+        "require_https": { "type": "boolean" },
+        "check_certificate": { "type": "boolean" }
+      }
+    },
+    "pattern_scanning": {
+      "type": "object",
+      "required": ["enabled", "scan_code", "scan_config", "scan_dependencies", "severity_actions", "ignore_patterns"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "scan_code": { "type": "boolean" },
+        "scan_config": { "type": "boolean" },
+        "scan_dependencies": { "type": "boolean" },
+        "severity_actions": {
+          "type": "object",
+          "required": ["critical", "high", "medium", "low"],
+          "additionalProperties": false,
+          "properties": {
+            "critical": { "$ref": "#/definitions/action" },
+            "high": { "$ref": "#/definitions/action" },
+            "medium": { "$ref": "#/definitions/action" },
+            "low": { "$ref": "#/definitions/action" }
+          }
+        },
+        "ignore_patterns": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "required": ["check_permissions", "require_justification", "dangerous_permissions", "permission_combinations"],
+      "additionalProperties": false,
+      "properties": {
+        "check_permissions": { "type": "boolean" },
+        "require_justification": { "type": "boolean" },
+        "dangerous_permissions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/action" }
+        },
+        "permission_combinations": {
+          "type": "object",
+          "required": ["dangerous"],
+          "additionalProperties": false,
+          "properties": {
+            "dangerous": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "quarantine": {
+      "type": "object",
+      "required": ["auto_quarantine", "quarantine_on", "retention_days", "notify_on_quarantine"],
+      "additionalProperties": false,
+      "properties": {
+        "auto_quarantine": { "type": "boolean" },
+        "quarantine_on": {
+          "type": "object",
+          "required": ["integrity_failure", "signature_invalid", "dangerous_patterns", "blocked_source", "blocked_author"],
+          "additionalProperties": false,
+          "properties": {
+            "integrity_failure": { "type": "boolean" },
+            "signature_invalid": { "type": "boolean" },
+            "dangerous_patterns": {
+              "type": "object",
+              "required": ["critical", "high"],
+              "additionalProperties": false,
+              "properties": {
+                "critical": { "type": "boolean" },
+                "high": { "type": "boolean" }
+              }
+            },
+            "blocked_source": { "type": "boolean" },
+            "blocked_author": { "type": "boolean" }
+          }
+        },
+        "retention_days": { "type": "integer", "minimum": 1 },
+        "notify_on_quarantine": { "type": "boolean" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "required": ["continuous_monitoring", "scan_interval_seconds", "watch_for_changes", "alert_on_modifications"],
+      "additionalProperties": false,
+      "properties": {
+        "continuous_monitoring": { "type": "boolean" },
+        "scan_interval_seconds": { "type": "integer", "minimum": 1 },
+        "watch_for_changes": { "type": "boolean" },
+        "alert_on_modifications": { "type": "boolean" }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "required": ["log_level", "log_validation", "log_scans", "log_quarantine", "audit_all_actions", "rotation"],
+      "additionalProperties": false,
+      "properties": {
+        "log_level": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
+        "log_validation": { "type": "boolean" },
+        "log_scans": { "type": "boolean" },
+        "log_quarantine": { "type": "boolean" },
+        "audit_all_actions": { "type": "boolean" },
+        "rotation": {
+          "type": "object",
+          "required": ["max_size_mb", "retention_days"],
+          "additionalProperties": false,
+          "properties": {
+            "max_size_mb": { "type": "integer", "minimum": 1 },
+            "retention_days": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "required": ["enabled", "channels"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "channels": {
+          "type": "object",
+          "required": ["email", "slack", "webhook"],
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "object",
+              "required": ["enabled", "recipients", "on_events"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "recipients": { "type": "array", "items": { "type": "string" } },
+                "on_events": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "slack": {
+              "type": "object",
+              "required": ["enabled", "webhook_url", "on_events"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "webhook_url": { "type": "string" },
+                "on_events": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "webhook": {
+              "type": "object",
+              "required": ["enabled", "url", "auth_header"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "url": { "type": "string" },
+                "auth_header": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "exceptions": {
+      "type": "object",
+      "required": ["skills"],
+      "additionalProperties": false,
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "reason", "expiry", "skip_checks"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "expiry": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+              "skip_checks": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "required": ["frameworks", "sbom_required", "license_compliance"],
+      "additionalProperties": false,
+      "properties": {
+        "frameworks": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "sbom_required": { "type": "boolean" },
+        "license_compliance": {
+          "type": "object",
+          "required": ["check_licenses", "allowed_licenses", "blocked_licenses"],
+          "additionalProperties": false,
+          "properties": {
+            "check_licenses": { "type": "boolean" },
+            "allowed_licenses": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "blocked_licenses": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "action": {
+      "type": "string",
+      "enum": ["block", "warn", "log"]
+    }
+  }
+}

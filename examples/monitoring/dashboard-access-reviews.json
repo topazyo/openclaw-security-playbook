@@ -718,6 +718,6 @@
   "related_playbooks": [
     "SEC-002 access-control-policy.md: Defines quarterly review requirement and procedures",
     "access-review.md procedure: Step-by-step quarterly review process",
-    "playbook-credential-theft.md (IRP-001): Orphaned accounts are credential theft vectors"
+    "playbook-credential-theft.md (IRP-001): Orphaned accounts are credential exfiltration vectors"
   ]
 }

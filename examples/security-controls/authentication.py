@@ -165,7 +165,7 @@ class PasswordHasher:
 hasher = PasswordHasher()
 
 # Hash password
-password = "MySecureP@ssw0rd123"
+password = os.environ.get("AUTH_DEMO_PASSWORD", "ExamplePasswordFromEnv123!")
 is_strong, violations = hasher.validate_password_strength(password)
 if is_strong:
     hashed = hasher.hash_password(password)
@@ -1090,7 +1090,7 @@ import pytest
 def test_password_hashing():
     """Test password hashing and verification."""
     hasher = PasswordHasher()
-    password = "TestPassword123!"
+    password = os.environ.get("TEST_AUTH_PASSWORD", "ExampleTestPassword123!")
     
     hashed = hasher.hash_password(password)
     assert hasher.verify_password(password, hashed)

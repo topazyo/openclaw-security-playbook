@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-"""Config Migrator - Migrates openclaw-agent.yml between versions"""
+"""Config Migrator - Migrates openclaw-agent.yml between versions.
 
-import yaml
+Run from repo root:
+    python tools/config-migrator.py --help
+"""
+
+import argparse
 import shutil
+import json
 from pathlib import Path
 from datetime import datetime
+
+try:
+    import yaml
+except ModuleNotFoundError:
+    yaml = None
 
 
 class ConfigMigrator:
@@ -12,6 +22,9 @@ class ConfigMigrator:
     
     def migrate(self, config_path, from_version, to_version):
         """Migrate configuration file."""
+        if yaml is None:
+            return {"success": False, "error": "Missing dependency: pyyaml"}
+
         try:
             # Backup original
             backup_path = self._create_backup(config_path)
@@ -62,5 +75,16 @@ class ConfigMigrator:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Migrate OpenClaw agent configuration versions")
+    parser.add_argument(
+        "--config",
+        default="configs/agent-config/openclaw-agent.yml",
+        help="Path to source configuration file",
+    )
+    parser.add_argument("--from-version", default="1.0", help="Source version")
+    parser.add_argument("--to-version", default="2.0", help="Target version")
+    args = parser.parse_args()
+
     migrator = ConfigMigrator()
-    print(migrator.migrate("configs/agent-config/openclaw-agent.yml", "1.0", "2.0"))
+    result = migrator.migrate(args.config, args.from_version, args.to_version)
+    print(json.dumps(result, indent=2))

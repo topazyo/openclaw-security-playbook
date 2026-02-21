@@ -40,11 +40,15 @@ cd clawdbot-security-playbook/scripts/hardening/docker
 
 # 2. Create secrets directory
 mkdir -p secrets
-echo "sk-ant-your-key" > secrets/anthropic_api_key.txt
-echo "sk-your-key" > secrets/openai_api_key.txt
+echo "${ANTHROPIC_API_KEY}" > secrets/anthropic_api_key.txt
+echo "${OPENAI_API_KEY}" > secrets/openai_api_key.txt
 echo "$(openssl rand -hex 32)" > secrets/gateway_secret_key.txt
 echo "$(openssl rand -hex 32)" > secrets/agent_auth_token.txt
 echo "$(openssl rand -hex 16)" > secrets/postgres_password.txt
+
+# Generate missing values if needed:
+# export ANTHROPIC_API_KEY="$(openssl rand -base64 32)"
+# export OPENAI_API_KEY="$(openssl rand -base64 32)"
 
 # 3. Set permissions
 chmod 600 secrets/*.txt
@@ -419,7 +423,7 @@ VERSION=1.0.0
 # Gateway configuration
 cat > config/gateway.yml << 'EOF'
 server:
-  host: 0.0.0.0
+  host: 127.0.0.1
   port: 8443
 
 security:
@@ -661,7 +665,7 @@ kubectl logs -f deployment/clawdbot-gateway
 - [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker)
 - [OWASP Docker Security](https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html)
 - [Trivy Documentation](https://aquasecurity.github.io/trivy/)
-- [ClawdBot Security Playbook](../../docs/guides/05-agent-sandboxing.md)
+- [ClawdBot Security Playbook](../../../docs/guides/04-runtime-sandboxing.md)
 
 ---
 

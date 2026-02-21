@@ -9,7 +9,7 @@ references:
   - https://github.com/topazyo/openclaw-security-playbook
   - https://cloudsecops.hashnode.dev/openclaw-detecting-compromise
 author: openclaw-security-playbook
-date: 2026/02/18
+date: 2026-02-21
 tags:
   - attack.initial_access
   - attack.t1133
@@ -18,15 +18,23 @@ logsource:
   category: network_connection
   product: linux
 detection:
-  selection:
+  selection_process_named:
     Image|endswith:
       - '/openclaw.mjs'
-      - '/node'
+      - '/clawdbot.mjs'
+      - '/moltbot.mjs'
+  selection_node_wrapped:
+    Image|endswith: '/node'
+    CommandLine|contains:
+      - 'openclaw'
+      - 'clawdbot'
+      - 'moltbot'
+  selection_exposed_bind:
     DestinationPort: 18789
     DestinationIp:
       - '0.0.0.0'
       - '::'
-  condition: selection
+  condition: (selection_process_named or selection_node_wrapped) and selection_exposed_bind
 falsepositives:
   - Intentional exposure behind firewall (document risk acceptance)
 level: critical

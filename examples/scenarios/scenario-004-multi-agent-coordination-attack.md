@@ -722,7 +722,7 @@ actions:
 
 ## Related Scenarios
 
-- `scenario-001-indirect-prompt-injection.md` - Prompt injection attack
+- `scenario-001-indirect-prompt-injection-attack.md` - Prompt injection attack
 - `scenario-002-malicious-skill-deployment.md` - Supply chain attack
 - `scenario-003-mcp-server-compromise.md` - Infrastructure breach
 

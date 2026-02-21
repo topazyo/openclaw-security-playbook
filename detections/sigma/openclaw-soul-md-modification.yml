@@ -11,7 +11,7 @@ references:
   - https://github.com/topazyo/openclaw-security-playbook
   - https://cloudsecops.hashnode.dev/openclaw-detecting-compromise
 author: openclaw-security-playbook
-date: 2026/02/18
+date: 2026-02-21
 tags:
   - attack.persistence
   - attack.t1546
@@ -24,10 +24,18 @@ detection:
   selection_file:
     TargetFilename|endswith: '/SOUL.md'
     EventType: 'FileModified'
-  filter_legitimate:
+  filter_legitimate_named:
     Image|endswith:
       - '/openclaw.mjs'
-  condition: selection_file and not filter_legitimate
+      - '/clawdbot.mjs'
+      - '/moltbot.mjs'
+  filter_legitimate_node_wrapped:
+    Image|endswith: '/node'
+    CommandLine|contains:
+      - 'openclaw'
+      - 'clawdbot'
+      - 'moltbot'
+  condition: selection_file and not (filter_legitimate_named or filter_legitimate_node_wrapped)
 falsepositives:
   - User manually editing SOUL.md via text editor (low risk if user-initiated)
   - Setup scripts initializing SOUL.md on first run

@@ -1029,7 +1029,7 @@ actions:
 
 ## Related Scenarios
 
-- `scenario-001-indirect-prompt-injection.md` - Prompt injection via external content
+- `scenario-001-indirect-prompt-injection-attack.md` - Prompt injection via external content
 - `scenario-002-malicious-skill-deployment.md` - Supply chain attack
 - `scenario-006-credential-theft-conversation-history.md` - Credentials in context
 

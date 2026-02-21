@@ -1,6 +1,24 @@
+---
+title: Community Tools Integration Guide
+layer: 4-6-7
+estimated_time: 75 minutes
+difficulty: Intermediate-Advanced
+---
+
 # Community Tools Integration Guide
 
 This guide provides comprehensive deployment instructions for open-source security tools released by the community in response to AI agent vulnerabilities disclosed in January-February 2026.
+
+## Platform Notes
+
+### Linux
+Use commands as written for package installation, service management, and log inspection.
+
+### macOS
+Use macOS-compatible package/service commands while preserving the same security controls.
+
+### Windows
+Use PowerShell/WSL2 equivalents for shell commands and keep verification outcomes identical.
 
 ## Table of Contents
 
@@ -52,7 +70,7 @@ This guide provides comprehensive deployment instructions for open-source securi
 | **SIEM Integration** | ❌ | ✅ Native | ❌ | ❌ | ⚠️ Custom |
 | **Tamper-Proof Logs** | ❌ | ✅ Hash chains | ❌ | ❌ | ❌ |
 | **MDM Deployment** | ✅ Docs included | ❌ | ❌ | ❌ | ❌ |
-| **OpenClaw Native** | N/A | ✅ Plugin | ✅ Plugin | ❌ | N/A |
+| **OpenClaw Native** | N/A | ✅ Skill Integration | ✅ Skill Integration | ❌ | N/A |
 | **JS/TS Support** | ❌ | ❌ | ❌ | ✅ NPM | ❌ |
 | **Installation Complexity** | Low | Medium | Medium | Low | Medium |
 | **Maintenance** | Community | Community | Community | Community | Self |
@@ -100,7 +118,7 @@ This guide provides comprehensive deployment instructions for open-source securi
 - Configuration directories: `~/.openclaw/`, `~/.moltbot/`, `~/.clawdbot/`
 - Running processes: Gateway services on port 18789
 - Docker containers: Images tagged with agent names
-- Browser extensions and IDE plugins
+- Browser skills and IDE skills
 
 ### Installation
 
@@ -187,6 +205,14 @@ done
 ./scripts/verification/verify_openclaw_security.sh
 ```
 
+**Verify:** Expected output:
+```text
+[FOUND] entries for known agent installations OR no findings if clean
+verify_openclaw_security.sh returns:
+  exit 0 when no critical findings
+  exit 1 when critical findings are present
+```
+
 ---
 
 ## openclaw-telemetry: Enterprise Telemetry
@@ -196,7 +222,7 @@ done
 **Author**: Knostic  
 **Repository**: https://github.com/knostic/openclaw-telemetry/  
 **Purpose**: Enterprise-grade behavioral monitoring with SIEM integration  
-**Deployment**: Native OpenClaw plugin
+**Deployment**: Native OpenClaw skill integration
 
 ### Key Features
 
@@ -210,7 +236,7 @@ done
 ### Installation
 
 ```bash
-# Install as OpenClaw plugin
+# Install as OpenClaw skill integration
 cd ~/.openclaw/plugins
 git clone https://github.com/knostic/openclaw-telemetry
 
@@ -406,6 +432,17 @@ def detect_anomalies_from_telemetry(telemetry_log_path):
 # AND apply your custom detection logic
 ```
 
+**Verify:** Expected output:
+```bash
+openclaw plugins list | grep openclaw-telemetry
+tail -n 3 ~/.openclaw/logs/telemetry.jsonl | jq '.event_type'
+```
+
+```text
+Skill integration list includes openclaw-telemetry
+Telemetry log events are emitted and parse as valid JSON
+```
+
 ---
 
 ## openclaw-shield: Runtime Security Enforcement
@@ -415,7 +452,7 @@ def detect_anomalies_from_telemetry(telemetry_log_path):
 **Author**: Knostic  
 **Repository**: https://github.com/knostic/openclaw-shield  
 **Purpose**: 5-layer defense-in-depth security enforcement at runtime  
-**Deployment**: Native OpenClaw plugin
+**Deployment**: Native OpenClaw skill integration
 
 ### The Five Defense Layers
 
@@ -430,7 +467,7 @@ Each layer can be independently enabled/disabled for gradual rollout.
 ### Installation
 
 ```bash
-# Install as OpenClaw plugin
+# Install as OpenClaw skill integration
 cd ~/.openclaw/plugins
 git clone https://github.com/knostic/openclaw-shield
 
@@ -559,6 +596,17 @@ shield:
 # Test Input Audit
 # Send message containing "my password is: 12345"
 # Expected: Alert triggered, logged to audit trail
+```
+
+**Verify:** Expected output:
+```bash
+openclaw plugins list | grep openclaw-shield
+grep -i "blocked\|redacted\|prompt injection" ~/.openclaw/logs/audit.jsonl | tail -n 5
+```
+
+```text
+Skill integration list includes openclaw-shield
+Blocked or redacted events appear for shield-protected actions
 ```
 
 ### Integration with This Playbook
@@ -995,7 +1043,7 @@ ps aux | grep -E "(claw|molt)"
 ```bash
 # openclaw-detect (more comprehensive)
 ./detect-openclaw.sh
-# Finds: binaries, configs, processes, Docker containers, browser extensions
+# Finds: binaries, configs, processes, Docker containers, browser skills
 ```
 
 **Migration Steps**:
@@ -1112,7 +1160,7 @@ shield:
 **openclaw-shield (tool_blocker) + Custom tool restrictions**: ⚠️ May conflict
 - Solution: Migrate all restrictions to openclaw-shield config
 
-**clawguard + OpenClaw plugins**: N/A - Different ecosystems
+**clawguard + OpenClaw skills**: N/A - Different ecosystems
 - clawguard is for JS/TS agents, not OpenClaw
 
 ---
@@ -1145,17 +1193,17 @@ find / -name "*claw*" ! -path "*/node_modules/*" ! -path "*/vendor/*"
 
 ### openclaw-telemetry Issues
 
-**Issue**: Plugin not loading
+**Issue**: Skill integration not loading
 
 **Solution**:
 ```bash
-# Check plugin directory
+# Check skills directory
 ls -la ~/.openclaw/plugins/openclaw-telemetry
 
-# Check OpenClaw plugin configuration
+# Check OpenClaw skills configuration
 cat ~/.openclaw/config/plugins.yml
 
-# Verify plugin registration
+# Verify skill registration
 openclaw plugins list
 ```
 
@@ -1169,7 +1217,7 @@ nc -zv siem.company.com 514
 # Check telemetry config
 cat ~/.openclaw/config/telemetry/config.yml | grep -A5 syslog
 
-# View telemetry plugin logs
+# View telemetry skill logs
 tail -f ~/.openclaw/logs/plugins/openclaw-telemetry.log
 ```
 

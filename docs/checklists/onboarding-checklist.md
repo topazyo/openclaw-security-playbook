@@ -1,8 +1,8 @@
 # Onboarding Checklist
 
 **Document Type**: New User Onboarding  
-**Version**: 1.0.0  
-**Last Updated**: 2026-02-14  
+**Version**: 1.0.1  
+**Last Updated**: 2026-02-21  
 **Owner**: Security Team + HR
 
 This checklist ensures new employees/contractors receive proper access and training for ClawdBot/OpenClaw systems.
@@ -183,7 +183,7 @@ secret-tool lookup service "ai.openclaw.anthropic"         # Linux
 docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Wait for health check
-./scripts/verification/wait-for-healthy.sh --timeout 300
+docker-compose -f configs/examples/docker-compose-full-stack.yml ps
 
 # Verify deployment
 ./scripts/verification/verify_openclaw_security.sh
@@ -195,10 +195,10 @@ docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
 #### Step 5: Run Tests
 ```bash
 # Integration tests
-./scripts/testing/run-integration-tests.sh --env dev
+pytest tests/integration
 
 # Smoke tests
-./scripts/testing/smoke-tests.sh
+pytest tests/unit/test_tools_help_smoke.py
 ```
 
 ---
@@ -320,6 +320,6 @@ Date: ______________________________
 **Related Documentation**:
 - [Access Control Policy](../policies/access-control-policy.md)
 - [Acceptable Use Policy](../policies/acceptable-use-policy.md)
-- [Data Classification Policy](../policies/data-classification-policy.md)
+- [Data Classification Policy](../policies/data-classification.md)
 - [Quick Start Guide](../guides/01-quick-start.md)
 - [Training Materials](../../training/)

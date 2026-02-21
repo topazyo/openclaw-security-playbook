@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Compliance Reporter - Generates SOC 2/ISO 27001/GDPR audit reports"""
+"""Compliance Reporter - Generates SOC 2/ISO 27001/GDPR audit reports.
 
+Run from repo root:
+    python tools/compliance-reporter.py --help
+"""
+
+import argparse
 import json
 from datetime import datetime
 
@@ -82,5 +87,21 @@ class ComplianceReporter:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate OpenClaw compliance reports")
+    parser.add_argument(
+        "--framework",
+        default="SOC2",
+        choices=["SOC2", "ISO27001", "GDPR"],
+        help="Compliance framework",
+    )
+    parser.add_argument("--output", help="Optional output path for JSON report")
+    args = parser.parse_args()
+
     reporter = ComplianceReporter()
-    print(json.dumps(reporter.generate_report("SOC2"), indent=2))
+    report = reporter.generate_report(args.framework)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+    else:
+        print(json.dumps(report, indent=2))

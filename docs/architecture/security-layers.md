@@ -104,7 +104,7 @@ Never trust, always verify. No implicit trust based on network location.
 
 Multiple independent layers protect against the same threat.
 
-**Example - Credential Theft Protection:**
+**Example - Credential Exfiltration Protection:**
 - Layer 1: OS keychain (prevents reading plaintext)
 - Layer 2: VPN (prevents remote access to gateway)
 - Layer 3: Sandbox (skill can't access keychain)
@@ -262,7 +262,7 @@ docker exec <container> touch /test  # Should fail: Read-only file system
 
 **Problem**: AI agents vulnerable to prompt injection attacks:
 - Indirect injection via emails, PDFs, web pages
-- Jailbreak attempts bypass system prompts
+- Prompt injection bypass attempts can evade system prompts
 - Tool execution without authorization
 - PII/credentials in outputs
 
@@ -295,7 +295,7 @@ echo "Ignore previous instructions" | ./test-shield.sh
 # Should return: BLOCKED - Prompt injection detected
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-shield)
+**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-shield-runtime-security-enforcement)
 
 ---
 
@@ -395,7 +395,7 @@ services:
 curl http://localhost:9090/metrics | grep openclaw
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-telemetry)
+**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-telemetry-enterprise-telemetry)
 
 ---
 
@@ -444,10 +444,10 @@ curl http://localhost:9090/metrics | grep openclaw
 **Verification**:
 ```bash
 # Scan for shadow AI
-./scripts/discovery/shadow-ai-scan.sh --network 10.0.0.0/8
+./scripts/verification/verify_openclaw_security.sh
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-detect)
+**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-detect-shadow-ai-discovery)
 
 ---
 
@@ -669,7 +669,7 @@ curl http://localhost:9090/metrics | grep openclaw_requests_total
 **Layer 7**:
 ```bash
 # Policy compliance
-./scripts/compliance/policy-audit.sh
+./scripts/verification/verify_openclaw_security.sh
 # Should return: 0 violations
 ```
 
@@ -703,6 +703,6 @@ curl http://localhost:9090/metrics | grep openclaw_requests_total
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: February 14, 2026  
+**Document Version**: 1.0.1  
+**Last Updated**: February 21, 2026  
 **Next Review**: May 14, 2026 (quarterly)

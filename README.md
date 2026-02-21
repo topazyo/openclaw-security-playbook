@@ -79,7 +79,7 @@ This playbook provides a **complete, production-ready security framework** with 
 - **Compliance:** 2 compliance mapping files (SOC 2, ISO 27001)
 
 ### 🔍 Detection Rules (18 files)
-- **IOCs:** Domain, port, process, and file path indicators + YARA rules for credential theft, malicious skills, and SOUL.md injection
+- **IOCs:** Domain, port, process, and file path indicators + YARA rules for credential exfiltration, malicious skills, and SOUL.md injection
 - **Sigma:** 4 platform-agnostic rules (credential harvest, gateway exposure, skill child process, SOUL.md modification)
 - **MDE (KQL):** Discovery, behavioral hunting (5 hunts), and kill chain detection (5 chains) for Microsoft Defender for Endpoint
 - **Splunk (SPL):** Discovery and behavioral hunting queries
@@ -108,7 +108,7 @@ This playbook provides a **complete, production-ready security framework** with 
 ### 🛠️ Operational Tools (6 files)
 - **openclaw-cli.py:** Comprehensive CLI (scan/playbook/report/config/simulate)
 - **policy-validator.py:** SEC-002/003/004/005 compliance validation
-- **incident-simulator.py:** Credential theft, MCP compromise, DoS scenarios
+- **incident-simulator.py:** Credential exfiltration, MCP compromise, DoS scenarios
 - **compliance-reporter.py:** SOC 2/ISO 27001/GDPR report generation
 - **certificate-manager.py:** Let's Encrypt ACME automation
 - **config-migrator.py:** Zero-downtime configuration upgrades
@@ -701,7 +701,7 @@ openclaw-security-playbook/
 │   ├── README.md                      # Detection content overview and telemetry schema
 │   ├── ioc/                           # Indicators of compromise
 │   │   ├── ioc-openclaw.txt          # Domains, ports, processes, file paths
-│   │   └── ioc-openclaw.yar          # YARA rules (credential theft, malicious skills, SOUL.md injection)
+│   │   └── ioc-openclaw.yar          # YARA rules (credential exfiltration, malicious skills, SOUL.md injection)
 │   ├── edr/                           # EDR platform queries
 │   │   └── mde/                       # Microsoft Defender for Endpoint
 │   │       ├── openclaw-discovery.kql        # Tier 1: Fleet-wide discovery
@@ -722,7 +722,7 @@ openclaw-security-playbook/
 │   │   ├── prompt-injection/          # Prompt injection attacks
 │   │   │   ├── direct-injection.md   # Direct prompt injection
 │   │   │   ├── indirect-injection.md # Indirect via documents/emails
-│   │   │   └── jailbreak-attempts.md # Jailbreak techniques
+│   │   │   └── jailbreak-attempts.md # Prompt injection bypass techniques
 │   │   │
 │   │   ├── data-exfiltration/         # Data theft techniques
 │   │   │   ├── conversation-leakage.md # Leaking conversation history

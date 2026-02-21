@@ -398,12 +398,17 @@ Result: Agent enters infinite loop, CPU 100%, eventually OOMKilled
 5. **Classify Attack Type**
    
    ```bash
-   # Run automated attack classification
-   ./scripts/incident-response/attack-classifier.py \
-     --traffic-logs /var/log/openclaw/access.log \
-     --network-logs /var/log/openclaw/network.pcap \
-     --duration-minutes 15 \
-     --output attack-analysis.json
+   # Build a quick attack profile from recent access logs
+   zcat /var/log/openclaw/access-*.log.gz | \
+     awk '{print $1}' | sort | uniq -c | sort -rn | head -20 > attack-top-sources.txt
+
+   TOTAL_REQ=$(awk '{sum += $1} END {print sum+0}' attack-top-sources.txt)
+   UNIQUE_IPS=$(wc -l < attack-top-sources.txt)
+
+   jq -n \
+     --argjson total_requests "${TOTAL_REQ:-0}" \
+     --argjson unique_ips "${UNIQUE_IPS:-0}" \
+     '{total_requests: $total_requests, unique_source_ips: $unique_ips}' > attack-analysis.json
    ```
    
    **Attack Classification Output**:
@@ -604,12 +609,14 @@ Result: Agent enters infinite loop, CPU 100%, eventually OOMKilled
    # Step 1 (T+2 hours): 50% of normal limits
    # Step 2 (T+4 hours): 75% of normal limits  
    # Step 3 (T+6 hours): 100% of normal limits
-   
-   ./scripts/incident-response/rate-limit-adjuster.py \
-     --current aggressive \
-     --target normal \
-     --transition-hours 6 \
-     --step-percentage 25
+
+   for step in 50 75 100; do
+     echo "Applying ${step}% of normal rate limits"
+     kubectl patch configmap openclaw-rate-limits -n openclaw-prod \
+       --type merge \
+       -p "{\"data\":{\"normal_limit_percent\":\"${step}\"}}"
+     sleep 7200
+   done
    ```
 
 2. **Scale Down Infrastructure**
@@ -640,12 +647,14 @@ Result: Agent enters infinite loop, CPU 100%, eventually OOMKilled
 4. **Verify Service Quality**
    
    ```bash
-   # Run synthetic monitoring tests
-   ./scripts/monitoring/synthetic-tests.sh \
-     --endpoints /health,/api/v1/status \
-     --expected-latency-ms 500 \
-     --expected-success-rate 0.99 \
-     --duration-minutes 30
+   # Run synthetic health checks for 30 minutes (60 samples, every 30s)
+   for i in $(seq 1 60); do
+     curl -s -o /dev/null -w "%{http_code} %{time_total}\n" \
+       https://gateway.openclaw.ai/health >> synthetic-health.log
+     curl -s -o /dev/null -w "%{http_code} %{time_total}\n" \
+       https://gateway.openclaw.ai/api/v1/status >> synthetic-status.log
+     sleep 30
+   done
    
    # Check error rates
    curl -X GET "https://monitoring.openclaw.ai/api/datasources/proxy/1/api/v1/query" \

@@ -22,7 +22,7 @@ data:
   gateway.yml: |
     gateway:
       bind:
-        address: "0.0.0.0"
+        address: "127.0.0.1"
         port: 18789
       auth:
         mode: "required"
@@ -37,8 +37,8 @@ metadata:
   namespace: openclaw-production
 type: Opaque
 stringData:
-  GATEWAY_TOKEN: "YOUR_GATEWAY_TOKEN_HERE"
-  ANTHROPIC_API_KEY: "sk-ant-api03-..."
+  GATEWAY_TOKEN: "${GATEWAY_TOKEN}"
+  ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
 
 ---
 # Deployment with full security
@@ -69,7 +69,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+              add:
+                - NET_BIND_SERVICE
             readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           resources:
             requests:
               cpu: 500m

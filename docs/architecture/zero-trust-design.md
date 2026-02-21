@@ -142,7 +142,7 @@ Every access request must prove identity using multiple factors.
 **Multi-Factor Authentication (MFA) Required:**
 
 ```yaml
-# configs/mcp-server-config/authentication.yaml
+# configs/mcp-server-config/authentication.yml
 authentication:
   methods:
     - name: "api_key"
@@ -202,7 +202,7 @@ authentication:
 - Disk encryption enabled (FileVault, LUKS, BitLocker)
 - OS patches current (< 30 days old)
 - Endpoint protection running (antivirus, EDR)
-- No jailbreak/root detected
+- No prompt injection bypass/root detected
 - Managed by MDM (for enterprise deployments)
 
 ### Service Identity
@@ -309,7 +309,7 @@ Grant only the permissions required for the specific task, for only the duration
 ### Role-Based Access Control (RBAC)
 
 ```yaml
-# configs/agent-config/skill-permissions.yaml
+# configs/agent-config/openclaw-agent.yml
 roles:
   - name: "viewer"
     description: "Read-only access to agent status"
@@ -636,7 +636,7 @@ audit_logging:
 
 ```bash
 #!/bin/bash
-# scripts/compliance/policy-audit.sh
+# scripts/verification/verify_openclaw_security.sh
 
 # Check all deployments for compliance
 violations=0
@@ -655,7 +655,7 @@ fi
 
 # Policy: All skills must have GPG signatures
 unsigned=$(find ~/.openclaw/skills -name "*.sig" -o -name "*.asc" | wc -l)
-total=$(find ~/.openclaw/skills -type d -d 1 | wc -l)
+total=$(find ~/.openclaw/skills -maxdepth 1 -type d | wc -l)
 if [ "$unsigned" -lt "$total" ]; then
     echo "❌ VIOLATION: Unsigned skills detected"
     ((violations++))
@@ -701,7 +701,7 @@ curl http://localhost:18789/health
 **Objective**: Implement RBAC and minimize permissions
 
 1. **Define roles**:
-   - Create [skill-permissions.yaml](../../configs/agent-config/skill-permissions.yaml)
+  - Create [skill allowlist policy](../../configs/skill-policies/allowlist.json)
    - Map users to roles
 
 2. **Implement authorization checks**:
@@ -754,7 +754,7 @@ docker exec clawdbot ping 10.0.0.1
 
 3. **Integrate SIEM**:
    - Forward logs to Splunk/Elastic
-   - Deploy detection rules from [examples/monitoring/siem-rules/](../../examples/monitoring/siem-rules/)
+  - Deploy detection rules from [detections/siem/](../../detections/siem/)
 
 **Verification**:
 ```bash
@@ -776,7 +776,7 @@ curl http://localhost:9090/metrics | grep openclaw
 - [Gateway Config (Hardened)](../../configs/templates/gateway.hardened.yml)
 - [Nginx Advanced Config](../../configs/examples/nginx-advanced.conf)
 - [Production Kubernetes](../../configs/examples/production-k8s.yml)
-- [Skill Permissions](../../configs/agent-config/skill-permissions.yaml)
+- [Skill Allowlist Policy](../../configs/skill-policies/allowlist.json)
 
 ### External Resources
 - [Google BeyondCorp](https://cloud.google.com/beyondcorp) - Zero-trust case study
@@ -786,6 +786,6 @@ curl http://localhost:9090/metrics | grep openclaw
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: February 14, 2026  
+**Document Version**: 1.0.1  
+**Last Updated**: February 21, 2026  
 **Next Review**: May 14, 2026 (quarterly)

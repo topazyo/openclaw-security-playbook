@@ -528,7 +528,7 @@ For skill developers and security teams:
 
 ## Related Scenarios
 
-- `scenario-001-indirect-prompt-injection.md` - Prompt injection attack
+- `scenario-001-indirect-prompt-injection-attack.md` - Prompt injection attack
 - `scenario-003-mcp-server-compromise.md` - Infrastructure breach
 - `scenario-005-credential-theft-via-skill.md` - API key exfiltration
 

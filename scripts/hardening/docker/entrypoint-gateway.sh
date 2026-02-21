@@ -35,5 +35,5 @@ fi
 echo "Starting gateway on port ${GATEWAY_PORT:-8443}..."
 exec python -m clawdbot.gateway \
     --config /app/config/gateway.yml \
-    --host "${GATEWAY_HOST:-0.0.0.0}" \
+    --host "${GATEWAY_HOST:-127.0.0.1}" \
     --port "${GATEWAY_PORT:-8443}"

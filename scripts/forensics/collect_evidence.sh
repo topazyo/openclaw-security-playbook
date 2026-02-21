@@ -10,14 +10,53 @@
 
 set -euo pipefail
 
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+print_help() {
+    cat <<'EOF'
+collect_evidence.sh — OpenClaw Incident Evidence Preservation
+
+Usage:
+  ./scripts/forensics/collect_evidence.sh [--containment] [--help|-h]
+
+Options:
+  --containment   Also stop agent services after evidence collection
+  --help, -h      Show this help message and exit
+
+Exit codes:
+    0  Successful execution (no critical issues, no warnings)
+    1  Critical findings detected during collection
+    2  Warnings detected or invalid arguments
+
+Run this before stopping the agent process to preserve volatile state.
+EOF
+}
+
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 INCIDENT_DIR="${HOME}/openclaw-incident-${TIMESTAMP}"
 CONTAINMENT=false
+CRITICAL_ISSUES=0
+WARNINGS=0
 
-for arg in "$@"; do
-    case $arg in
-        --containment) CONTAINMENT=true ;;
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --containment)
+            CONTAINMENT=true
+            ;;
+        --help|-h)
+            print_help
+            exit 0
+            ;;
+        *)
+            echo -e "${YELLOW}[WARN] Unknown argument: $1${NC}"
+            print_help
+            exit 2
+            ;;
     esac
+    shift
 done
 
 echo "============================================================"
@@ -73,18 +112,33 @@ find ~/ \( -path "*/.moltbot/*" -o -path "*/.clawdbot/*" -o -path "*/.openclaw/*
 
 bak_count=$(wc -l < "${INCIDENT_DIR}/filesystem/backup-credential-files.txt")
 if [ "${bak_count}" -gt 0 ]; then
-    echo "    !! CRITICAL: Found ${bak_count} backup credential files"
+    echo -e "    ${RED}[CRITICAL] Found ${bak_count} backup credential files${NC}"
+    CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
 else
-    echo "    OK: No backup credential files found"
+    echo -e "    ${GREEN}[PASS] No backup credential files found${NC}"
 fi
 
 echo "[+] Phase 5: Verifying telemetry hash chain integrity..."
+HASH_INPUT_FOUND=false
 for jsonl_file in ~/.openclaw/logs/telemetry.jsonl ~/.moltbot/logs/telemetry.jsonl; do
     if [ -f "${jsonl_file}" ]; then
+        HASH_INPUT_FOUND=true
         echo "    Checking: ${jsonl_file}"
-        python3 "$(dirname "$0")/verify_hash_chain.py"             --input "${jsonl_file}"             --output "${INCIDENT_DIR}/hashes/hash-chain-verify.json" 2>/dev/null             && echo "    Hash chain: INTACT"             || echo "    Hash chain: !! BROKEN — log tampering possible"
+        if python3 "$(dirname "$0")/verify_hash_chain.py" --input "${jsonl_file}" --output "${INCIDENT_DIR}/hashes/hash-chain-verify.json" >/dev/null 2>&1; then
+            echo -e "    ${GREEN}[PASS] Hash chain intact${NC}"
+        else
+            echo -e "    ${RED}[CRITICAL] Hash chain broken — log tampering possible${NC}"
+            CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+        fi
     fi
 done
+
+if [ "${HASH_INPUT_FOUND}" = false ]; then
+    echo -e "    ${YELLOW}[WARN] No telemetry hash-chain inputs found${NC}"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+echo -e "${GREEN}[PASS] Evidence collection finished${NC}"
 
 echo "[+] Phase 6: Capturing skill manifests..."
 for dir in ~/.openclaw/skills ~/.moltbot/skills ~/.clawdbot/skills; do
@@ -117,4 +171,19 @@ if [ "${CONTAINMENT}" = true ]; then
     systemctl stop openclaw 2>/dev/null || true
     docker stop clawdbot 2>/dev/null || true
     echo "    Agent stopped."
+fi
+
+echo ""
+echo "============================================================"
+echo " Evidence Collection Summary"
+echo "============================================================"
+echo -e " Critical issues: ${RED}${CRITICAL_ISSUES}${NC}"
+echo -e " Warnings: ${YELLOW}${WARNINGS}${NC}"
+
+if [ "${CRITICAL_ISSUES}" -gt 0 ]; then
+    exit 1
+elif [ "${WARNINGS}" -gt 0 ]; then
+    exit 2
+else
+    exit 0
 fi

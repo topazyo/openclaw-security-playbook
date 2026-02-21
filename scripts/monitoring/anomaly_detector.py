@@ -10,7 +10,7 @@ For production deployments, consider using openclaw-telemetry instead:
 https://github.com/knostic/openclaw-telemetry
 
 openclaw-telemetry provides:
-• Native OpenClaw plugin integration (zero configuration)
+• Native OpenClaw skill integration (zero configuration)
 • Tamper-proof hash chains for audit log integrity
 • SIEM forwarding via CEF/syslog (Splunk, ELK, QRadar)
 • Automatic sensitive data redaction

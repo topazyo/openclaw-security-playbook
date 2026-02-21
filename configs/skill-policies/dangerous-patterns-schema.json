@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openclaw.ai/schemas/skill-dangerous-patterns-v1.json",
+  "title": "OpenClaw Dangerous Patterns",
+  "type": "object",
+  "required": ["version", "last_updated", "description", "patterns", "file_patterns", "network_patterns"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "last_updated": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "description": { "type": "string", "minLength": 1 },
+    "patterns": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/patternRule" }
+    },
+    "file_patterns": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/simpleRule" }
+    },
+    "network_patterns": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/simpleRule" }
+    }
+  },
+  "definitions": {
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "patternRule": {
+      "type": "object",
+      "required": ["id", "name", "pattern", "severity", "description", "languages", "recommendation"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 },
+        "severity": { "$ref": "#/definitions/severity" },
+        "description": { "type": "string", "minLength": 1 },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "recommendation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "simpleRule": {
+      "type": "object",
+      "required": ["id", "name", "pattern", "severity", "description", "recommendation"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 },
+        "severity": { "$ref": "#/definitions/severity" },
+        "description": { "type": "string", "minLength": 1 },
+        "recommendation": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

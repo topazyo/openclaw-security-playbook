@@ -144,7 +144,7 @@ container:
 # =============================================================================
 # LAYER 4: RUNTIME SECURITY ENFORCEMENT (openclaw-shield)
 # =============================================================================
-# Plugin: https://github.com/knostic/openclaw-shield
+# Skill integration: https://github.com/knostic/openclaw-shield
 # See: docs/guides/07-community-tools-integration.md#openclaw-shield
 
 shield:
@@ -471,7 +471,7 @@ skills:
 # =============================================================================
 # LAYER 6: BEHAVIORAL MONITORING (openclaw-telemetry)
 # =============================================================================
-# Plugin: https://github.com/knostic/openclaw-telemetry
+# Skill integration: https://github.com/knostic/openclaw-telemetry
 # See: docs/guides/07-community-tools-integration.md#openclaw-telemetry
 
 telemetry:
@@ -769,8 +769,8 @@ metadata:
 
 # Deployment Guide:
 # 1. Review and customize this configuration for your environment
-# 2. Install openclaw-shield plugin: cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-shield
-# 3. Install openclaw-telemetry plugin: cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-telemetry
+# 2. Install openclaw-shield skill integration: cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-shield
+# 3. Install openclaw-telemetry skill integration: cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-telemetry
 # 4. Deploy openclaw-detect via MDM (see docs/guides/07-community-tools-integration.md)
 # 5. Test in staging environment before production
 # 6. Run verification: ./scripts/verification/verify_openclaw_security.sh

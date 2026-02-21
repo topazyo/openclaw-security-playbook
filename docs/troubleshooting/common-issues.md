@@ -249,16 +249,18 @@ Error: ANTHROPIC_API_KEY not found in configuration or environment
 echo $ANTHROPIC_API_KEY
 
 # Set environment variable (temporary)
-export ANTHROPIC_API_KEY="sk-ant-1234..."
+read -s -p "Enter ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY && echo
+export ANTHROPIC_API_KEY
 
 # Add to shell profile (persistent)
-echo 'export ANTHROPIC_API_KEY="sk-ant-1234..."' >> ~/.bashrc
+echo '# export ANTHROPIC_API_KEY from your OS keychain in shell startup' >> ~/.bashrc
 source ~/.bashrc
 
 # Or use .env file
+# Generate: openssl rand -base64 32
 cat > ~/.openclaw/.env << EOF
-ANTHROPIC_API_KEY=sk-ant-1234...
-OPENAI_API_KEY=sk-5678...
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+OPENAI_API_KEY=${OPENAI_API_KEY}
 EOF
 
 # Load .env file
@@ -299,7 +301,7 @@ clawdbot config validate --verbose
 
 # Invalid IP address
 # WRONG: host: "256.1.1.1"
-# RIGHT: host: "0.0.0.0" or "127.0.0.1"
+# RIGHT: host: "127.0.0.1"
 
 # Invalid timeout
 # WRONG: timeout: -1

@@ -92,7 +92,7 @@
             }
           }
         ],
-        "related_playbooks": ["IRP-001 (Credential Theft)"],
+        "related_playbooks": ["IRP-001 (Credential Exfiltration)"],
         "compliance": ["SOC 2 CC6.1 (Logical Access)", "ISO 27001 A.9.4.3 (Password Management)"]
       },
       {
@@ -124,14 +124,14 @@
             "message": "@channel 👤 *ADMIN AFTER-HOURS ACTIVITY*\n*User:* {{user_id}}\n*Role:* {{metadata.role}}\n*Time:* {{@timestamp}} UTC (outside 6AM-10PM)\n*Action:* {{event_type}}\n*Resource:* {{resource}}\n*Source IP:* {{source_ip}}\n*Geographic Location:* {{geo.city}}, {{geo.country}}\n\n*VERIFICATION REQUIRED:* Contact user immediately to confirm legitimate activity. If no response in 15 minutes, activate IRP-001 and suspend account."
           }
         ],
-        "related_playbooks": ["IRP-001 (Credential Theft)", "SEC-002 (Access Control Policy - After-hours monitoring)"],
+        "related_playbooks": ["IRP-001 (Credential Exfiltration)", "SEC-002 (Access Control Policy - After-hours monitoring)"],
         "false_positive_handling": "Legitimate after-hours work (on-call, incidents, deployments) should be logged in advance via change request. Otherwise, assume compromise."
       },
       {
         "id": "critical-004",
         "name": "Large Data Exfiltration Detected",
         "severity": "P0-Critical",
-        "description": "Abnormal outbound data transfer >100MB in 10 minutes. Possible data breach, credential theft, or insider threat exfiltration.",
+        "description": "Abnormal outbound data transfer >100MB in 10 minutes. Possible data breach, credential exfiltration, or insider threat exfiltration.",
         "query": {
           "datasource": "Prometheus",
           "query_expr": "sum(rate(openclaw_network_bytes_total{direction=\"outbound\"}[10m])) > 100000000",
@@ -194,7 +194,7 @@
           },
           {
             "type": "slack",
-            "message": "@channel 🔌 *SHADOW AI DETECTED*\n*Skill Name:* {{skill.name}}\n*Version:* {{skill.version}}\n*Author:* {{skill.author}}\n*Publisher:* {{skill.publisher}}\n*Signature Valid:* {{skill.signature_valid}}\n*Installed By:* {{user_id}}\n*Host:* {{host}}\n*Installation Method:* {{installation_method}}\n\n*THREAT:* Unsigned/unauthorized skills bypass supply chain controls. May contain: backdoors, credential theft, prompt injection, data exfiltration.\n\n*AUTO-ACTION:* Skill quarantined. Activate IRP-003. Run skill_manifest.py --verify."
+            "message": "@channel 🔌 *SHADOW AI DETECTED*\n*Skill Name:* {{skill.name}}\n*Version:* {{skill.version}}\n*Author:* {{skill.author}}\n*Publisher:* {{skill.publisher}}\n*Signature Valid:* {{skill.signature_valid}}\n*Installed By:* {{user_id}}\n*Host:* {{host}}\n*Installation Method:* {{installation_method}}\n\n*THREAT:* Unsigned/unauthorized skills bypass supply chain controls. May contain: backdoors, credential exfiltration, prompt injection, data exfiltration.\n\n*AUTO-ACTION:* Skill quarantined. Activate IRP-003. Run skill_manifest.py --verify."
           },
           {
             "type": "auto_remediation",
@@ -256,7 +256,7 @@
             }
           }
         ],
-        "related_playbooks": ["IRP-001 (Credential Theft)", "dashboard-user-activity.json Panel 6 (Geographic Anomalies)"],
+        "related_playbooks": ["IRP-001 (Credential Exfiltration)", "dashboard-user-activity.json Panel 6 (Geographic Anomalies)"],
         "compliance": ["SOC 2 CC6.1 (Logical Access)", "ISO 27001 A.9.4.2 (Secure Logon)"],
         "false_positive_handling": "VPN usage may trigger false positives. Whitelist corporate VPN exit IPs. Legitimate international travel should be pre-registered in system."
       },

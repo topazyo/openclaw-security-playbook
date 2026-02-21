@@ -2,8 +2,8 @@
 
 **OpenClaw Security Framework - Developer Onboarding**
 
-Version: 1.0  
-Last Updated: 2024-01-15  
+Version: 1.1  
+Last Updated: 2026-02-21  
 Duration: 2 hours  
 Audience: Application developers, DevOps engineers
 
@@ -21,7 +21,9 @@ Audience: Application developers, DevOps engineers
 
 2. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+  python -m venv .venv
+  source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+  pip install click pyyaml boto3 requests jinja2 matplotlib pandas reportlab elasticsearch
    ```
 
 3. **Run verification script**:
@@ -35,7 +37,7 @@ Audience: Application developers, DevOps engineers
 
 ```bash
 # Development environment
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d --profile dev
+docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Production environment (Kubernetes)
 kubectl apply -f configs/examples/production-k8s.yml
@@ -67,7 +69,7 @@ security_controls:
 **Step 3: Test Configuration**
 
 ```bash
-openclaw-cli config validate configs/agent-config/openclaw-agent.yml
+python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
 ```
 
 ---
@@ -76,90 +78,71 @@ openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 
 ### Input Validation
 
-**Example: Validate User Input**
+**Example: Configure Input Validation**
 
-```python
-from examples.security_controls.input_validation import InputValidator
+```yaml
+# configs/agent-config/openclaw-agent.yml
+security_controls:
+  input_validation:
+    enabled: true
+    max_payload_size_mb: 10
+    allowed_content_types:
+      - application/json
+      - text/plain
+    sanitization_rules:
+      - xss
+      - sql_injection
+      - path_traversal
+```
 
-validator = InputValidator({
-    "max_payload_size_mb": 10,
-    "allowed_content_types": ["application/json"],
-    "sanitization_rules": ["xss", "sql_injection", "path_traversal"],
-})
-
-# Sanitize user input
-user_comment = request.json.get("comment")
-sanitized_comment = validator.sanitize_xss(user_comment)
-
-# Check for SQL injection
-if validator.detect_sql_injection(user_comment):
-    return {"error": "Malicious input detected"}, 400
+```bash
+python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
 ```
 
 ### Rate Limiting
 
-**Example: Apply Rate Limits**
+**Example: Configure Rate Limits**
 
-```python
-from examples.security_controls.rate_limiting import RateLimiter
-
-limiter = RateLimiter({
-    "requests_per_minute": 100,
-    "burst_size": 20,
-    "algorithm": "token_bucket",
-    "redis_url": "redis://localhost:6379/0",
-})
-
-# Check rate limit before processing request
-user_id = request.headers.get("X-User-ID")
-
-if not limiter.check_rate_limit(user_id):
-    return {"error": "Rate limit exceeded"}, 429
+```yaml
+# configs/agent-config/openclaw-agent.yml
+security_controls:
+  rate_limiting:
+    enabled: true
+    algorithm: token_bucket
+    requests_per_minute: 100
+    burst_size: 20
+    per_user_limits:
+      requests_per_minute: 50
+      burst_size: 10
 ```
 
 ### Authentication
 
-**Example: Verify mTLS Certificate**
+**Example: Configure mTLS + MFA**
 
-```python
-from examples.security_controls.authentication import AuthManager
-
-auth_manager = AuthManager({
-    "methods": ["mTLS", "OAuth2"],
-    "mfa_required": True,
-})
-
-# Verify client certificate
-client_cert = request.environ.get("SSL_CLIENT_CERT")
-
-if not auth_manager.verify_mtls_cert(client_cert):
-    return {"error": "Invalid certificate"}, 401
-
-# Verify MFA
-mfa_code = request.headers.get("X-MFA-Code")
-
-if not auth_manager.verify_totp(user_id, mfa_code):
-    return {"error": "MFA verification failed"}, 401
+```yaml
+# configs/agent-config/openclaw-agent.yml
+security_controls:
+  authentication:
+    method: mTLS
+    mfa_required: true
+    mtls:
+      enabled: true
+      client_cert_required: true
 ```
 
 ### Encryption
 
-**Example: Encrypt Sensitive Data**
+**Example: Configure Encryption Controls**
 
-```python
-from examples.security_controls.encryption import EncryptionManager
-
-encryption_manager = EncryptionManager({
-    "algorithm": "AES-256-GCM",
-    "vault_url": "http://localhost:8200",
-})
-
-# Encrypt PII data
-ssn = "123-45-6789"
-ciphertext, nonce = encryption_manager.encrypt(ssn.encode())
-
-# Decrypt when needed
-decrypted = encryption_manager.decrypt(ciphertext, nonce)
+```yaml
+# configs/agent-config/openclaw-agent.yml
+security_controls:
+  encryption:
+    algorithm: AES-256-GCM
+    key_rotation_days: 90
+    tls_enabled: true
+    tls_min_version: "1.3"
 ```
 
 ---
@@ -232,7 +215,7 @@ jobs:
       
       - name: Run Trivy scan
         run: |
-          ./scripts/discovery/os-scan.sh --image ${{ matrix.image }}
+          ./scripts/vulnerability-scanning/os-scan.sh --image ${{ matrix.image }}
       
       - name: Run dependency scan
         run: |
@@ -242,7 +225,7 @@ jobs:
       - name: Create Jira tickets
         if: failure()
         run: |
-          python scripts/incident-response/create-tickets.py --severity CRITICAL
+          python scripts/vulnerability-scanning/create-tickets.py --input scan-results.json --severity CRITICAL
 ```
 
 ### Pre-commit Hooks
@@ -256,7 +239,7 @@ repos:
     hooks:
       - id: openclaw-config-validate
         name: Validate OpenClaw Config
-        entry: openclaw-cli config validate
+        entry: python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
         language: system
         files: \\.yml$
 ```

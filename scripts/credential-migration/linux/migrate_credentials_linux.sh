@@ -300,14 +300,8 @@ detect_credentials_in_files() {
 
     local found_count=0
 
-    # Credential patterns to search for
-    local patterns=(
-        'sk-ant-[a-zA-Z0-9_-]{20,}'           # Anthropic API keys
-        'sk-[a-zA-Z0-9]{48}'                   # OpenAI API keys
-        'AKIA[0-9A-Z]{16}'                     # AWS access keys
-        'ghp_[a-zA-Z0-9]{36}'                  # GitHub tokens
-        'xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}' # Slack tokens
-    )
+    # Credential patterns to search for (single-pass regex)
+    local credential_regex='sk-ant-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{48}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}'
 
     for config_dir in "${CONFIG_DIRS[@]}"; do
         if [ ! -d "$config_dir" ]; then
@@ -318,13 +312,11 @@ detect_credentials_in_files() {
 
         # Find configuration files
         while IFS= read -r file; do
-            for pattern in "${patterns[@]}"; do
-                if grep -q -E "$pattern" "$file" 2>/dev/null; then
-                    echo "FILE|$file|$(grep -E "$pattern" "$file" | head -1)" >> "$CREDENTIALS_FOUND"
-                    ((found_count++))
-                    warning "Found credential in: $file"
-                fi
-            done
+            if grep -q -E "$credential_regex" "$file" 2>/dev/null; then
+                echo "FILE|$file|$(grep -E "$credential_regex" "$file" | head -1)" >> "$CREDENTIALS_FOUND"
+                ((found_count++))
+                warning "Found credential in: $file"
+            fi
         done < <(find "$config_dir" -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.conf" -o -name "*.env" \) 2>/dev/null)
     done
 
@@ -583,9 +575,7 @@ cleanup_old_credentials() {
             cp "$location" "$location.bak"
 
             # Remove credential lines
-            sed -i.tmp -E '/sk-[a-zA-Z0-9_-]{20,}/d' "$location"
-            sed -i.tmp -E '/AKIA[0-9A-Z]{16}/d' "$location"
-            sed -i.tmp -E '/ghp_[a-zA-Z0-9]{36}/d' "$location"
+            sed -i.tmp -E '/sk-ant-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{48}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}/d' "$location"
             rm -f "$location.tmp"
 
             success "Cleaned: $location"
@@ -599,11 +589,7 @@ cleanup_old_credentials() {
 
             cp "$env_file" "$env_file.bak"
 
-            sed -i.tmp '/export ANTHROPIC_API_KEY=/d' "$env_file"
-            sed -i.tmp '/export OPENAI_API_KEY=/d' "$env_file"
-            sed -i.tmp '/export AWS_ACCESS_KEY_ID=/d' "$env_file"
-            sed -i.tmp '/export AWS_SECRET_ACCESS_KEY=/d' "$env_file"
-            sed -i.tmp '/export GITHUB_TOKEN=/d' "$env_file"
+            sed -i.tmp -E '/export ANTHROPIC_API_KEY=|export OPENAI_API_KEY=|export AWS_ACCESS_KEY_ID=|export AWS_SECRET_ACCESS_KEY=|export GITHUB_TOKEN=|export SLACK_TOKEN=/d' "$env_file"
             rm -f "$env_file.tmp"
 
             success "Cleaned: $env_file"

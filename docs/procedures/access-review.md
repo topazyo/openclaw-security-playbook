@@ -544,4 +544,4 @@ Q1 2026 vs Q4 2025:
 **Last Review**: Q4 2025 (October 2025)  
 **Next Review**: Q2 2026 (April 2026)  
 **Questions**: security@company.com  
-**Manager Training**: Required annually (see [Training Materials](../../training/security-awareness/access-control-for-managers.md))
+**Manager Training**: Required annually (see [Training Materials](../../training/security-training.md))

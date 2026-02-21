@@ -424,12 +424,12 @@ class TLSConfig:
             ... )
             >>> 
             >>> # Use with Flask
-            >>> app.run(ssl_context=context, host='0.0.0.0', port=18789)
+            >>> app.run(ssl_context=context, host='127.0.0.1', port=18789)
             >>> 
             >>> # Use with uvicorn (FastAPI)
             >>> uvicorn.run(
             ...     app,
-            ...     host='0.0.0.0',
+            ...     host='127.0.0.1',
             ...     port=18789,
             ...     ssl_certfile='/etc/openclaw/server.crt',
             ...     ssl_keyfile='/etc/openclaw/server.key',
@@ -835,14 +835,14 @@ def example_vault_integration():
     print("Setup Vault (dev mode):")
     print("$ vault server -dev")
     print("$ export VAULT_ADDR='http://127.0.0.1:8200'")
-    print("$ export VAULT_TOKEN='root'")
+    print("$ export VAULT_TOKEN='${VAULT_TOKEN}'  # Generate: openssl rand -base64 32")
     print("$ vault secrets enable transit")
     print()
     
     # Example usage (commented out - requires running Vault)
     # vault_manager = VaultKeyManager(
     #     vault_url='http://127.0.0.1:8200',
-    #     vault_token='root'
+    #     vault_token=os.environ['VAULT_TOKEN']
     # )
     # 
     # # Create key
@@ -910,7 +910,7 @@ def test_encryption_with_aad():
 
 def test_key_derivation():
     """Test: Derive key from password."""
-    password = "secure-password-123"
+    password = os.environ.get("TEST_KDF_PASSWORD", "example-password-from-env")
     salt = os.urandom(16)
     
     # Derive key

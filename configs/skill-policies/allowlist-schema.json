@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openclaw.ai/schemas/skill-allowlist-v1.json",
+  "title": "OpenClaw Skill Allowlist",
+  "type": "object",
+  "required": ["version", "last_updated", "description", "sources", "skills", "authors", "domains"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "last_updated": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "description": { "type": "string", "minLength": 1 },
+    "sources": {
+      "type": "object",
+      "required": ["trusted", "approved", "blocked"],
+      "additionalProperties": false,
+      "properties": {
+        "trusted": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "approved": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "blocked": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "required": ["approved", "deprecated", "blocked"],
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "version", "source", "allowed_permissions"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "version": { "type": "string", "minLength": 1 },
+              "source": { "type": "string", "minLength": 1 },
+              "allowed_permissions": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        },
+        "deprecated": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "version", "reason", "deprecated_since"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "version": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "deprecated_since": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+            }
+          }
+        },
+        "blocked": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "reason", "blocked_since"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "blocked_since": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+            }
+          }
+        }
+      }
+    },
+    "authors": {
+      "type": "object",
+      "required": ["trusted", "verified", "blocked"],
+      "additionalProperties": false,
+      "properties": {
+        "trusted": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "verified": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "blocked": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "domains": {
+      "type": "object",
+      "required": ["allowed", "blocked"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "blocked": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

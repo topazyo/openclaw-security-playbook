@@ -98,7 +98,7 @@ This policy ensures:
 - **ISO 27001**: A.9.1.2 (Access to networks and network services)
 - **GDPR**: Article 32 (Security of processing - access control)
 
-**Implementation**: See [configs/agent-config/skill-permissions.yaml](../../configs/agent-config/skill-permissions.yaml)
+**Implementation**: See [configs/skill-policies/allowlist.json](../../configs/skill-policies/allowlist.json)
 
 ---
 
@@ -550,7 +550,7 @@ Access control compliance demonstrated through:
 
 ### Configuration Templates
 - [Gateway Authentication](../../configs/templates/gateway.hardened.yml)
-- [Skill Permissions (RBAC)](../../configs/agent-config/skill-permissions.yaml)
+- [Skill Allowlist (RBAC)](../../configs/skill-policies/allowlist.json)
 - [mTLS Configuration](../../configs/examples/nginx-advanced.conf)
 
 ### Related Policies

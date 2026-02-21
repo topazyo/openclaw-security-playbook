@@ -1,3 +1,10 @@
+---
+title: Quick Start Guide
+layer: Cross-layer
+estimated_time: 15 minutes
+difficulty: Beginner
+---
+
 # Quick Start Guide
 
 **Estimated Time:** 15 minutes  
@@ -5,6 +12,17 @@
 **Prerequisites:** Docker, basic command-line knowledge
 
 This guide gets you from zero to a hardened AI agent deployment in 15 minutes.
+
+## Platform Notes
+
+### Linux
+Use the commands as written.
+
+### macOS
+Use the commands as written; install GNU tools if a command differs from BSD behavior.
+
+### Windows
+Use PowerShell equivalents where needed, or run shell commands via WSL2.
 
 ## Table of Contents
 
@@ -193,7 +211,7 @@ chmod +x verify.sh
 ./verify.sh
 ```
 
-**Expected Output:**
+**Verify:** Expected output:
 ```
 [1/3] Checking network binding...
 ✓ Gateway bound to localhost only

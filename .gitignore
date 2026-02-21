@@ -41,6 +41,8 @@ AGENTS.md
 # VIBE audit and implementation reports (local analysis only, do not sync to GitHub)
 VIBE_*.md
 PROGRESS_REPORTS/
+BATCH_REPORTS/
+MONTHLY_REPORTS/
 SHELL_SCRIPT_PERFORMANCE_AUDIT.md
 PERFORMANCE_AUDIT_REPORT.md
 Quality Gate Checklist — PR Template.md

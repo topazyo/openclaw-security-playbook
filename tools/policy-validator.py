@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Policy Validator - Validates agent configs against SEC-002/003/004/005 policies"""
+"""Policy Validator - Validates agent configs against SEC-002/003/004/005 policies.
 
-import yaml
+Run from repo root:
+    python tools/policy-validator.py --help
+"""
+
+import argparse
 import re
 from pathlib import Path
+
+try:
+    import yaml
+except ModuleNotFoundError:
+    yaml = None
 
 
 class PolicyValidator:
@@ -57,6 +66,9 @@ class PolicyValidator:
     
     def validate_config(self, config_path):
         """Validate configuration file syntax and settings."""
+        if yaml is None:
+            return {"valid": False, "errors": ["Missing dependency: pyyaml"]}
+
         try:
             with open(config_path) as f:
                 config = yaml.safe_load(f)
@@ -73,6 +85,9 @@ class PolicyValidator:
     
     def _load_config(self, path):
         """Load YAML configuration."""
+        if yaml is None:
+            return {}
+
         try:
             with open(path) as f:
                 return yaml.safe_load(f)
@@ -81,5 +96,9 @@ class PolicyValidator:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Validate OpenClaw policy compliance")
+    parser.add_argument("--policy", default="SEC-002", help="Policy to validate (default: SEC-002)")
+    args = parser.parse_args()
+
     validator = PolicyValidator()
-    print(validator.validate_policy("SEC-002"))
+    print(validator.validate_policy(args.policy))

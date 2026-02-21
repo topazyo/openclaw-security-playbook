@@ -1,3 +1,10 @@
+---
+title: Runtime Sandboxing Guide
+layer: 3
+estimated_time: 45 minutes
+difficulty: Intermediate
+---
+
 # Runtime Sandboxing Guide
 
 **Layer 3 of 7-Layer Defense-in-Depth Model**
@@ -462,6 +469,18 @@ docker run --rm hello-world
 ---
 
 ## Testing and Verification
+
+### Baseline Hardening Verification
+
+```bash
+docker inspect clawdbot-production \
+  --format 'User={{.Config.User}} ReadOnly={{.HostConfig.ReadonlyRootfs}} CapDrop={{.HostConfig.CapDrop}} PidsLimit={{.HostConfig.PidsLimit}}'
+```
+
+**Verify:** Expected output:
+```text
+User=1000:1000 ReadOnly=true CapDrop=[ALL] PidsLimit=100
+```
 
 ### Security Test Suite
 

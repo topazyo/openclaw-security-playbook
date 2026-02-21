@@ -25,7 +25,7 @@
 ## Overview
 
 ### Purpose
-This playbook provides step-by-step procedures for responding to supply chain attacks involving malicious or compromised OpenClaw/ClawdBot skills (plugins/extensions), including backdoored npm packages, typosquatting attacks, and dependency confusion.
+This playbook provides step-by-step procedures for responding to supply chain attacks involving malicious or compromised OpenClaw/ClawdBot skills, including backdoored npm packages, typosquatting attacks, and dependency confusion.
 
 ### Scope
 - **Attack types**: Malicious skill installation, skill compromise post-install, dependency confusion, typosquatting, backdoored npm packages
@@ -51,7 +51,7 @@ This playbook provides step-by-step procedures for responding to supply chain at
 
 ### Attack Scenarios
 - **[Scenario 002: Malicious Skill Deployment](../scenarios/scenario-002-malicious-skill-deployment.md)** - Typosquatting attack via npm
-- **[Attack Pattern: Supply Chain Attack](../attack-scenarios/supply-chain/)** - npm package poisoning, dependency confusion
+- **[Scenario 002: Malicious Skill Deployment](../scenarios/scenario-002-malicious-skill-deployment.md)** - npm package poisoning, dependency confusion
 
 ### Technical References
 - **[Supply Chain Security Guide](../../docs/guides/05-supply-chain-security.md)** - Layer 5: Skill integrity, manifest validation, SBOM generation
@@ -163,7 +163,7 @@ This playbook provides step-by-step procedures for responding to supply chain at
 
 5. **GitHub Repository Compromise**
    
-   - Skill's GitHub repository shows suspicious commits (credential theft, obfuscated code)
+  - Skill's GitHub repository shows suspicious commits (credential exfiltration, obfuscated code)
    - Repository suddenly transferred to new owner
    - Recent commits from unknown committers without PR review
    
@@ -408,7 +408,7 @@ This playbook provides step-by-step procedures for responding to supply chain at
    Package: @attacker/credential-stealer
    Version: 1.2.3
    Malicious Behavior:
-   - Credential theft via keychain access
+  - Credential exfiltration via keychain access
    - Data exfiltration to https://attacker.com/collect
    - Unauthorized filesystem access
    
@@ -587,7 +587,7 @@ This playbook provides step-by-step procedures for responding to supply chain at
    {
      "skill": "@attacker/credential-stealer",
      "all_versions": true,
-     "reason": "Malicious skill - credential theft - IRP-003",
+    "reason": "Malicious skill - credential exfiltration - IRP-003",
      "date_added": "2026-02-14",
      "references": [
        "https://openclaw.ai/security/incident/IRP-003",
@@ -975,7 +975,7 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 This package contains malicious code designed to steal credentials and exfiltrate data to attacker-controlled servers.
 
 ## Malicious Behavior
-1. **Credential Theft**: Accesses OS keychain without user consent
+1. **Credential Exfiltration**: Accesses OS keychain without user consent
 2. **Data Exfiltration**: Sends stolen credentials to https://attacker.com/collect
 3. **Filesystem Persistence**: Creates backdoor in `~/.bashrc`
 

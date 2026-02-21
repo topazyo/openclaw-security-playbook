@@ -1,9 +1,9 @@
 # Acceptable Use Policy
 
 **Policy ID**: SEC-005  
-**Version**: 1.0.0  
+**Version**: 1.0.1  
 **Effective Date**: 2026-01-15  
-**Last Updated**: 2026-02-14  
+**Last Updated**: 2026-02-21  
 **Owner**: Security Team (security@company.com)  
 **Approval**: CISO, CTO, HR, Legal  
 **Review Frequency**: Annually
@@ -147,19 +147,20 @@ services:
     user: root  # Running as root
 ```
 
-```yaml
-# ✅ ACCEPTABLE: Secure configuration
-services:
-  clawdbot:
-    image: openclaw/clawdbot:1.2.3@sha256:abc123...  # Pinned version
-    ports:
-      - "127.0.0.1:18789:18789"  # Localhost only
-    environment:
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"  # From keychain
-    user: "1000:1000"  # Non-root
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
+```bash
+# ✅ ACCEPTABLE: Secure runtime hardening
+docker run -d --name clawdbot \
+   -p 127.0.0.1:18789:18789 \
+   -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+   --user "1000:1000" \
+   --cap-drop ALL \
+   --cap-add NET_BIND_SERVICE \
+   --read-only \
+   --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+   --security-opt no-new-privileges:true \
+   --security-opt seccomp=./scripts/hardening/docker/seccomp-profiles/clawdbot.json \
+   --cpus "2.0" --memory "4g" --pids-limit 100 \
+   openclaw/clawdbot:1.2.3@sha256:abc123...
 ```
 
 **Reference**: [Production Docker Compose Example](../../configs/examples/docker-compose-full-stack.yml)
@@ -175,7 +176,7 @@ services:
 
 **Not Permitted**:
 - Prompt injection attempts (circumventing security controls)
-- Jailbreaking prompts (bypassing content policies)
+- Prompt injection bypass attempts (bypassing content policies)
 - Generating illegal, harmful, or offensive content
 - Creating prompts designed to extract training data
 
@@ -203,7 +204,7 @@ services:
 - Email/Slack credentials
 - Leave credentials in browser autocomplete or clipboard
 
-**Attack Scenario**: See [Scenario 005: Credential Theft via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
+**Attack Scenario**: See [Scenario 005: Credential Exfiltration via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
 
 **If You Suspect Credential Compromise**:
 1. Rotate API key immediately (see [Credential Isolation Guide](../guides/02-credential-isolation.md))
@@ -244,7 +245,7 @@ services:
 - Blocked by openclaw-shield (PII redaction, output filtering)
 - Audited in quarterly access reviews
 
-**Attack Scenario**: See [Scenario 006: Credential Theft via Conversation History](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
+**Attack Scenario**: See [Scenario 006: Credential Exfiltration via Conversation History](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
 
 ---
 
@@ -253,7 +254,7 @@ services:
 **Never**:
 - Install skills from untrusted sources
 - Bypass skill signature verification
-- Enable `autoInstall` or `autoUpdate` in production
+- Enable `autoInstall` or `autoUpdate` in production, or disable `requireSignature`
 - Modify skill manifests to change permissions
 - Upload skills without security review
 
@@ -570,8 +571,8 @@ Ticket: AUTO-INC-2026-042 (created automatically)
 ### Attack Scenarios (Real-World Examples)
 - [Scenario 001: Indirect Prompt Injection](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)
 - [Scenario 002: Malicious Skill Deployment](../../examples/scenarios/scenario-002-malicious-skill-deployment.md)
-- [Scenario 005: Credential Theft via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
-- [Scenario 006: Credential Theft via Conversation History](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
+- [Scenario 005: Credential Exfiltration via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
+- [Scenario 006: Credential Exfiltration via Conversation History](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
 
 ### Configuration Examples
 - [Production Docker Compose](../../configs/examples/docker-compose-full-stack.yml)

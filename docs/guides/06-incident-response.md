@@ -1,3 +1,10 @@
+---
+title: Incident Response Guide
+layer: 6-7
+estimated_time: 60 minutes
+difficulty: Advanced
+---
+
 # Incident Response Guide
 
 **Layer 6-7 Integration: Response Procedures Across All Layers**
@@ -7,6 +14,17 @@
 **Prerequisites:** Understanding of all previous security layers, incident response basics
 
 This guide provides actionable incident response playbooks for AI agent security incidents, from detection through recovery.
+
+## Platform Notes
+
+### Linux
+Use commands as written for Docker, `iptables`, and forensic collection.
+
+### macOS
+Prefer equivalent `pf`/system tooling where Linux-specific networking commands differ.
+
+### Windows
+Use PowerShell equivalents and WSL2 where bash-oriented commands are required.
 
 ## Table of Contents
 
@@ -237,42 +255,19 @@ git clone https://github.com/anthropic-ai/openclaw-skills ~/.openclaw/skills
 ### Automated Evidence Collection Script
 
 ```bash
-#!/bin/bash
-# evidence_collection.sh
+# Use the canonical collection script from this repository
+./scripts/forensics/collect_evidence.sh
 
-INCIDENT_ID="INC-$(date +%Y%m%d-%H%M%S)"
-EVIDENCE_DIR=~/incidents/$INCIDENT_ID
+# Optional: collect evidence and then run containment
+./scripts/forensics/collect_evidence.sh --containment
+```
 
-mkdir -p $EVIDENCE_DIR/{logs,configs,network,forensics}
-
-# Collect logs
-cp -r ~/.openclaw/logs $EVIDENCE_DIR/logs/
-docker logs clawdbot-production > $EVIDENCE_DIR/logs/docker.log 2>&1
-
-# Collect configurations
-cp -r ~/.openclaw/config $EVIDENCE_DIR/configs/
-
-# Network state
-ss -tuln > $EVIDENCE_DIR/network/listening-ports.txt
-sudo iptables -L -n -v > $EVIDENCE_DIR/network/firewall-rules.txt
-
-# Process list
-ps auxf > $EVIDENCE_DIR/forensics/processes.txt
-
-# Skill manifest
-./scripts/supply-chain/skill_manifest.py \
-  --skills-dir ~/.openclaw/skills \
-  --output $EVIDENCE_DIR/forensics/skill-manifest.json
-
-# Calculate hashes
-cd $EVIDENCE_DIR
-find . -type f -exec sha256sum {} \; > evidence-hashes.txt
-
-# Create archive
-tar -czf ../evidence-$INCIDENT_ID.tar.gz .
-sha256sum ../evidence-$INCIDENT_ID.tar.gz > ../evidence-$INCIDENT_ID.tar.gz.sha256
-
-echo "Evidence collected: evidence-$INCIDENT_ID.tar.gz"
+**Verify:** Expected output:
+```text
+Evidence collection complete: /home/<user>/openclaw-incident-YYYYMMDD-HHMMSS
+Next steps:
+  1. Review SOUL.md files for injected instructions
+  2. Check hash chain report for log tampering
 ```
 
 ---

@@ -51,9 +51,9 @@ This playbook provides step-by-step procedures for responding to data breach inc
 - **[Incident Response Procedure](../../docs/procedures/incident-response.md)** - 5-phase IR framework
 
 ### Attack Scenarios
-- **[Scenario 006: Credential Theft via Conversation History](../scenarios/scenario-006-credential-theft-conversation-history.md)** - S3 bucket misconfiguration exposing logs
+- **[Scenario 006: Credential Exfiltration via Conversation History](../scenarios/scenario-006-credential-theft-conversation-history.md)** - S3 bucket misconfiguration exposing logs
 - **[Scenario 001: Indirect Prompt Injection](../scenarios/scenario-001-indirect-prompt-injection-attack.md)** - Email-based prompt injection for data exfiltration
-- **[RAG Poisoning](../attack-scenarios/data-exfiltration/rag-poisoning.md)** - Vector database poisoning for credential theft
+- **[Scenario 006: Credential Exfiltration via Conversation History](../scenarios/scenario-006-credential-theft-conversation-history.md)** - Vector/database data exposure leading to credential exfiltration
 
 ### Technical References
 - **[Data Classification Guide](../../docs/policies/data-classification.md)** - Classification criteria and handling requirements
@@ -533,11 +533,10 @@ This playbook provides step-by-step procedures for responding to data breach inc
    
    **Scenario B: Prompt Injection Attack**
    ```bash
-   # Review conversation history for injection payload
-   ./scripts/security-scanning/prompt-injection-scanner.py \
-     --conversation-db /var/lib/openclaw/conversations.db \
-     --agent-id agent-prod-19 \
-     --lookback-hours 24
+   # Review telemetry for anomalous behavior linked to prompt injection
+   python scripts/monitoring/anomaly_detector.py \
+     --logfile ~/.openclaw/logs/telemetry.jsonl \
+     --output-json
    ```
    
    **Root Cause**: Indirect prompt injection via email instructed agent to exfiltrate conversation history.
@@ -629,9 +628,11 @@ This playbook provides step-by-step procedures for responding to data breach inc
      --test-data-protection
    
    # Test for same vulnerability
-   ./scripts/security-scanning/vulnerability-scanner.py \
-     --target agent-prod-19 \
-     --vulnerability-id CVE-Data-Breach-S3
+   ./scripts/vulnerability-scanning/os-scan.sh \
+     --target auto \
+     --severity HIGH \
+     --format json \
+     --output data-breach-os-scan.json
    ```
 
 ---

@@ -1,3 +1,4 @@
+# See: docs/guides/01-07.md
 # clawdbot.secure.full.yml
 # Complete Secure Configuration Template for ClawdBot AI Agent
 #
@@ -295,11 +296,11 @@ tools:
       image: "alpine:3.19"
       network: "none"
       read_only: true
-      user: "nobody"
+      user: "1000:1000"
       capabilities_drop: ["ALL"]
       security_opt:
         - "no-new-privileges:true"
-        - "seccomp=default"
+        - "seccomp=scripts/hardening/docker/seccomp-profiles/default.json"
       tmpfs:
         - "/tmp:rw,noexec,nosuid,size=100m"
 

@@ -28,7 +28,7 @@
 This playbook provides step-by-step procedures for responding to prompt injection attacks against OpenClaw/ClawdBot agents, including both **direct injection** (user-initiated) and **indirect injection** (via documents, emails, web pages).
 
 ### Scope
-- **Attack types**: Direct prompt injection, indirect prompt injection, jailbreak attempts, system prompt extraction, goal hijacking
+- **Attack types**: Direct prompt injection, indirect prompt injection, prompt injection bypass attempts, system prompt extraction, goal hijacking
 - **Attack vectors**: User prompts, email content, PDF documents, web pages scraped by agent, RAG database poisoning
 - **Systems covered**: ClawdBot agents, gateway API, openclaw-shield runtime enforcement, conversation history database
 
@@ -50,13 +50,13 @@ This playbook provides step-by-step procedures for responding to prompt injectio
 
 ### Attack Scenarios
 - **[Scenario 001: Indirect Prompt Injection Attack](../scenarios/scenario-001-indirect-prompt-injection-attack.md)** - Email-based injection exfiltrating credentials
-- **[Attack Pattern: Direct Injection](../attack-scenarios/prompt-injection/direct-injection.md)** - User-initiated jailbreak techniques
-- **[Attack Pattern: Indirect Injection](../attack-scenarios/prompt-injection/indirect-injection.md)** - Document/email-based attacks
+- **[Scenario 001: Indirect Prompt Injection Attack](../scenarios/scenario-001-indirect-prompt-injection-attack.md)** - User- and document-initiated prompt injection patterns
+- **[Scenario 001: Indirect Prompt Injection Attack](../scenarios/scenario-001-indirect-prompt-injection-attack.md)** - Document/email-based attacks
 
 ### Technical References
 - **[Community Tools Integration - openclaw-shield](../../docs/guides/07-community-tools-integration.md#openclaw-shield)** - Runtime enforcement, prompt injection guards, PII redaction
 - **[Security Layers Guide](../../docs/architecture/security-layers.md)** - Layer 4: Runtime Enforcement
-- **[Prompt Injection Scanner](../../scripts/security-scanning/prompt-injection-scanner.py)** - Automated detection tool
+- **[Anomaly Detector](../../scripts/monitoring/anomaly_detector.py)** - Automated behavioral detection tool
 
 ---
 
@@ -91,8 +91,8 @@ This playbook provides step-by-step procedures for responding to prompt injectio
    # Goal hijacking
    (new|updated|revised).{0,20}(instructions|goal|objective|mission)
    
-   # Jailbreak attempts
-   (DAN|STAN|AIM|Developer Mode|Jailbreak).{0,30}(enabled|activated|mode)
+  # Prompt injection bypass attempts
+  (DAN|STAN|AIM|Developer Mode|Prompt Injection Bypass).{0,30}(enabled|activated|mode)
    
    # Encoding bypasses
    (base64|rot13|hex|unicode).{0,20}(decode|translate|convert)
@@ -164,12 +164,10 @@ This playbook provides step-by-step procedures for responding to prompt injectio
 5. **Conversation History Anomalies**
    
    ```bash
-   # Search for suspicious patterns in conversation history
-   ./scripts/security-scanning/prompt-injection-scanner.py \
-     --conversation-db /var/lib/openclaw/conversations.db \
-     --agent-id agent-prod-07 \
-     --lookback-hours 24 \
-     --threshold 0.7
+   # Search for suspicious prompt-driven behavior in telemetry
+   python scripts/monitoring/anomaly_detector.py \
+     --logfile ~/.openclaw/logs/telemetry.jsonl \
+     --output-json
    ```
    
    **Indicators**:
@@ -262,7 +260,7 @@ This playbook provides step-by-step procedures for responding to prompt injectio
    |-------------|-----------------|----------|
    | **Direct Injection** | User deliberately crafts injection prompt, immediate execution | P0 - Critical |
    | **Indirect Injection** | Malicious instructions embedded in document/email | P0 - Critical |
-   | **Jailbreak Attempt** | User trying to bypass safety guidelines (e.g., DAN mode) | P1 - High |
+  | **Prompt Injection Bypass Attempt** | User trying to bypass safety guidelines (e.g., DAN mode) | P1 - High |
    | **System Prompt Extraction** | User attempting to reveal internal instructions | P2 - Medium |
    | **Goal Hijacking** | Attacker changes agent's objective mid-conversation | P0 - Critical |
 
@@ -292,7 +290,7 @@ This playbook provides step-by-step procedures for responding to prompt injectio
      severity = P0  # Critical - Active breach
    ELSE IF (injection_blocked BUT multiple_attempts) THEN
      severity = P1  # High - Determined attacker
-   ELSE IF (jailbreak_attempt WITHOUT system_impact) THEN
+  ELSE IF (bypass_attempt WITHOUT system_impact) THEN
      severity = P2  # Medium - Policy violation
    ELSE
      severity = P3  # Low - Detected and blocked
@@ -786,7 +784,7 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 ### Key Sections to Complete
 
 1. **Executive Summary**
-   - Prompt injection attack type (direct/indirect/jailbreak)
+  - Prompt injection attack type (direct/indirect/bypass)
    - Attack success (blocked/partial/full compromise)
    - Data accessed or exfiltrated
    - Business impact (service disruption, reputational damage)
