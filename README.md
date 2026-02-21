@@ -906,9 +906,9 @@ openclaw-security-playbook/
 - **CIS Docker Benchmark:** https://www.cisecurity.org/benchmark/docker
 
 ### Research & Publications
-- **AI Agent Security Research:** [Link to your research papers]
-- **Prompt Injection Taxonomy:** https://arxiv.org/abs/2302.12173
-- **Supply Chain Security for AI:** [Relevant academic papers]
+- **AI Agent Security Research:** https://arxiv.org/abs/2302.12173
+- **Prompt Injection Taxonomy:** https://arxiv.org/abs/2402.00898
+- **Supply Chain Security for AI:** https://dl.acm.org/doi/10.1145/3634737.3656289
 
 ---
 
