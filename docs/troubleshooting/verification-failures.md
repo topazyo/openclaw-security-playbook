@@ -170,7 +170,7 @@ Remove-Item "$env:TEMP\test-cred.xml"
 **Symptom:**
 ```
 ❌ FAIL: Found potential API keys in config files:
-~/.openclaw/config/gateway.yml: ANTHROPIC_API_KEY=sk-ant-...
+~/.openclaw/config/gateway.yml: ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 ```
 
 **Cause:** Credentials hardcoded in configuration files
@@ -184,17 +184,20 @@ vim ~/.openclaw/config/gateway.yml
 
 # 2. Store credentials in OS keychain
 # macOS
-security add-generic-password -a "$USER" -s "ai.openclaw.anthropic" -w "sk-ant-..." -U
+security add-generic-password -a "$USER" -s "ai.openclaw.anthropic" -w "${ANTHROPIC_API_KEY}" -U
 
 # Linux
-echo "sk-ant-..." | secret-tool store --label='Anthropic API Key' service ai.openclaw.anthropic account "$USER"
+echo "${ANTHROPIC_API_KEY}" | secret-tool store --label='Anthropic API Key' service ai.openclaw.anthropic account "$USER"
 
 # Windows (PowerShell)
-$apikey = ConvertTo-SecureString "sk-ant-..." -AsPlainText -Force
+$apikey = ConvertTo-SecureString "${env:ANTHROPIC_API_KEY}" -AsPlainText -Force
 New-Object System.Management.Automation.PSCredential("ai.openclaw.anthropic", $apikey) | Export-Clixml -Path "$env:LOCALAPPDATA\openclaw\credentials\anthropic.xml"
 
+# Generate key if needed:
+# openssl rand -base64 32
+
 # 3. Verify credentials removed
-grep -r "sk-" ~/.openclaw/config/
+grep -rE "(sk-ant-|sk-proj-|AKIA[0-9A-Z]{16})" ~/.openclaw/config/
 # Should return no results
 
 # 4. Verify credentials accessible from keychain

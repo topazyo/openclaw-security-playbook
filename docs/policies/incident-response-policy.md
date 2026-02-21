@@ -274,7 +274,7 @@ This policy ensures:
 
 | Incident Type | Containment Actions |
 |---------------|---------------------|
-| **Credential Theft** | 1. Rotate API keys immediately<br>2. Check for unauthorized usage (audit logs)<br>3. Block attacker IPs<br>4. See [Playbook 1](../../examples/incident-response/playbook-credential-theft.md) |
+| **Credential Exfiltration** | 1. Rotate API keys immediately<br>2. Check for unauthorized usage (audit logs)<br>3. Block attacker IPs<br>4. See [Playbook 1](../../examples/incident-response/playbook-credential-theft.md) |
 | **Prompt Injection** | 1. Enable stricter input validation<br>2. Block specific patterns<br>3. Roll back to safe conversation state<br>4. See [Playbook 2](../../examples/incident-response/playbook-prompt-injection.md) |
 | **Malicious Skill** | 1. Quarantine skill (move to `/quarantine`)<br>2. Kill skill processes<br>3. Check for persistence (cron, startup scripts)<br>4. See [Playbook 3](../../examples/incident-response/playbook-skill-compromise.md) |
 | **Container Escape** | 1. Kill container immediately<br>2. Isolate host from network<br>3. Image forensics<br>4. Review seccomp/AppArmor logs |

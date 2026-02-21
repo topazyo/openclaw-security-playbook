@@ -67,7 +67,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Management direction and support for information security in accordance with business requirements and relevant laws and regulations.
 
 **Implementation**:
-- [Security Policy](../policies/security-policy.md) (SEC-001) - Overarching security policy, board-approved
+- [Security Policy](../../configs/organization-policies/security-policy.json) (SEC-001) - Overarching security policy, board-approved
 - [Access Control Policy](../policies/access-control-policy.md) (SEC-002) - Identity and access management
 - [Data Classification Policy](../policies/data-classification.md) (SEC-003) - Data handling requirements
 - [Incident Response Policy](../policies/incident-response-policy.md) (SEC-004) - Security incident management

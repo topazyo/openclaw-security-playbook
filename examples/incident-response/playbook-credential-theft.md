@@ -1,4 +1,4 @@
-# Incident Response Playbook: Credential Theft
+# Incident Response Playbook: Credential Exfiltration
 
 **Playbook ID**: IRP-001  
 **Severity**: P0 - Critical  
@@ -25,7 +25,7 @@
 ## Overview
 
 ### Purpose
-This playbook provides step-by-step procedures for responding to credential theft incidents involving OpenClaw/ClawdBot agent credentials, API keys, or authentication tokens.
+This playbook provides step-by-step procedures for responding to credential exfiltration incidents involving OpenClaw/ClawdBot agent credentials, API keys, or authentication tokens.
 
 ### Scope
 - **Stolen credential types**: OS keychain entries, environment variables, configuration files, conversation history with embedded credentials
@@ -50,8 +50,8 @@ This playbook provides step-by-step procedures for responding to credential thef
 - **[Incident Response Procedure](../../docs/procedures/incident-response.md)** - 5-phase IR framework (Preparation → Detection → Containment → Eradication → Recovery)
 
 ### Attack Scenarios
-- **[Scenario 005: Credential Theft via Skill](../scenarios/scenario-005-credential-theft-via-skill.md)** - Malicious skill exfiltrates credentials
-- **[Scenario 006: Credential Theft via Conversation History](../scenarios/scenario-006-credential-theft-conversation-history.md)** - S3 misconfiguration exposes credentials in logs
+- **[Scenario 005: Credential Exfiltration via Skill](../scenarios/scenario-005-credential-theft-via-skill.md)** - Malicious skill exfiltrates credentials
+- **[Scenario 006: Credential Exfiltration via Conversation History](../scenarios/scenario-006-credential-theft-conversation-history.md)** - S3 misconfiguration exposes credentials in logs
 
 ### Technical References
 - **[Credential Isolation Guide](../../docs/guides/02-credential-isolation.md)** - OS keychain best practices, backup file persistence risks
@@ -226,7 +226,7 @@ This playbook provides step-by-step procedures for responding to credential thef
    | Severity | Description | Example |
    |----------|-------------|---------|
    | **P0 - Critical** | Production credentials compromised, active exploitation, data breach likely | Admin API key stolen, attacker has shell access |
-   | **P1 - High** | Development/staging credentials compromised, potential for escalation | Staging database password leaked, no prod access yet |
+  | **P1 - High** | Development/staging credentials compromised, potential for escalation | Staging database password exposed, no prod access yet |
    | **P2 - Medium** | Read-only credentials compromised, limited blast radius | Monitoring API key leaked (read-only scope) |
    | **P3 - Low** | Expired credentials found, no active risk | Old API key found in archived logs (already rotated) |
 
@@ -296,17 +296,23 @@ This playbook provides step-by-step procedures for responding to credential thef
    **Principle**: Assume all secrets accessed by the compromised credential are also compromised.
    
    ```bash
-   # Identify all secrets accessed by user in past 7 days
-   ./scripts/credential-migration/identify_accessed_secrets.py \
-     --user-id alice@openclaw.ai \
-     --lookback-days 7 \
-     --output secrets-to-rotate.json
-   
-   # Batch rotate secrets
-   for secret in $(cat secrets-to-rotate.json | jq -r '.secrets[].name'); do
-     echo "Rotating secret: $secret"
-     ./scripts/credential-migration/rotate_secret.sh --secret-name "$secret"
-   done
+   # Scope likely exposure first (uses telemetry + backup-file checks)
+   ./scripts/forensics/check_credential_scope.sh 2026-02-14
+
+   # Build provider rotation checklist (execute in each provider console/API)
+   cat > secrets-to-rotate.txt <<'EOF'
+anthropic_api_key
+openai_api_key
+database_connection_string
+mcp_server_certificate
+gateway_tls_certificate
+s3_access_key
+monitoring_service_token
+EOF
+
+   while read -r secret; do
+     echo "Rotate secret now: $secret"
+   done < secrets-to-rotate.txt
    ```
    
    **Critical Secrets to Rotate**:
@@ -356,7 +362,7 @@ This playbook provides step-by-step procedures for responding to credential thef
        --action block_ip \
        --ip-address "$ip" \
        --duration 7d \
-       --reason "Credential theft attempt - IRP-001"
+      --reason "Credential exfiltration attempt - IRP-001"
    done
    ```
 
@@ -469,12 +475,10 @@ This playbook provides step-by-step procedures for responding to credential thef
    
    **Scenario B: Prompt Injection Attack**
    ```bash
-   # Search conversation history for injection patterns
-   ./scripts/security-scanning/prompt-injection-scanner.py \
-     --conversation-db /var/lib/openclaw/conversations.db \
-     --user-id alice@openclaw.ai \
-     --lookback-days 7 \
-     --output injection-analysis.json
+   # Search telemetry for prompt-driven behavioral anomalies
+   python scripts/monitoring/anomaly_detector.py \
+     --logfile ~/.openclaw/logs/telemetry.jsonl \
+     --output-json
    ```
    
    **Indicators**:
@@ -504,7 +508,7 @@ This playbook provides step-by-step procedures for responding to credential thef
    - Git commit `abc1234` contains AWS access keys (never removed from history)
    
    **Remediation**:
-   - Implement automated backup file cleanup (add to [hardening script](../../scripts/hardening/agent-hardening.sh))
+  - Implement automated backup file cleanup (add to [hardening workflow](../../scripts/hardening/docker/README.md))
    - Configure `.gitignore` to exclude all backup file patterns
    - Run GitGuardian scan on entire repository history
    - Rewrite Git history to remove secrets (for private repos only)
@@ -568,7 +572,11 @@ This playbook provides step-by-step procedures for responding to credential thef
    # Check for same vulnerability across all environments
    for env in dev staging prod; do
      echo "Checking $env environment..."
-     ./scripts/vulnerability-scanning/os-scan.sh --env $env --vulnerability CVE-Credential-Theft
+     ./scripts/vulnerability-scanning/os-scan.sh \
+       --target auto \
+       --severity HIGH \
+       --format json \
+       --output "os-scan-${env}.json"
    done
    ```
 
@@ -716,7 +724,7 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 **Key Sections to Complete**:
 
 1. **Executive Summary** (1 paragraph)
-   - Incident type (credential theft)
+  - Incident type (credential exfiltration)
    - Scope (users/agents affected)
    - Business impact (downtime, data accessed)
    - Resolution status
@@ -818,7 +826,7 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 - Improvements planned and tracked
 
 **GDPR** (Article 33 - Breach Notification to Supervisory Authority):
-- **Assessment**: Credential theft with no evidence of personal data exfiltration
+- **Assessment**: Credential exfiltration with no evidence of personal data exfiltration
 - **Conclusion**: Notification NOT required (low risk to rights and freedoms)
 - **Rationale**: All accessed data was Internal/Confidential tier, no PII involved
 - **Documentation**: Breach register updated, 72-hour notification waived

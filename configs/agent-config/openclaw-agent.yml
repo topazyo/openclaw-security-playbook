@@ -32,7 +32,7 @@ agent:
     cpu_limit_cores: 2.0
 
 # Security Controls
-# SOC 2 CC6.1, ISO 27001 A.14.1.2 (Input validation)
+# SOC 2 CC6.1, ISO 27001 A.8.25 (Secure development lifecycle)
 security_controls:
   
   # Input Validation
@@ -69,7 +69,7 @@ security_controls:
     reject_null_bytes: true
   
   # Rate Limiting
-  # SOC 2 CC6.1, ISO 27001 A.14.1.3 (Availability)
+  # SOC 2 CC6.1, ISO 27001 A.8.27 (Secure system architecture and engineering principles)
   # References: examples/security-controls/rate-limiting.py
   rate_limiting:
     enabled: true
@@ -101,7 +101,7 @@ security_controls:
     retry_after_seconds: 60
   
   # Authentication & Authorization
-  # SOC 2 CC6.2, ISO 27001 A.9.2.1 (User access management)
+  # SOC 2 CC6.2, ISO 27001 A.5.16 (Identity management)
   # References: examples/security-controls/authentication.py
   authentication:
     # Supported methods: mTLS, OAuth2, API_Key
@@ -154,7 +154,7 @@ security_controls:
     idle_timeout_seconds: 1800  # 30 minutes
   
   # Authorization (RBAC)
-  # SOC 2 CC6.3, ISO 27001 A.9.2.3 (Privileged access management)
+  # SOC 2 CC6.3, ISO 27001 A.5.18 (Access rights)
   authorization:
     enabled: true
     rbac_enabled: true
@@ -188,7 +188,7 @@ security_controls:
         - "admin"
   
   # Encryption
-  # SOC 2 CC6.1, ISO 27001 A.10.1.1 (Cryptographic controls)
+  # SOC 2 CC6.1, ISO 27001 A.8.24 (Use of cryptography)
   # References: examples/security-controls/encryption.py
   encryption:
     # Encryption algorithm for data at rest
@@ -215,7 +215,7 @@ security_controls:
       - "TLS_CHACHA20_POLY1305_SHA256"
   
   # Logging & Audit
-  # SOC 2 CC7.2, ISO 27001 A.12.4.1 (Event logging)
+  # SOC 2 CC7.2, ISO 27001 A.8.15 (Logging)
   # References: examples/security-controls/logging.py
   logging:
     # Log format (json for ECS compatibility)
@@ -265,6 +265,7 @@ security_controls:
 
 # MCP Server Configuration
 # Model Context Protocol server connection settings
+# SOC 2 CC6.7, ISO 27001 A.8.24 (Use of cryptography)
 mcp_server:
   # Server connection
   host: ${MCP_SERVER_HOST}
@@ -298,7 +299,7 @@ mcp_server:
   retry_backoff_seconds: 1
 
 # Monitoring & Observability
-# SOC 2 CC7.2, ISO 27001 A.12.4.1 (Monitoring)
+# SOC 2 CC7.2, ISO 27001 A.8.16 (Monitoring activities)
 monitoring:
   # Elasticsearch for centralized logging
   elasticsearch:
@@ -364,12 +365,12 @@ compliance:
   # ISO 27001:2022 compliance
   iso27001_enabled: true
   iso27001_controls:
-    - "A.9.2.1"   # User registration and de-registration
-    - "A.9.2.3"   # Management of privileged access rights
-    - "A.10.1.1"  # Cryptographic controls
-    - "A.12.4.1"  # Event logging
-    - "A.14.1.2"  # Securing application services
-    - "A.16.1.4"  # Assessment of and decision on information security events
+    - "A.5.16"  # Identity management
+    - "A.5.18"  # Access rights
+    - "A.8.24"  # Use of cryptography
+    - "A.8.15"  # Logging
+    - "A.8.25"  # Secure development lifecycle
+    - "A.5.25"  # Assessment and decision on information security events
   
   # GDPR compliance
   gdpr_enabled: true
@@ -390,6 +391,7 @@ compliance:
 # Skill Configuration
 # Controls for skill execution and permissions
 # References: configs/skill-policies/
+# SOC 2 CC6.7, ISO 27001 A.8.8 (Management of technical vulnerabilities)
 skills:
   # Skill installation settings
   auto_install: false
@@ -430,7 +432,7 @@ skills:
       - "/home"
 
 # Backup & Disaster Recovery
-# SOC 2 CC9.1, ISO 27001 A.12.3.1 (Information backup)
+# SOC 2 CC9.1, ISO 27001 A.8.13 (Information backup)
 backup:
   enabled: true
   

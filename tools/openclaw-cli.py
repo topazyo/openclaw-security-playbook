@@ -4,6 +4,8 @@ OpenClaw Security CLI
 
 Main command-line interface for OpenClaw Security operations.
 Provides subcommands for scanning, playbooks, reporting, and configuration.
+Run from repo root:
+    python tools/openclaw-cli.py --help
 
 Subcommands:
   scan       - Run security scans (vulnerability, compliance, access)
@@ -25,12 +27,18 @@ Installation:
 """
 
 import click
-import yaml
 import json
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
-from tabulate import tabulate
+
+try:
+    from tabulate import tabulate
+except ModuleNotFoundError:
+    def tabulate(rows, headers):
+        rendered = [" | ".join(headers)]
+        rendered.extend(" | ".join(str(cell) for cell in row) for row in rows)
+        return "\n".join(rendered)
 
 
 # ============================================================================

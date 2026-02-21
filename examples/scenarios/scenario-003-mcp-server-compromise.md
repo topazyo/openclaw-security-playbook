@@ -95,7 +95,7 @@ postgres:x:999:999:PostgreSQL:/var/lib/postgresql:/bin/bash
 
 **Success:** Attacker confirmed path traversal vulnerability
 
-### Day 1, T+3 hours: Credential Theft
+### Day 1, T+3 hours: Credential Exfiltration
 
 **Attacker Actions:**
 Exfiltrated configuration files containing credentials.
@@ -843,9 +843,9 @@ actions:
 
 ## Related Scenarios
 
-- `scenario-001-indirect-prompt-injection.md` - Prompt injection attack
+- `scenario-001-indirect-prompt-injection-attack.md` - Prompt injection attack
 - `scenario-002-malicious-skill-deployment.md` - Supply chain attack
-- `scenario-004-credential-theft-conversation-history.md` - Credential exposure
+- `scenario-006-credential-theft-conversation-history.md` - Credential exposure
 
 ---
 

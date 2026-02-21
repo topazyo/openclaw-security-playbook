@@ -1,3 +1,10 @@
+---
+title: Credential Isolation Guide
+layer: 1
+estimated_time: 30 minutes
+difficulty: Intermediate
+---
+
 # Credential Isolation Guide
 
 **Layer 1 of 7-Layer Defense-in-Depth Model**
@@ -7,6 +14,17 @@
 **Prerequisites:** Basic understanding of operating system security
 
 This guide covers OS-level credential isolation to prevent plaintext credential exposure, the #1 attack vector in AI agent compromises.
+
+## Platform Notes
+
+### Linux
+Follow the Linux implementation section and verify with `secret-tool` checks.
+
+### macOS
+Follow the macOS implementation section and verify with Keychain CLI checks.
+
+### Windows
+Follow the Windows implementation section and verify with Credential Manager or PowerShell checks.
 
 ## Table of Contents
 
@@ -267,6 +285,16 @@ secret-tool lookup \
   environment production
 
 # Output: sk-ant-api03-YOUR-KEY-HERE
+```
+
+**Verify:** Expected output:
+```bash
+secret-tool search service ai.openclaw.anthropic username $USER
+# [/org/freedesktop/secrets/collection/login/1]
+# label = OpenClaw Anthropic API Key
+
+secret-tool lookup service ai.openclaw.anthropic username $USER environment production
+# sk-ant-... (your stored key value)
 ```
 
 ### Step 6: Automatic Unlocking (Optional)

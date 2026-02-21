@@ -1,6 +1,6 @@
 ## 📄 Scenario 6: `examples/scenarios/credential-theft-conversation-history.md`
 
-# Real-World Scenario: Credential Theft from Conversation History
+# Real-World Scenario: Credential Exfiltration from Conversation History
 
 **Scenario ID**: SCENARIO-006  
 **Category**: Credential Exposure / Data Leakage  
@@ -1017,7 +1017,7 @@ actions:
 ## Related Scenarios
 
 - `scenario-003-mcp-server-compromise.md` - Infrastructure breach
-- `scenario-005-rag-poisoning-data-exfiltration.md` - Data exfiltration
+- `scenario-005-credential-theft-via-skill.md` - Credential exfiltration via malicious skill
 
 ---
 

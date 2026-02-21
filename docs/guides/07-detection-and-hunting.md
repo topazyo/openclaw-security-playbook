@@ -1,3 +1,10 @@
+---
+title: Detection and Hunting Guide
+layer: 6-7
+estimated_time: 30 minutes
+difficulty: Intermediate
+---
+
 # Detection and Hunting Guide
 
 This guide covers deploying and operating the detection content in `detections/` for
@@ -5,6 +12,17 @@ OpenClaw, Moltbot, and Clawdbot deployments.
 
 It is the companion reference to
 [Part 3: Detecting OpenClaw Compromise](https://cloudsecops.hashnode.dev/openclaw-detecting-compromise).
+
+## Platform Notes
+
+### Linux
+Use commands as written for telemetry validation and forensic scripts.
+
+### macOS
+Use equivalent CLI tooling where GNU/Linux command behavior differs.
+
+### Windows
+Run shell-centric commands through WSL2 or PowerShell equivalents.
 
 ## Prerequisites
 
@@ -70,6 +88,12 @@ tail -5 ~/.openclaw/logs/telemetry.jsonl | jq '.timestamp'
 # Verify hash chain is intact
 python3 scripts/forensics/verify_hash_chain.py \
     --input ~/.openclaw/logs/telemetry.jsonl
+```
+
+**Verify:** Expected output:
+```text
+Recent telemetry timestamps are returned for the latest events.
+Hash chain verification reports integrity checks passed with no tampering detected.
 ```
 
 ## Tuning Notes

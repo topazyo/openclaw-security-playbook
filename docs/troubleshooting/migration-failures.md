@@ -16,7 +16,7 @@ This guide covers troubleshooting for credential migration scripts across macOS 
 6. [Verification Failures](#verification-failures)
 7. [Cleanup Issues](#cleanup-issues)
 8. [Rollback Procedures](#rollback-procedures)
-9. [Emergency Recovery](#emergency-recovery)
+9. [Emergency Recovery](#emergency-recovery-lost-all-credentials)
 10. [Platform Comparison](#platform-comparison)
 
 ---

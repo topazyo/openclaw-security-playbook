@@ -702,10 +702,10 @@ def example_sensitive_data_redaction():
     log_data = {
         "user_id": "user-123",
         "action": "update_credentials",
-        "password": "secret123",
-        "credit_card": "1234-5678-9012-3456",
+        "password": "${DEMO_PASSWORD}",
+        "credit_card": "${DEMO_CARD_TOKEN}",
         "email": "user@example.com",
-        "api_key": "sk-openclaw-abc123def456ghi789jkl012mno345pqr678stu901vwx234"
+        "api_key": "${OPENCLAW_API_KEY}"
     }
     
     print("Original data:")

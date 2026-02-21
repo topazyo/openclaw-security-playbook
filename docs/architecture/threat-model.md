@@ -138,7 +138,7 @@ This threat model uses the **STRIDE** framework:
 |--------|-------------|--------|------------|
 | **Prompt Injection** | Malicious prompts alter agent behavior | High | Input sanitization, delimiter stripping, openclaw-shield (see [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)) |
 | **Conversation History Poisoning** | Attacker modifies stored conversation data | Medium | Encrypted storage, integrity checksums, access controls |
-| **RAG Database Poisoning** | Malicious documents injected into vector DB | High | Document validation, provenance tracking (see [examples/attack-scenarios/data-exfiltration/rag-poisoning.md](../../examples/attack-scenarios/data-exfiltration/rag-poisoning.md)) |
+| **RAG Database Poisoning** | Malicious documents injected into vector DB | High | Document validation, provenance tracking (see [Scenario 006](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)) |
 | **Skill Code Tampering** | Installed skills modified post-installation | Medium | Integrity monitoring, GPG signatures (Layer 5, see [05-supply-chain-security.md](../guides/05-supply-chain-security.md)) |
 | **Config File Tampering** | Attacker modifies config to disable security | High | Read-only filesystem, config validation on load |
 
@@ -169,7 +169,7 @@ This threat model uses the **STRIDE** framework:
 | **Recursive Skill Invocation** | Infinite loop exhausts resources | Medium | Call depth limits, timeout enforcement |
 | **Network Flooding** | Gateway overwhelmed with requests | Medium | Rate limiting (see [gateway.hardened.yml](../../configs/templates/gateway.hardened.yml)), DDoS protection |
 | **Disk Space Exhaustion** | Logs/conversations fill disk | Low | Log rotation, disk quotas, monitoring |
-| **Container Escape Exploit** | DoS via container breakout | Low | Seccomp, AppArmor, read-only rootfs (see [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md)) |
+| **Container Escape Exploit** | DoS via container escape | Low | Seccomp, AppArmor, read-only rootfs (see [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md)) |
 
 ### E - Elevation of Privilege
 
@@ -219,7 +219,7 @@ This threat model uses the **STRIDE** framework:
 - **Impact**: Host compromise
 - **Mitigation**: Layer 3 (sandboxing), see [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md)
 
-**6. RAG Poisoning → Credential Theft**
+**6. RAG Poisoning → Credential Exfiltration**
 - **Attack Vector**: Malicious documents in vector DB
 - **Likelihood**: Medium
 - **Impact**: Information disclosure
@@ -281,7 +281,7 @@ This threat model uses the **STRIDE** framework:
 
 ## Threat Scenarios
 
-### Scenario 1: Multi-Stage Credential Theft
+### Scenario 1: Multi-Stage Credential Exfiltration
 
 **Attacker Goal**: Exfiltrate Claude API keys
 
@@ -329,7 +329,7 @@ This threat model uses the **STRIDE** framework:
 3. **Installation**: Target installs malicious skill
 4. **Execution**: Skill runs in agent context
 5. **Persistence**: Skill modifies agent config
-6. **Impact**: Backdoor, credential theft
+6. **Impact**: Backdoor, credential exfiltration
 
 **Mitigations**:
 - ✅ Layer 5: GPG signature verification (blocks step 3)
@@ -391,8 +391,8 @@ Low        │   P4   │    P3    │   P2    │    P1    │
 - [Scenario 002: Malicious Skill Deployment](../../examples/scenarios/scenario-002-malicious-skill-deployment.md)
 - [Scenario 003: MCP Server Compromise](../../examples/scenarios/scenario-003-mcp-server-compromise.md)
 - [Scenario 004: Multi-Agent Coordination Attack](../../examples/scenarios/scenario-004-multi-agent-coordination-attack.md)
-- [Scenario 005: Credential Theft via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
-- [Scenario 006: Credential Theft (Conversation History)](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
+- [Scenario 005: Credential Exfiltration via Skill](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)
+- [Scenario 006: Credential Exfiltration (Conversation History)](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
 - [Scenario 007: Denial of Service](../../examples/scenarios/scenario-007-denial-of-service-resource-exhaustion.md)
 
 ### External Resources

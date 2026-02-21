@@ -9,19 +9,69 @@
 
 set -euo pipefail
 
-INCIDENT_DIR="${1:-}"
-if [ -z "${INCIDENT_DIR}" ]; then
-    echo "Usage: $0 --incident-dir <path>"
-    exit 1
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+print_help() {
+    cat <<'EOF'
+build_timeline.sh — Reconstruct attack timeline from openclaw-telemetry logs
+
+Usage:
+  ./scripts/forensics/build_timeline.sh --incident-dir <path>
+  ./scripts/forensics/build_timeline.sh --incident-dir=<path>
+  ./scripts/forensics/build_timeline.sh --help|-h
+
+Exit codes:
+  0  Timeline built with no HIGH/CRITICAL findings
+  1  CRITICAL findings present in timeline
+  2  Warnings present (HIGH findings or input/telemetry issues)
+EOF
+}
+
+INCIDENT_DIR=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --incident-dir)
+            shift
+            INCIDENT_DIR="${1:-}"
+            ;;
+        --incident-dir=*)
+            INCIDENT_DIR="${1#--incident-dir=}"
+            ;;
+        --help|-h)
+            print_help
+            exit 0
+            ;;
+        *)
+            echo -e "${YELLOW}[WARN] Unknown argument: $1${NC}"
+            print_help
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+if [ -z "${INCIDENT_DIR}" ] || [ ! -d "${INCIDENT_DIR}" ]; then
+    echo -e "${YELLOW}[WARN] Missing or invalid incident directory${NC}"
+    print_help
+    exit 2
 fi
-INCIDENT_DIR="${INCIDENT_DIR#--incident-dir=}"
+
+if [ ! -d "${INCIDENT_DIR}/logs" ]; then
+    echo -e "${YELLOW}[WARN] No logs directory found: ${INCIDENT_DIR}/logs${NC}"
+    exit 2
+fi
 
 OUTPUT="${INCIDENT_DIR}/timeline.tsv"
 
 echo "Building attack timeline..."
 printf "timestamp\tevent_type\tsession_id\ttool_name\tdetail\trisk_level\n" > "${OUTPUT}"
 
+log_inputs=0
 find "${INCIDENT_DIR}/logs" -name "telemetry.jsonl" 2>/dev/null | while read -r jsonl; do
+    log_inputs=$((log_inputs + 1))
     jq -r '
         . as $event |
         (
@@ -55,6 +105,11 @@ find "${INCIDENT_DIR}/logs" -name "telemetry.jsonl" 2>/dev/null | while read -r 
     ' "${jsonl}" 2>/dev/null >> "${OUTPUT}"
 done
 
+if [ ! -s "${OUTPUT}" ]; then
+    echo -e "${YELLOW}[WARN] No telemetry events parsed for timeline${NC}"
+    exit 2
+fi
+
 sort -t$'\t' -k1,1 "${OUTPUT}" -o "${OUTPUT}.sorted"
 mv "${OUTPUT}.sorted" "${OUTPUT}"
 
@@ -71,3 +126,14 @@ echo "First suspicious event:"
 grep -E "CRITICAL|HIGH" "${OUTPUT}" | head -1 || echo "(none)"
 echo ""
 echo "To review: column -t -s $'\t' ${OUTPUT} | less -S"
+
+if [ "${critical}" -gt 0 ]; then
+    echo -e "${RED}[CRITICAL] Timeline contains critical events${NC}"
+    exit 1
+elif [ "${high}" -gt 0 ]; then
+    echo -e "${YELLOW}[WARN] Timeline contains high-risk events${NC}"
+    exit 2
+else
+    echo -e "${GREEN}[PASS] Timeline built with no high/critical findings${NC}"
+    exit 0
+fi

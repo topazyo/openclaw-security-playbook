@@ -398,7 +398,7 @@ Use this checklist for all agents that process external content:
 
 - `scenario-002-malicious-skill-deployment.md` - Supply chain attack
 - `scenario-003-mcp-server-compromise.md` - Infrastructure breach
-- `scenario-004-cross-agent-exfiltration.md` - Multi-agent coordination attack
+- `scenario-004-multi-agent-coordination-attack.md` - Multi-agent coordination attack
 
 ---
 

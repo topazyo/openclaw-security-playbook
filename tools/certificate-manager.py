@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Certificate Manager - Automates TLS certificate renewal via Let's Encrypt ACME"""
+"""Certificate Manager - Automates TLS certificate renewal via Let's Encrypt ACME.
+
+Run from repo root:
+    python tools/certificate-manager.py --help
+"""
 
 import subprocess
+import argparse
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -68,5 +74,28 @@ class CertificateManager:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Manage OpenClaw TLS certificates")
+    parser.add_argument(
+        "--action",
+        default="list",
+        choices=["list", "expiry", "renew"],
+        help="Certificate management action",
+    )
+    parser.add_argument("--cert-path", help="Certificate path for expiry checks")
+    parser.add_argument("--domain", help="Domain for renewal")
+    args = parser.parse_args()
+
     manager = CertificateManager()
-    print(manager.list_certificates())
+
+    if args.action == "expiry":
+        if not args.cert_path:
+            print(json.dumps({"error": "--cert-path is required for action=expiry"}, indent=2))
+        else:
+            print(json.dumps(manager.check_expiry(args.cert_path), indent=2, default=str))
+    elif args.action == "renew":
+        if not args.domain:
+            print(json.dumps({"error": "--domain is required for action=renew"}, indent=2))
+        else:
+            print(json.dumps(manager.renew_certificate(args.domain), indent=2))
+    else:
+        print(json.dumps(manager.list_certificates(), indent=2))

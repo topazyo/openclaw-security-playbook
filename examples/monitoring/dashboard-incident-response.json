@@ -804,7 +804,7 @@
                     {
                       "type": "value",
                       "value": "IRP-001",
-                      "text": "IRP-001 (Credential Theft)"
+                      "text": "IRP-001 (Credential Exfiltration)"
                     },
                     {
                       "type": "value",
@@ -1221,7 +1221,7 @@
     },
     "links": [
       {
-        "title": "IRP-001: Credential Theft",
+        "title": "IRP-001: Credential Exfiltration",
         "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-credential-theft.md",
         "type": "link",
         "icon": "doc"

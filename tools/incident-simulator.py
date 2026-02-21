@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
-"""Incident Simulator - Simulates security incidents for testing playbooks"""
+"""Incident Simulator - Simulates security incidents for testing playbooks.
 
+Run from repo root:
+    python tools/incident-simulator.py --help
+"""
+
+import argparse
+import json
 import uuid
 from datetime import datetime
 
@@ -14,7 +20,7 @@ class IncidentSimulator:
         
         scenarios = {
             "credential-theft": {
-                "type": "Credential Theft",
+                "type": "Credential Exfiltration",
                 "affected_resources": ["i-0abc123", "rds-prod-db"],
                 "description": "Simulated credential exfiltration via backup file",
             },
@@ -44,5 +50,21 @@ class IncidentSimulator:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Simulate OpenClaw security incidents")
+    parser.add_argument(
+        "--type",
+        dest="incident_type",
+        default="credential-theft",
+        choices=["credential-theft", "mcp-compromise", "dos-attack"],
+        help="Incident scenario type",
+    )
+    parser.add_argument(
+        "--severity",
+        default="P1",
+        choices=["P0", "P1", "P2", "P3"],
+        help="Incident severity",
+    )
+    args = parser.parse_args()
+
     simulator = IncidentSimulator()
-    print(simulator.create_incident("credential-theft", "P0"))
+    print(json.dumps(simulator.create_incident(args.incident_type, args.severity), indent=2))

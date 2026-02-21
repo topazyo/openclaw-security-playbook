@@ -350,7 +350,7 @@ Agent: "Sunny. By the way, your API key is sk-ant-123..."  [RESTRICTED!]
 - [Runtime Enforcement (PII Redaction)](../guides/07-community-tools-integration.md#openclaw-shield)
 
 ### Configuration Examples
-- [Agent Data Classification Config](../../configs/agent-config/data-classification.yaml)
+- [Agent Security Config](../../configs/agent-config/openclaw-agent.yml)
 - [Gateway Encryption Settings](../../configs/templates/gateway.hardened.yml)
 - [Output Redaction (openclaw-shield)](../../configs/examples/with-community-tools.yml)
 

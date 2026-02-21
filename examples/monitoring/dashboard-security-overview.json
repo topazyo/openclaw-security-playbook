@@ -805,7 +805,7 @@
         },
         "links": [
           {
-            "title": "IRP-001: Credential Theft Response",
+            "title": "IRP-001: Credential Exfiltration Response",
             "url": "https://github.com/openclaw/security-playbook/blob/main/examples/incident-response/playbook-credential-theft.md"
           }
         ]

@@ -79,7 +79,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity demonstrates a commitment to integrity and ethical values.
 
 **Implementation**:
-- [Security Policy](../policies/security-policy.md) (SEC-001) defines ethical use of AI agents
+- [Security Policy](../../configs/organization-policies/security-policy.json) (SEC-001) defines ethical use of AI agents
 - [Acceptable Use Policy](../policies/acceptable-use-policy.md) (SEC-005) signed by all employees annually
 - Code of Conduct prohibits misuse (credential sharing, data exfiltration, unauthorized access)
 - Whistleblower hotline for reporting violations (anonymous reporting available)
@@ -204,7 +204,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity specifies objectives with sufficient clarity to enable identification of risks.
 
 **Implementation**:
-- [Threat Model](../architecture/threat-model.md) catalogs AI-specific risks (prompt injection, credential theft, supply chain attacks)
+- [Threat Model](../architecture/threat-model.md) catalogs AI-specific risks (prompt injection, credential exfiltration, supply chain attacks)
 - Annual risk assessment (STRIDE methodology)
 - Real-world attack scenarios documented (see [examples/scenarios/](../../examples/scenarios/))
 
@@ -237,7 +237,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 
 **Implementation**:
 - Fraud risk assessment includes:
-  - **Insider threat**: Credential theft by employees (see [Scenario 005](../../examples/scenarios/scenario-005-credential-theft-via-skill.md))
+  - **Insider threat**: Credential exfiltration by employees (see [Scenario 005](../../examples/scenarios/scenario-005-credential-theft-via-skill.md))
   - **Impersonation**: Unauthorized use of AI agent
   - **Data exfiltration**: Conversation history theft (see [Scenario 006](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md))
 - Behavioral monitoring (openclaw-telemetry detects anomalies)

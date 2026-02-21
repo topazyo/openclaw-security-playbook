@@ -106,6 +106,7 @@ DO_START=false
 DO_UNINSTALL=false
 DO_SHOW_QR=false
 PEER_NAME=""
+OS_TYPE=""
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -155,14 +156,21 @@ require_root() {
 # ============================================================================
 
 detect_os() {
+    if [ -n "$OS_TYPE" ]; then
+        echo "$OS_TYPE"
+        return 0
+    fi
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
+        OS_TYPE="macos"
     elif [[ -f /etc/os-release ]]; then
         source /etc/os-release
-        echo "$ID"
+        OS_TYPE="$ID"
     else
-        echo "unknown"
+        OS_TYPE="unknown"
     fi
+
+    echo "$OS_TYPE"
 }
 
 check_wireguard_installed() {
@@ -307,11 +315,11 @@ get_server_public_ip() {
     local public_ip=""
 
     # Method 1: ip API
-    public_ip=$(curl -s https://api.ipify.org 2>/dev/null || true)
+    public_ip=$(curl -s --connect-timeout 5 --max-time 10 https://api.ipify.org 2>/dev/null || true)
 
     # Method 2: ifconfig.me
     if [ -z "$public_ip" ]; then
-        public_ip=$(curl -s https://ifconfig.me 2>/dev/null || true)
+        public_ip=$(curl -s --connect-timeout 5 --max-time 10 https://ifconfig.me 2>/dev/null || true)
     fi
 
     # Method 3: dig
@@ -331,15 +339,27 @@ get_server_public_ip() {
 allocate_ip_address() {
     # Allocate next available IP in the VPN network
     local network_prefix=$(echo "$WG_NETWORK" | cut -d'/' -f1 | cut -d'.' -f1-3)
-    local existing_ips=$(wg show "$WG_INTERFACE" allowed-ips 2>/dev/null | awk '{print $2}' | cut -d'/' -f1 | cut -d'.' -f4 | sort -n || echo "")
+    local existing_ips
+    existing_ips=$(wg show "$WG_INTERFACE" allowed-ips 2>/dev/null | awk '{print $2}' | cut -d'/' -f1 | cut -d'.' -f4 || true)
 
-    local next_ip=2
-
-    while echo "$existing_ips" | grep -q "^${next_ip}$"; do
-        ((next_ip++))
+    declare -A used_octets=()
+    local octet
+    for octet in $existing_ips; do
+        if [[ "$octet" =~ ^[0-9]+$ ]]; then
+            used_octets["$octet"]=1
+        fi
     done
 
-    echo "${network_prefix}.${next_ip}"
+    local next_ip
+    for ((next_ip = 2; next_ip <= 254; next_ip++)); do
+        if [ -z "${used_octets[$next_ip]+x}" ]; then
+            echo "${network_prefix}.${next_ip}"
+            return 0
+        fi
+    done
+
+    error "No available peer IP addresses remain in $WG_NETWORK"
+    return 1
 }
 
 # ============================================================================
@@ -424,7 +444,7 @@ EOF
 configure_firewall_server() {
     info "Configuring firewall for WireGuard server..."
 
-    local os=$(detect_os)
+    local os="$OS_TYPE"
 
     case "$os" in
         ubuntu|debian)
@@ -686,7 +706,7 @@ enable_autostart() {
 
     info "Enabling WireGuard autostart..."
 
-    local os=$(detect_os)
+    local os="$OS_TYPE"
 
     case "$os" in
         macos)
@@ -760,17 +780,31 @@ verify_connectivity() {
     # Test connectivity to each peer
     info "Testing peer connectivity..."
 
+    local peer_allowed_ips
+    peer_allowed_ips=$(wg show "$WG_INTERFACE" allowed-ips 2>/dev/null || true)
+
+    local -a ping_pids=()
+    local -a ping_ips=()
+
     while IFS= read -r peer_pubkey; do
-        local peer_ip=$(wg show "$WG_INTERFACE" allowed-ips | grep "$peer_pubkey" | awk '{print $2}' | cut -d'/' -f1)
+        local peer_ip
+        peer_ip=$(awk -v key="$peer_pubkey" '$1 == key {split($2, ip, "/"); print ip[1]}' <<< "$peer_allowed_ips" | head -n1)
 
         if [ -n "$peer_ip" ]; then
-            if ping -c 1 -W 2 "$peer_ip" &>/dev/null; then
-                success "Peer reachable: $peer_ip"
-            else
-                warning "Cannot reach peer: $peer_ip"
-            fi
+            ping -c 1 -W 2 "$peer_ip" &>/dev/null &
+            ping_pids+=("$!")
+            ping_ips+=("$peer_ip")
         fi
     done <<< "$peers"
+
+    local idx
+    for idx in "${!ping_pids[@]}"; do
+        if wait "${ping_pids[$idx]}"; then
+            success "Peer reachable: ${ping_ips[$idx]}"
+        else
+            warning "Cannot reach peer: ${ping_ips[$idx]}"
+        fi
+    done
 }
 
 # ============================================================================
@@ -856,7 +890,7 @@ uninstall_wireguard() {
     fi
 
     # Disable autostart
-    local os=$(detect_os)
+    local os="$OS_TYPE"
     if [ "$os" != "macos" ]; then
         systemctl disable "wg-quick@${WG_INTERFACE}.service" 2>/dev/null || true
     fi
@@ -945,6 +979,8 @@ EOF
 }
 
 main() {
+    detect_os > /dev/null
+
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in

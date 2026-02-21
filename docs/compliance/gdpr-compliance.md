@@ -375,7 +375,7 @@ This document details ClawdBot/OpenClaw compliance with the EU General Data Prot
 ### Organizational Measures
 
 **Policies and Procedures**:
-- [Security Policy](../policies/security-policy.md) (SEC-001)
+- [Security Policy](../../configs/organization-policies/security-policy.json) (SEC-001)
 - [Data Classification Policy](../policies/data-classification.md) (SEC-003) - PII classified as Restricted
 - [Incident Response Policy](../policies/incident-response-policy.md) (SEC-004) - Breach notification procedures
 
@@ -638,7 +638,7 @@ This document details ClawdBot/OpenClaw compliance with the EU General Data Prot
 
 | Risk | Likelihood | Severity | Impact | Mitigation |
 |------|------------|----------|--------|------------|
-| **Unauthorized access** (credential theft) | Medium | High | Identity theft, confidential info disclosure | MFA, VPN, access controls (see [Access Control Policy](../policies/access-control-policy.md)) |
+| **Unauthorized access** (credential exfiltration) | Medium | High | Identity theft, confidential info disclosure | MFA, VPN, access controls (see [Access Control Policy](../policies/access-control-policy.md)) |
 | **PII leakage** (user includes PII in prompt) | High | Medium | Privacy violation, GDPR breach | PII redaction (openclaw-shield), user training (don't share PII) |
 | **Data breach** (cloud storage compromised) | Low | High | Mass disclosure of conversations | Encryption (AES-256), access logging, monitoring |
 | **Insider threat** (employee exfiltration) | Low | High | Confidential info disclosure | Least privilege, behavioral monitoring (openclaw-telemetry), audit logs |

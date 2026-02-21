@@ -1,3 +1,10 @@
+---
+title: Supply Chain Security Guide
+layer: 5
+estimated_time: 40 minutes
+difficulty: Intermediate
+---
+
 # Supply Chain Security Guide
 
 **Layer 5 of 7-Layer Defense-in-Depth Model**
@@ -7,6 +14,17 @@
 **Prerequisites:** Basic cryptography knowledge, git experience
 
 This guide covers supply chain integrity for AI agent skills, preventing malicious skill installation and modification.
+
+## Platform Notes
+
+### Linux
+Run integrity and signature commands as shown in this guide.
+
+### macOS
+Use the same commands with available package managers (`brew`, `pipx`, or `pip`).
+
+### Windows
+Run commands in PowerShell or WSL2; keep signature and manifest validation steps equivalent.
 
 ## Table of Contents
 
@@ -448,8 +466,7 @@ skills:
 
     - skill: "http-client"
       version: ">=2.0.0,<2.1.0"  # Allow patches, not minor
-      autoUpdate: true
-      autoUpdateScope: "patch"  # patch, minor, or major
+      autoUpdate: false
 ```
 
 ### Update Procedure
@@ -540,6 +557,32 @@ skills:
    - Review network connections
    - Scan for credential exfiltration
    - Rotate all credentials (see: [02-credential-isolation.md](02-credential-isolation.md))
+
+---
+
+## Verification and Testing
+
+```bash
+# Verify signature for a skill artifact
+gpg --verify file-reader.py.asc file-reader.py
+
+# Verify skill policy defaults remain hardened
+grep -E "requireSignature|autoUpdate|autoInstall" ~/.openclaw/config/skills.yml
+
+# Verify baseline integrity comparison
+./scripts/supply-chain/skill_manifest.py \
+  --skills-dir ~/.openclaw/skills \
+  --compare manifests/baseline-20260214.json
+```
+
+**Verify:** Expected output:
+```text
+gpg: Good signature from "..."
+requireSignature: true
+autoUpdate: false
+autoInstall: false
+No unexpected skill additions or hash mismatches
+```
 
 ---
 

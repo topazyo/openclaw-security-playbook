@@ -2,8 +2,8 @@
 
 **OpenClaw Security Framework - Security Team Onboarding**
 
-Version: 1.0  
-Last Updated: 2024-01-15  
+Version: 1.1  
+Last Updated: 2026-02-21  
 Duration: 4 hours  
 Audience: Security engineers, SOC analysts, incident responders
 
@@ -30,7 +30,7 @@ This guide provides comprehensive training for security team members responsible
 
 By the end of this training, you will:
 - Understand the 7-layer defense-in-depth architecture
-- Execute incident response playbooks (IRP-001 through IRP-006)
+- Execute incident response playbooks from `examples/incident-response/`
 - Monitor security events using Grafana dashboards
 - Generate compliance reports for SOC 2/ISO 27001/GDPR
 - Use the `openclaw-cli` toolkit for daily operations
@@ -49,7 +49,7 @@ By the end of this training, you will:
 ### 7-Layer Defense Model
 
 #### Layer 1: Credential Isolation
-- **Purpose**: Prevent credential theft from AI agents
+- **Purpose**: Prevent credential exfiltration from AI agents
 - **Implementation**: OS keychains (macOS Keychain, Linux Secret Service, Windows Credential Manager)
 - **Attack Vectors**: Backup file persistence, conversation history leaks
 - **Verification**: `scripts/verification/verify_openclaw_security.sh`
@@ -72,14 +72,14 @@ By the end of this training, you will:
 - **Configuration**: `docs/guides/07-community-tools-integration.md`
 
 #### Layer 5: Supply Chain Security
-- **Purpose**: Prevent malicious skills/plugins
+- **Purpose**: Prevent malicious skills
 - **Implementation**: Skill manifest verification, integrity checking
 - **Tools**: `scripts/supply-chain/skill_integrity_monitor.sh`
 
 #### Layer 6: Monitoring & Detection
 - **Purpose**: Detect anomalous AI agent behavior
 - **Implementation**: openclaw-telemetry, Prometheus, Grafana, Elasticsearch
-- **Dashboards**: `examples/monitoring/dashboards/`
+- **Dashboards**: `examples/monitoring/`
 
 #### Layer 7: Governance & Compliance
 - **Purpose**: Discover and manage shadow AI deployments
@@ -99,24 +99,24 @@ By the end of this training, you will:
 
 2. **Scan for New Vulnerabilities**
    ```bash
-   openclaw-cli scan vulnerability --target production
+   python tools/openclaw-cli.py scan vulnerability --target production
    ```
    
 3. **Review Compliance Status**
    ```bash
-   openclaw-cli scan compliance --policy SEC-003
+   python tools/openclaw-cli.py scan compliance --policy SEC-003
    ```
 
 4. **Generate Daily Security Summary**
    ```bash
-   openclaw-cli report weekly --start $(date -d '1 day ago' +%Y-%m-%d) --end $(date +%Y-%m-%d)
+   python tools/openclaw-cli.py report weekly --start $(date -d '1 day ago' +%Y-%m-%d) --end $(date +%Y-%m-%d)
    ```
 
 ### Weekly Tasks
 
 1. **Quarterly Access Review** (every 90 days)
    ```bash
-   openclaw-cli scan access --days 90
+   python tools/openclaw-cli.py scan access --days 90
    ```
    
 2. **Certificate Expiry Check**
@@ -133,7 +133,7 @@ By the end of this training, you will:
 
 1. **SOC 2 Compliance Report**
    ```bash
-   openclaw-cli report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m).json
+   python tools/openclaw-cli.py report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m).json
    ```
    
 2. **Skill Integrity Audit**
@@ -149,62 +149,62 @@ By the end of this training, you will:
 
 The framework includes 6 incident response playbooks:
 
-1. **IRP-001**: Security incident response (general)
-2. **Playbook-Credential-Theft**: Credential exfiltration
-3. **Playbook-Malicious-Skill**: Compromised skill/plugin
-4. **Playbook-MCP-Compromise**: MCP server exploitation
-5. **Playbook-Multi-Agent**: Coordinated multi-agent attack
-6. **Playbook-DoS**: Resource exhaustion attacks
+1. **playbook-credential-theft.md**: Credential exfiltration scenario
+2. **playbook-prompt-injection.md**: Prompt injection attack
+3. **playbook-skill-compromise.md**: Malicious or compromised skill
+4. **playbook-data-breach.md**: Sensitive data disclosure/breach
+5. **playbook-denial-of-service.md**: Resource exhaustion attack
+6. **docs/guides/06-incident-response.md**: Canonical triage and response procedure
 
-### Example: Responding to Credential Theft (IRP-001)
+### Example: Responding to Credential Exfiltration
 
 **Detection Phase**
 ```bash
 # Collect forensic evidence
-python scripts/incident-response/forensics-collector.py --incident-id INC-2024-001
+python scripts/incident-response/forensics-collector.py --incident INC-2026-001 --level quick
 
 # Scan for indicators of compromise
-python scripts/discovery/ioc-scanner.py --resources i-0abc123
+python scripts/incident-response/ioc-scanner.py --ip 198.51.100.10
 ```
 
 **Containment Phase**
 ```bash
 # Isolate compromised EC2 instance
-python scripts/incident-response/auto-containment.py --resource i-0abc123 --action isolate
+python scripts/incident-response/auto-containment.py --incident INC-2026-001 --target i-0abc123 --action isolate-ec2 --dry-run
 
 # Send PagerDuty alert
-python scripts/incident-response/notification-manager.py --severity critical --incident INC-2024-001
+python scripts/incident-response/notification-manager.py --incident INC-2026-001 --severity CRITICAL --channel pagerduty
 ```
 
 **Eradication Phase**
 ```bash
 # Generate incident timeline
-python scripts/incident-response/timeline-generator.py --incident-id INC-2024-001
+python scripts/incident-response/timeline-generator.py --incident INC-2026-001 --output timeline.md
 
 # Calculate blast radius
-python scripts/incident-response/impact-analyzer.py --incident-id INC-2024-001
+python scripts/incident-response/impact-analyzer.py --incident INC-2026-001 --resource i-0abc123 --data-types PII,Credentials
 ```
 
 **Recovery Phase**
 ```bash
 # Restore services
-./examples/backups/backup-restore.sh --backup-id backup-2024-01-15 --rto-hours 4
+bash configs/examples/backup-restore.sh list
 ```
 
 **PIR Phase**
 ```bash
 # Include in weekly report
-python scripts/reporting/generate-weekly-report.py --start 2024-01-15 --end 2024-01-22
+python scripts/vulnerability-scanning/generate-weekly-report.py --output reports/weekly-vuln-report.pdf --weeks 12
 ```
 
 ### Using openclaw-cli for Incidents
 
 ```bash
 # Execute playbook
-openclaw-cli playbook execute IRP-001 --severity P0
+python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
 
 # Simulate incident for testing
-openclaw-cli simulate incident --type credential-theft --severity P1
+python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
 ```
 
 ---
@@ -248,7 +248,7 @@ Access dashboards at [https://grafana.openclaw.ai](https://grafana.openclaw.ai):
 
 | Alert | Severity | Action |
 |-------|----------|--------|
-| CredentialExfiltrationDetected | CRITICAL | Execute playbook-credential-theft.md |
+| CredentialExfiltrationDetected | CRITICAL | Execute `playbook-credential-theft.md` and follow `docs/guides/06-incident-response.md` |
 | VulnerabilityCritical | HIGH | Apply patch within 7 days (SEC-003) |
 | AuthFailureRateLimitExceeded | MEDIUM | Review access logs |
 | CertificateExpiringSoon | LOW | Renew with certificate-manager.py |
@@ -263,15 +263,15 @@ Access dashboards at [https://grafana.openclaw.ai](https://grafana.openclaw.ai):
 - CC6.1: Logical and physical access controls (MFA required)
 - CC7.1: Threat identification procedures (vulnerability scanning)
 - CC7.2: Continuous monitoring (Prometheus/Grafana)
-- CC7.3: Incident response (IRP-001 through IRP-006)
+- CC7.3: Incident response (documented playbooks in `examples/incident-response/`)
 
 **Evidence Collection**:
 ```bash
 # Generate SOC 2 report
-openclaw-cli report compliance --framework SOC2 --output audits/soc2-2024-Q1.json
+python tools/openclaw-cli.py report compliance --framework SOC2 --output audits/soc2-2026-Q1.json
 
 # Export audit logs (7-year retention)
-python scripts/monitoring/anomaly_detector.py --export-logs --start 2024-01-01 --end 2024-03-31
+python scripts/monitoring/anomaly_detector.py --logfile ~/.openclaw/logs/telemetry.jsonl --output-json
 ```
 
 ### ISO 27001:2022
@@ -284,10 +284,10 @@ python scripts/monitoring/anomaly_detector.py --export-logs --start 2024-01-01 -
 
 **Compliance Check**:
 ```bash
-openclaw-cli scan compliance --policy SEC-002  # Data classification
-openclaw-cli scan compliance --policy SEC-003  # Vulnerability management
-openclaw-cli scan compliance --policy SEC-004  # Access control
-openclaw-cli scan compliance --policy SEC-005  # Incident response
+python tools/openclaw-cli.py scan compliance --policy SEC-002  # Data classification
+python tools/openclaw-cli.py scan compliance --policy SEC-003  # Vulnerability management
+python tools/openclaw-cli.py scan compliance --policy SEC-004  # Access control
+python tools/openclaw-cli.py scan compliance --policy SEC-005  # Incident response
 ```
 
 ### GDPR
@@ -306,24 +306,24 @@ openclaw-cli scan compliance --policy SEC-005  # Incident response
 
 ```bash
 # Scan operations
-openclaw-cli scan vulnerability --target production
-openclaw-cli scan compliance --policy SEC-003
-openclaw-cli scan access --days 90
+python tools/openclaw-cli.py scan vulnerability --target production
+python tools/openclaw-cli.py scan compliance --policy SEC-003
+python tools/openclaw-cli.py scan access --days 90
 
 # Playbook execution
-openclaw-cli playbook list
-openclaw-cli playbook execute IRP-001 --severity P0 --dry-run
+python tools/openclaw-cli.py playbook list
+python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
 
 # Report generation
-openclaw-cli report weekly --start 2024-01-15 --end 2024-01-22
-openclaw-cli report compliance --framework SOC2
+python tools/openclaw-cli.py report weekly --start 2026-02-01 --end 2026-02-21
+python tools/openclaw-cli.py report compliance --framework SOC2
 
 # Configuration management
-openclaw-cli config validate configs/agent-config/openclaw-agent.yml
-openclaw-cli config migrate openclaw-agent.yml --from-version 1.0 --to-version 2.0
+python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
+python tools/openclaw-cli.py config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
 
 # Incident simulation
-openclaw-cli simulate incident --type credential-theft --severity P1
+python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
 ```
 
 ### Python Tools
@@ -353,46 +353,46 @@ python tools/config-migrator.py
 
 1. Run OS package scan:
    ```bash
-   ./scripts/discovery/os-scan.sh --image debian:12
+   ./scripts/vulnerability-scanning/os-scan.sh --image debian:12
    ```
 
 2. Review results in Grafana dashboard-system-health.json Panel 10
 
 3. Create Jira tickets for CRITICAL vulnerabilities:
    ```bash
-   python scripts/incident-response/create-tickets.py --severity CRITICAL
+   python scripts/vulnerability-scanning/create-tickets.py --input scan-results.json --severity CRITICAL
    ```
 
 ### Lab 2: Simulate Incident Response
 
-1. Simulate credential theft incident:
+1. Simulate credential exfiltration incident:
    ```bash
-   openclaw-cli simulate incident --type credential-theft --severity P0
+   python tools/openclaw-cli.py simulate incident --type credential-theft --severity P0
    ```
 
-2. Execute IRP-001 playbook:
+2. Execute credential exfiltration playbook:
    ```bash
-   openclaw-cli playbook execute IRP-001 --severity P0
+   python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
    ```
 
 3. Review incident timeline:
    ```bash
-   python scripts/incident-response/timeline-generator.py --incident-id INC-2024-001
+   python scripts/incident-response/timeline-generator.py --incident INC-2026-001 --output timeline.md
    ```
 
 ### Lab 3: Generate Compliance Report
 
 1. Run SOC 2 compliance check:
    ```bash
-   openclaw-cli scan compliance --policy SEC-002
-   openclaw-cli scan compliance --policy SEC-003
-   openclaw-cli scan compliance --policy SEC-004
-   openclaw-cli scan compliance --policy SEC-005
+python tools/openclaw-cli.py scan compliance --policy SEC-002
+python tools/openclaw-cli.py scan compliance --policy SEC-003
+python tools/openclaw-cli.py scan compliance --policy SEC-004
+python tools/openclaw-cli.py scan compliance --policy SEC-005
    ```
 
 2. Generate report:
    ```bash
-   openclaw-cli report compliance --framework SOC2 --output soc2-report.json
+   python tools/openclaw-cli.py report compliance --framework SOC2 --output soc2-report.json
    ```
 
 3. Review control status (should be 100% compliant)
@@ -401,10 +401,10 @@ python tools/config-migrator.py
 
 ## Additional Resources
 
-- **Documentation**: [docs/guides/](../guides/)
+- **Documentation**: [docs/guides/](../docs/guides/)
 - **Runbooks**: [examples/incident-response/](../examples/incident-response/)
-- **Troubleshooting**: [docs/troubleshooting/](../troubleshooting/)
-- **Community Tools**: [docs/guides/07-community-tools-integration.md](../guides/07-community-tools-integration.md)
+- **Troubleshooting**: [docs/troubleshooting/](../docs/troubleshooting/)
+- **Community Tools**: [docs/guides/07-community-tools-integration.md](../docs/guides/07-community-tools-integration.md)
 
 ---
 

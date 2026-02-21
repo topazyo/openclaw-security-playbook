@@ -482,7 +482,7 @@ output.elasticsearch:
 ### Log Encryption
 
 **Encryption at Rest**:
-- **SIEM/Log aggregator**: Elasticsearch encryption at rest (encryption plugin or encrypted EBS/Azure Disk)
+- **SIEM/Log aggregator**: Elasticsearch encryption at rest (encryption module or encrypted EBS/Azure Disk)
 - **Backup logs**: S3 server-side encryption (SSE-S3 or SSE-KMS) + GPG encryption before upload
 
 **Encryption in Transit**:
@@ -509,7 +509,7 @@ output.elasticsearch:
 - **Operators**: Read access to application logs (for troubleshooting), no access to audit logs
 
 **RBAC Enforcement**:
-- Elasticsearch: Security plugin (role-based access to indices)
+- Elasticsearch: Security module (role-based access to indices)
 - Kibana: Spaces and roles (different teams see different dashboards)
 - S3: IAM policies (least privilege)
 

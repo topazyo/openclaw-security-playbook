@@ -144,7 +144,7 @@
         "Requests to bypass security controls",
         "Instructions to ignore previous directives",
         "Attempts to extract training data",
-        "Jailbreak or prompt injection attempts",
+        "Prompt injection bypass or prompt injection attempts",
         "Requests for malicious code",
         "Social engineering scenarios"
       ],

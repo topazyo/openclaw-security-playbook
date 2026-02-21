@@ -531,7 +531,7 @@
         "id": 11,
         "title": "Risk Exposure by Category",
         "type": "bar",
-        "description": "Open risk items by category. Categories: Credential Theft, Data Breach, Prompt Injection, Supply Chain, DoS, Insider Threat. Prioritize high-count categories for remediation.",
+        "description": "Open risk items by category. Categories: Credential Exfiltration, Data Breach, Prompt Injection, Supply Chain, DoS, Insider Threat. Prioritize high-count categories for remediation.",
         "gridPos": {"h": 9, "w": 12, "x": 0, "y": 33},
         "datasource": "Elasticsearch",
         "targets": [

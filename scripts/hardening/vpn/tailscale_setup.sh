@@ -86,6 +86,8 @@ DO_CONFIGURE=false
 DO_VERIFY=false
 DO_TROUBLESHOOT=false
 DO_UNINSTALL=false
+OS_TYPE=""
+TAILSCALE_STATUS_CACHE=""
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -126,13 +128,28 @@ log() {
 # ============================================================================
 
 detect_os() {
+    if [ -n "$OS_TYPE" ]; then
+        echo "$OS_TYPE"
+        return 0
+    fi
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
+        OS_TYPE="macos"
     elif [[ -f /etc/os-release ]]; then
         source /etc/os-release
-        echo "$ID"
+        OS_TYPE="$ID"
     else
-        echo "unknown"
+        OS_TYPE="unknown"
+    fi
+
+    echo "$OS_TYPE"
+}
+
+get_tailscale_status_json() {
+    if [ -n "$TAILSCALE_STATUS_CACHE" ]; then
+        echo "$TAILSCALE_STATUS_CACHE"
+    else
+        tailscale status --json 2>/dev/null || echo '{}'
     fi
 }
 
@@ -178,8 +195,8 @@ install_tailscale_ubuntu() {
     info "Installing Tailscale on Ubuntu/Debian..."
 
     # Add Tailscale repository
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).gpg | sudo apt-key add -
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).list | sudo tee /etc/apt/sources.list.d/tailscale.list
+    curl -fsSL --connect-timeout 10 --max-time 30 https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).gpg | sudo apt-key add -
+    curl -fsSL --connect-timeout 10 --max-time 30 https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).list | sudo tee /etc/apt/sources.list.d/tailscale.list
 
     # Update and install
     sudo apt-get update
@@ -222,7 +239,7 @@ install_tailscale() {
         return 0
     fi
 
-    local os=$(detect_os)
+    local os="$OS_TYPE"
 
     case "$os" in
         macos)
@@ -284,6 +301,7 @@ authenticate_tailscale() {
 
     if check_tailscale_running; then
         success "Authentication successful"
+        TAILSCALE_STATUS_CACHE=""
         tailscale status
         return 0
     else
@@ -488,7 +506,7 @@ verify_installation() {
     fi
 
     # Check authentication status
-    local status=$(tailscale status --json 2>/dev/null || echo '{}')
+    local status=$(get_tailscale_status_json)
     local backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
 
     if [ "$backend_state" = "Running" ]; then
@@ -508,8 +526,8 @@ verify_installation() {
     fi
 
     # Check DNS
-    if tailscale status --json | jq -e '.MagicDNSSuffix' &>/dev/null; then
-        local dns_suffix=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+    if echo "$status" | jq -e '.MagicDNSSuffix' &>/dev/null; then
+        local dns_suffix=$(echo "$status" | jq -r '.MagicDNSSuffix')
         success "MagicDNS enabled: $dns_suffix"
     else
         info "MagicDNS not configured"
@@ -527,27 +545,38 @@ verify_connectivity() {
     fi
 
     # Get list of peers
-    local peers=$(tailscale status --json | jq -r '.Peer | keys[]' 2>/dev/null)
+    local status=$(get_tailscale_status_json)
+    local peer_entries=$(echo "$status" | jq -r '.Peer | to_entries[]? | [.key, (.value.HostName // "unknown"), (.value.TailscaleIPs[0] // "")] | @tsv' 2>/dev/null)
 
-    if [ -z "$peers" ]; then
+    if [ -z "$peer_entries" ]; then
         warning "No peers found. This may be the first device."
         return 0
     fi
 
     # Test connectivity to each peer
     info "Testing connectivity to peers..."
-    while IFS= read -r peer; do
-        local peer_ip=$(tailscale status --json | jq -r ".Peer[\"$peer\"].TailscaleIPs[0]")
-        local peer_name=$(tailscale status --json | jq -r ".Peer[\"$peer\"].HostName")
 
+    local -a ping_pids=()
+    local -a ping_names=()
+    local -a ping_ips=()
+
+    while IFS=$'\t' read -r peer_key peer_name peer_ip; do
         if [ -n "$peer_ip" ]; then
-            if ping -c 1 -W 2 "$peer_ip" &>/dev/null; then
-                success "Connectivity OK: $peer_name ($peer_ip)"
-            else
-                warning "Cannot ping: $peer_name ($peer_ip)"
-            fi
+            ping -c 1 -W 2 "$peer_ip" &>/dev/null &
+            ping_pids+=("$!")
+            ping_names+=("$peer_name")
+            ping_ips+=("$peer_ip")
         fi
-    done <<< "$peers"
+    done <<< "$peer_entries"
+
+    local idx
+    for idx in "${!ping_pids[@]}"; do
+        if wait "${ping_pids[$idx]}"; then
+            success "Connectivity OK: ${ping_names[$idx]} (${ping_ips[$idx]})"
+        else
+            warning "Cannot ping: ${ping_names[$idx]} (${ping_ips[$idx]})"
+        fi
+    done
 }
 
 verify_acl_compliance() {
@@ -559,7 +588,8 @@ verify_acl_compliance() {
     info "3. Review access rules for tag:$TAILSCALE_TAG"
 
     # Check device tags
-    local tags=$(tailscale status --json | jq -r '.Self.Tags[]?' 2>/dev/null)
+    local status=$(get_tailscale_status_json)
+    local tags=$(echo "$status" | jq -r '.Self.Tags[]?' 2>/dev/null)
 
     if [ -n "$tags" ]; then
         success "Device tags:"
@@ -589,7 +619,7 @@ troubleshoot_connection() {
 
     # Check firewall
     info "Checking firewall configuration..."
-    local os=$(detect_os)
+    local os="$OS_TYPE"
 
     case "$os" in
         macos)
@@ -643,7 +673,7 @@ troubleshoot_auth() {
     info "Troubleshooting authentication..."
 
     # Check authentication status
-    local status=$(tailscale status --json 2>/dev/null || echo '{}')
+    local status=$(get_tailscale_status_json)
     local backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
 
     info "Backend state: $backend_state"
@@ -697,7 +727,7 @@ uninstall_tailscale() {
 
     # Stop Tailscale service
     info "Stopping Tailscale service..."
-    local os=$(detect_os)
+    local os="$OS_TYPE"
 
     case "$os" in
         macos)
@@ -772,6 +802,8 @@ EOF
 main() {
     # Create log directory
     mkdir -p "$LOG_DIR"
+
+    detect_os > /dev/null
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -876,6 +908,7 @@ main() {
 
     # Verify setup
     if [ "$DO_VERIFY" = true ]; then
+        TAILSCALE_STATUS_CACHE="$(tailscale status --json 2>/dev/null || echo '{}')"
         verify_installation
         verify_connectivity
         verify_acl_compliance

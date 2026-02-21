@@ -1,3 +1,4 @@
+# See: docs/guides/03-network-segmentation.md
 # gateway.hardened.yml
 # Production-Grade Gateway Configuration for ClawdBot AI Agent
 #
@@ -38,7 +39,7 @@ network:
   # Primary binding
   bind:
     # CRITICAL SECURITY: Use 127.0.0.1 for localhost-only access
-    # Use 0.0.0.0 ONLY if behind a reverse proxy with strict firewall rules
+    # Never use 0.0.0.0 for gateway binding
     address: "127.0.0.1"  # <PLACEHOLDER: 127.0.0.1 recommended>
     port: 18789
 

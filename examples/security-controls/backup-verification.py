@@ -251,7 +251,7 @@ class BackupVerifier:
             >>> verifier = BackupVerifier()
             >>> is_valid, errors = verifier.verify_database_backup(
             ...     'openclaw_backup_2026-02-15.sql',
-            ...     'postgresql://test:test@localhost:5433/openclaw_test'
+            ...     'postgresql://${TEST_DB_USER}:${TEST_DB_PASSWORD}@127.0.0.1:5433/openclaw_test'
             ... )
         """
         errors = []

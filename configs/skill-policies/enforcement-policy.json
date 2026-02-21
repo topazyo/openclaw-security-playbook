@@ -19,24 +19,24 @@
     },
 
     "integrity": {
-      "required": false,
+      "required": true,
       "algorithm": "sha256",
       "fail_on_mismatch": true,
-      "allow_unsigned": true
+      "allow_unsigned": false
     },
 
     "signature": {
-      "required": false,
-      "verify_pgp": false,
+      "required": true,
+      "verify_pgp": true,
       "trusted_keys": [],
-      "fail_on_invalid": false
+      "fail_on_invalid": true
     }
   },
 
   "source_validation": {
     "check_allowlist": true,
-    "block_untrusted": false,
-    "warn_untrusted": true,
+    "block_untrusted": true,
+    "warn_untrusted": false,
     "require_https": true,
     "check_certificate": true
   },
@@ -66,8 +66,8 @@
 
     "dangerous_permissions": {
       "filesystem:write": "warn",
-      "network:unrestricted": "warn",
-      "process:exec": "warn",
+      "network:unrestricted": "block",
+      "process:exec": "block",
       "secrets:write": "block"
     },
 
@@ -80,13 +80,13 @@
   },
 
   "quarantine": {
-    "auto_quarantine": false,
+    "auto_quarantine": true,
     "quarantine_on": {
       "integrity_failure": true,
-      "signature_invalid": false,
+      "signature_invalid": true,
       "dangerous_patterns": {
         "critical": true,
-        "high": false
+        "high": true
       },
       "blocked_source": true,
       "blocked_author": true
@@ -153,7 +153,7 @@
       "OWASP-SAMM",
       "NIST-SSDF"
     ],
-    "sbom_required": false,
+    "sbom_required": true,
     "license_compliance": {
       "check_licenses": true,
       "allowed_licenses": [

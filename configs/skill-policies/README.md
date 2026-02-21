@@ -92,6 +92,15 @@ This directory contains security policies for validating and monitoring Model Co
 ajv validate -s manifest-schema.json -d skill-manifest.json
 ```
 
+### Policy schema validation (ajv-cli)
+
+```bash
+# Validate policy files with ajv-cli
+ajv validate -s allowlist-schema.json -d allowlist.json
+ajv validate -s dangerous-patterns-schema.json -d dangerous-patterns.json
+ajv validate -s enforcement-policy-schema.json -d enforcement-policy.json
+```
+
 ---
 
 ### 4. enforcement-policy.json
@@ -235,7 +244,7 @@ Edit `enforcement-policy.json`:
            │ Pass
            ▼
 ┌─────────────────────┐
-│  Check Allowlist    │───────► Not Approved → Warn
+│  Check Allowlist    │───────► Not Approved → Block
 └──────────┬──────────┘
            │ Approved
            ▼
@@ -245,12 +254,12 @@ Edit `enforcement-policy.json`:
            │ Pass
            ▼
 ┌─────────────────────┐
-│  Scan Patterns      │───────► Critical → Quarantine
-└──────────┬──────────┘         High → Block/Warn
-           │ Pass               Medium → Warn
+│  Scan Patterns      │───────► Critical/High → Block + Quarantine
+└──────────┬──────────┘         Medium → Warn
+           │ Pass               Low → Log
            ▼
 ┌─────────────────────┐
-│  Check Permissions  │───────► Dangerous → Warn
+│  Check Permissions  │───────► Dangerous → Block/Warn (policy-mapped)
 └──────────┬──────────┘
            │ OK
            ▼
@@ -259,21 +268,37 @@ Edit `enforcement-policy.json`:
 └─────────────────────┘
 ```
 
+### Enforcement Semantics Contract (POLICY-SEM-001)
+
+The following semantics are treated as contract-level defaults for production:
+
+- `production` enforcement level is `block`.
+- Untrusted sources are blocked (`source_validation.block_untrusted: true`).
+- Signature and integrity validation are mandatory (`validation.signature.required: true`, `validation.integrity.required: true`).
+- Unsigned skills are rejected (`validation.integrity.allow_unsigned: false`).
+- Invalid signatures fail validation (`validation.signature.fail_on_invalid: true`).
+- Pattern scanning actions are stable:
+  - `critical` → `block` + quarantine
+  - `high` → `block` + quarantine
+  - `medium` → `warn`
+  - `low` → `log`
+- Dangerous permissions are policy-mapped and deterministic:
+  - `process:exec` → `block`
+  - `network:unrestricted` → `block`
+  - `filesystem:write` → `warn`
+  - `secrets:write` → `block`
+
+Do not relax these defaults without a documented contract decision and cross-file audit update.
+
 ---
 
 ## Best Practices
 
-### 1. Start Permissive, Then Tighten
+### 1. Keep Production Enforcement Immutable
 
 ```json
-// Initial deployment
 "enforcement_level": {
-  "production": "warn"    // Collect data
-}
-
-// After baseline established
-"enforcement_level": {
-  "production": "block"   // Enforce strictly
+  "production": "block"
 }
 ```
 
@@ -436,7 +461,7 @@ export SKILL_SCAN_INTERVAL="600"  # 10 minutes
 - [OWASP Secure Coding Practices](https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/)
 - [NIST Secure Software Development Framework](https://csrc.nist.gov/publications/detail/sp/800-218/final)
 - [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification)
-- [ClawdBot Supply Chain Security Guide](../../docs/guides/06-supply-chain-security.md)
+- [ClawdBot Supply Chain Security Guide](../../docs/guides/05-supply-chain-security.md)
 
 ---
 

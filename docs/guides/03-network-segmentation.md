@@ -1,3 +1,10 @@
+---
+title: Network Segmentation Guide
+layer: 2
+estimated_time: 45 minutes
+difficulty: Intermediate-Advanced
+---
+
 # Network Segmentation Guide
 
 **Layer 2 of 7-Layer Defense-in-Depth Model**
@@ -740,6 +747,13 @@ for i in {1..100}; do
 done
 
 # Expected: First ~20 requests: 200, then: 429 (Too Many Requests)
+```
+
+**Verify:** Expected output summary:
+```text
+1) External network request to :18789 is refused or times out
+2) VPN network request returns {"status":"healthy"}
+3) Burst traffic receives HTTP 429 after configured limit
 ```
 
 ---
