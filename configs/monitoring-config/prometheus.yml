@@ -1,4 +1,4 @@
-# Prometheus Configuration for OpenClaw Security Monitoring
+﻿# Prometheus Configuration for OpenClaw Security Monitoring
 # Prometheus v2.45+ required
 #
 # Purpose: Service discovery, metrics scraping, and alert rules
@@ -19,13 +19,13 @@
 global:
   # Scrape interval (how often to collect metrics)
   scrape_interval: 15s
-  
+
   # Evaluation interval (how often to evaluate recording/alerting rules)
   evaluation_interval: 15s
-  
+
   # Scrape timeout (must be less than scrape_interval)
   scrape_timeout: 10s
-  
+
   # External labels (added to all metrics)
   external_labels:
     cluster: "openclaw-prod"
@@ -41,7 +41,7 @@ alerting:
     - static_configs:
         - targets:
             - "alertmanager.openclaw.ai:9093"
-      
+
       # Alert relabeling
       relabel_configs:
         - source_labels: [__address__]
@@ -50,7 +50,7 @@ alerting:
           target_label: instance
         - target_label: __address__
           replacement: "alertmanager.openclaw.ai:9093"
-      
+
       # Timeout configuration
       timeout: 10s
 
@@ -69,78 +69,78 @@ rule_files:
 # ============================================================================
 # Define targets and how to scrape them
 scrape_configs:
-  
+
   # --------------------------------------------------------------------------
   # OPENCLAW AGENTS
   # --------------------------------------------------------------------------
   # Kubernetes pod discovery for openclaw agents
   - job_name: "openclaw-agents"
-    
+
     # Scrape interval (override global)
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     # Kubernetes service discovery
     kubernetes_sd_configs:
       - role: pod
         namespaces:
           names:
             - "openclaw"
-        
+
         # API server configuration
         api_server: "https://kubernetes.default.svc"
         tls_config:
           ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
         bearer_token_file: "/var/run/secrets/kubernetes.io/serviceaccount/token"
-    
+
     # Relabeling rules (filter and transform labels)
     relabel_configs:
       # Only scrape pods with label app=openclaw-agent
       - source_labels: [__meta_kubernetes_pod_label_app]
         action: keep
         regex: openclaw-agent
-      
+
       # Extract pod name
       - source_labels: [__meta_kubernetes_pod_name]
         target_label: pod
-      
+
       # Extract namespace
       - source_labels: [__meta_kubernetes_namespace]
         target_label: namespace
-      
+
       # Extract node name
       - source_labels: [__meta_kubernetes_pod_node_name]
         target_label: node
-      
+
       # Extract pod IP
       - source_labels: [__meta_kubernetes_pod_ip]
         target_label: pod_ip
-      
+
       # Use pod's metrics port (annotation prometheus.io/port)
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
         action: replace
         target_label: __address__
         regex: (.+)
         replacement: $1
-    
+
     # Metrics path
     metrics_path: "/metrics"
-    
+
     # Scheme (http or https)
     scheme: "https"
     tls_config:
       insecure_skip_verify: false
       ca_file: "/etc/openclaw/ca.crt"
-  
+
   # --------------------------------------------------------------------------
   # MCP SERVERS
   # --------------------------------------------------------------------------
   # Static configuration for MCP servers
   - job_name: "mcp-servers"
-    
+
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     # Static targets
     static_configs:
       - targets:
@@ -150,96 +150,96 @@ scrape_configs:
         labels:
           service: "mcp-server"
           environment: "production"
-    
+
     metrics_path: "/metrics"
     scheme: "https"
     tls_config:
       ca_file: "/etc/openclaw/ca.crt"
       cert_file: "/etc/openclaw/prometheus.crt"
       key_file: "/etc/openclaw/prometheus.key"
-  
+
   # --------------------------------------------------------------------------
   # ELASTICSEARCH
   # --------------------------------------------------------------------------
   # Scrape Elasticsearch cluster metrics
   - job_name: "elasticsearch"
-    
+
     scrape_interval: 30s  # Less frequent (expensive metrics)
     scrape_timeout: 15s
-    
+
     static_configs:
       - targets:
           - "elk.openclaw.ai:9200"
         labels:
           cluster: "openclaw-logs"
           environment: "production"
-    
+
     metrics_path: "/_prometheus/metrics"
     scheme: "https"
-    
+
     # Basic auth for Elasticsearch
     basic_auth:
       username: "prometheus"
       password_file: "/etc/prometheus/secrets/elasticsearch-password"
-    
+
     tls_config:
       ca_file: "/etc/openclaw/ca.crt"
-  
+
   # --------------------------------------------------------------------------
   # REDIS
   # --------------------------------------------------------------------------
   # Scrape Redis metrics via redis_exporter
   - job_name: "redis"
-    
+
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     static_configs:
       - targets:
           - "redis-exporter.openclaw.ai:9121"
         labels:
           service: "redis"
           instance: "redis-01"
-    
+
     metrics_path: "/metrics"
     scheme: "http"
-  
+
   # --------------------------------------------------------------------------
   # POSTGRESQL
   # --------------------------------------------------------------------------
   # Scrape PostgreSQL metrics via postgres_exporter
   - job_name: "postgresql"
-    
+
     scrape_interval: 30s
     scrape_timeout: 15s
-    
+
     static_configs:
       - targets:
           - "postgres-exporter.openclaw.ai:9187"
         labels:
           service: "postgresql"
           database: "openclaw"
-    
+
     metrics_path: "/metrics"
     scheme: "http"
-  
+
   # --------------------------------------------------------------------------
   # NODE EXPORTER (SYSTEM METRICS)
   # --------------------------------------------------------------------------
   # Scrape OS-level metrics from all nodes
   - job_name: "node-exporter"
-    
+
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     # EC2 service discovery (AWS)
     ec2_sd_configs:
       - region: "us-east-1"
         port: 9100
-        
+
         # IAM role for service discovery
         role_arn: "arn:aws:iam::123456789012:role/prometheus-ec2-discovery"
-        
+
         # Filter instances by tags
         filters:
           - name: "tag:Environment"
@@ -248,45 +248,45 @@ scrape_configs:
           - name: "tag:MonitoringEnabled"
             values:
               - "true"
-    
+
     relabel_configs:
       # Use private IP for scraping
       - source_labels: [__meta_ec2_private_ip]
         target_label: __address__
         replacement: "$1:9100"
-      
+
       # Use instance ID as instance label
       - source_labels: [__meta_ec2_instance_id]
         target_label: instance
-      
+
       # Extract instance name from tag
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance_name
-      
+
       # Extract instance type
       - source_labels: [__meta_ec2_instance_type]
         target_label: instance_type
-      
+
       # Extract availability zone
       - source_labels: [__meta_ec2_availability_zone]
         target_label: availability_zone
-    
+
     metrics_path: "/metrics"
     scheme: "http"
-  
+
   # --------------------------------------------------------------------------
   # BLACKBOX EXPORTER (ENDPOINT MONITORING)
   # --------------------------------------------------------------------------
   # Probe external endpoints (availability, TLS, latency)
   - job_name: "blackbox-http"
-    
+
     scrape_interval: 30s
     scrape_timeout: 15s
-    
+
     metrics_path: "/probe"
     params:
       module: [http_2xx]
-    
+
     static_configs:
       - targets:
           - "https://api.openclaw.ai/health"
@@ -294,29 +294,29 @@ scrape_configs:
           - "https://auth.openclaw.ai/.well-known/openid-configuration"
         labels:
           probe_type: "http"
-    
+
     relabel_configs:
       # Use target as __param_target
       - source_labels: [__address__]
         target_label: __param_target
-      
+
       # Use blackbox exporter address
       - target_label: __address__
         replacement: "blackbox-exporter.openclaw.ai:9115"
-      
+
       # Set instance label to target URL
       - source_labels: [__param_target]
         target_label: instance
-  
+
   - job_name: "blackbox-tcp"
-    
+
     scrape_interval: 30s
     scrape_timeout: 10s
-    
+
     metrics_path: "/probe"
     params:
       module: [tcp_connect]
-    
+
     static_configs:
       - targets:
           - "mcp-01.openclaw.ai:8443"
@@ -324,7 +324,7 @@ scrape_configs:
           - "mcp-03.openclaw.ai:8443"
         labels:
           probe_type: "tcp"
-    
+
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -332,16 +332,16 @@ scrape_configs:
         replacement: "blackbox-exporter.openclaw.ai:9115"
       - source_labels: [__param_target]
         target_label: instance
-  
+
   - job_name: "blackbox-icmp"
-    
+
     scrape_interval: 30s
     scrape_timeout: 10s
-    
+
     metrics_path: "/probe"
     params:
       module: [icmp]
-    
+
     static_configs:
       - targets:
           - "mcp-01.openclaw.ai"
@@ -350,7 +350,7 @@ scrape_configs:
           - "elk.openclaw.ai"
         labels:
           probe_type: "icmp"
-    
+
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -358,16 +358,16 @@ scrape_configs:
         replacement: "blackbox-exporter.openclaw.ai:9115"
       - source_labels: [__param_target]
         target_label: instance
-  
+
   # --------------------------------------------------------------------------
   # OPENCLAW GATEWAY
   # --------------------------------------------------------------------------
   # API Gateway metrics
   - job_name: "openclaw-gateway"
-    
+
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     static_configs:
       - targets:
           - "gateway-01.openclaw.ai:9090"
@@ -375,27 +375,27 @@ scrape_configs:
         labels:
           service: "gateway"
           environment: "production"
-    
+
     metrics_path: "/metrics"
     scheme: "https"
     tls_config:
       ca_file: "/etc/openclaw/ca.crt"
-  
+
   # --------------------------------------------------------------------------
   # PROMETHEUS SELF-MONITORING
   # --------------------------------------------------------------------------
   # Scrape Prometheus itself
   - job_name: "prometheus"
-    
+
     scrape_interval: 15s
     scrape_timeout: 10s
-    
+
     static_configs:
       - targets:
           - "localhost:9090"
         labels:
           service: "prometheus"
-    
+
     metrics_path: "/metrics"
     scheme: "http"
 
@@ -405,10 +405,10 @@ scrape_configs:
 # Send metrics to remote storage (e.g., Cortex, Thanos, Mimir)
 remote_write:
   - url: "https://prometheus-remote.openclaw.ai/api/v1/write"
-    
+
     # Remote timeout
     remote_timeout: 30s
-    
+
     # Queue configuration
     queue_config:
       capacity: 10000
@@ -418,24 +418,24 @@ remote_write:
       batch_send_deadline: 5s
       min_backoff: 30ms
       max_backoff: 100ms
-    
+
     # Metadata configuration
     metadata_config:
       send: true
       send_interval: 1m
-    
+
     # Write relabeling (filter metrics sent to remote storage)
     write_relabel_configs:
       # Only send high-cardinality aggregates
       - source_labels: [__name__]
         regex: ".*_bucket|.*_count|.*_sum"
         action: keep
-    
+
     # Basic auth
     basic_auth:
       username: "prometheus"
       password_file: "/etc/prometheus/secrets/remote-write-password"
-    
+
     # TLS configuration
     tls_config:
       ca_file: "/etc/openclaw/ca.crt"
@@ -446,19 +446,19 @@ remote_write:
 # Query metrics from remote storage
 remote_read:
   - url: "https://prometheus-remote.openclaw.ai/api/v1/read"
-    
+
     # Read timeout
     remote_timeout: 1m
-    
+
     # Required selectors (only query specific metrics)
     required_matchers:
       - '{environment="production"}'
-    
+
     # Basic auth
     basic_auth:
       username: "prometheus"
       password_file: "/etc/prometheus/secrets/remote-read-password"
-    
+
     # TLS configuration
     tls_config:
       ca_file: "/etc/openclaw/ca.crt"
@@ -471,13 +471,13 @@ storage:
   tsdb:
     # Retention time (how long to keep metrics)
     retention.time: "30d"
-    
+
     # Retention size (max disk space for metrics)
     retention.size: "100GB"
-    
+
     # Path to TSDB directory
     path: "/var/lib/prometheus/data"
-    
+
     # Compression (none, snappy, zstd)
     wal_compression: true
 

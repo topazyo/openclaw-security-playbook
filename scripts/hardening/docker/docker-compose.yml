@@ -1,4 +1,4 @@
-# Docker Compose Configuration for ClawdBot - Hardened
+﻿# Docker Compose Configuration for ClawdBot - Hardened
 # Version: 1.0.0
 # Last Updated: February 14, 2026
 #
@@ -651,30 +651,30 @@ secrets:
 #   1. Network Isolation
 #      - Separate networks for frontend, backend, and monitoring
 #      - Backend network has no external access
-#   
+#
 #   2. Resource Limits
 #      - CPU limits prevent resource exhaustion
 #      - Memory limits prevent OOM attacks
 #      - PID limits prevent fork bombs
-#   
+#
 #   3. Filesystem Security
 #      - Read-only root filesystems where possible
 #      - Temporary filesystems with noexec, nosuid
 #      - Minimal writable mounts
-#   
+#
 #   4. User Security
 #      - All services run as non-root users
 #      - Minimal capabilities (CAP_DROP ALL)
 #      - no-new-privileges flag
-#   
+#
 #   5. Secrets Management
 #      - Secrets stored in files, not environment variables
 #      - Mounted into containers securely
-#   
+#
 #   6. Health Checks
 #      - All critical services have health checks
 #      - Automatic restart on failure
-#   
+#
 #   7. Logging
 #      - Centralized JSON logging
 #      - Log rotation to prevent disk exhaustion
@@ -682,22 +682,22 @@ secrets:
 # Usage Examples:
 #   # Start all services
 #   docker-compose up -d
-#   
+#
 #   # Check service status
 #   docker-compose ps
-#   
+#
 #   # View logs
 #   docker-compose logs -f clawdbot-gateway
-#   
+#
 #   # Scale agent service
 #   docker-compose up -d --scale clawdbot-agent=3
-#   
+#
 #   # Run security scan
 #   docker-compose run trivy image clawdbot/gateway:latest
-#   
+#
 #   # Stop all services
 #   docker-compose down
-#   
+#
 #   # Remove all data (WARNING: destructive)
 #   docker-compose down -v
 #
@@ -705,10 +705,10 @@ secrets:
 #   # Update images
 #   docker-compose pull
 #   docker-compose up -d
-#   
+#
 #   # Backup data
 #   docker-compose exec postgres pg_dump -U clawdbot > backup.sql
-#   
+#
 #   # Restore data
 #   docker-compose exec -T postgres psql -U clawdbot < backup.sql
 #
