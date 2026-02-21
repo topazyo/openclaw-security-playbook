@@ -74,8 +74,8 @@ docker run -d \
   \
   # Filesystem (read-only root, tmpfs for temp files)
   --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-  --tmpfs /var/run:rw,noexec,nosuid,size=10m \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+  --tmpfs /var/run:rw,noexec,nosuid,nodev,size=10m \
   \
   # Volume mounts (minimum required, read-only where possible)
   -v ~/.openclaw/config:/app/config:ro \
@@ -88,7 +88,7 @@ docker run -d \
   # -p 127.0.0.1:18789:18789 \
   \
   # Security options
-  --security-opt no-new-privileges \
+  --security-opt no-new-privileges:true \
   --security-opt seccomp=openclaw-seccomp.json \
   --security-opt apparmor=openclaw-apparmor \
   \
@@ -178,14 +178,15 @@ docker run --read-only ...
 **Solution:** Use tmpfs (memory-only, no persistence)
 
 ```bash
---tmpfs /tmp:rw,noexec,nosuid,size=100m \
---tmpfs /var/run:rw,noexec,nosuid,size=10m
+--tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+--tmpfs /var/run:rw,noexec,nosuid,nodev,size=10m
 ```
 
 **tmpfs Options:**
 - `rw` — Read-write
 - `noexec` — Cannot execute binaries (prevents downloading exploits)
 - `nosuid` — Cannot use SUID binaries
+- `nodev` — Device files are not interpreted
 - `size=100m` — Limit to 100MB (prevents memory exhaustion)
 
 ### Volume Mount Security
@@ -560,8 +561,8 @@ services:
     # Filesystem
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
-      - /var/run:rw,noexec,nosuid,size=10m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
+      - /var/run:rw,noexec,nosuid,nodev,size=10m
 
     # Volumes
     volumes:

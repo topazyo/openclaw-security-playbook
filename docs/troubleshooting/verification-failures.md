@@ -622,7 +622,7 @@ docker run -d \
   --cap-add NET_BIND_SERVICE \
   --security-opt no-new-privileges:true \
   --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
   -p 127.0.0.1:18789:18789 \
   anthropic/clawdbot:latest
 
@@ -662,10 +662,11 @@ docker run -d \
   --name clawdbot-production \
   --user 1000:1000 \
   --cap-drop ALL \
+  --security-opt no-new-privileges:true \
   --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-  --tmpfs /app/logs:rw,nosuid,size=500m \
-  --tmpfs /app/cache:rw,nosuid,size=200m \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+  --tmpfs /app/logs:rw,noexec,nosuid,nodev,size=500m \
+  --tmpfs /app/cache:rw,noexec,nosuid,nodev,size=200m \
   -v ~/.openclaw/config:/app/config:ro \
   -p 127.0.0.1:18789:18789 \
   anthropic/clawdbot:latest
@@ -702,12 +703,13 @@ docker run -d \
   --name clawdbot-production \
   --user 1000:1000 \
   --cap-drop ALL \
+  --security-opt no-new-privileges:true \
   --read-only \
   --memory="2g" \
   --memory-swap="2g" \
   --cpus="2.0" \
   --pids-limit=100 \
-  --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
   -p 127.0.0.1:18789:18789 \
   anthropic/clawdbot:latest
 
@@ -786,7 +788,7 @@ journalctl -u openclaw-shield -n 50
 **Solution:**
 ```bash
 # 1. Edit ClawdBot configuration
-vim ~/.openclaw/config/clawdbot.yml
+vim ~/.openclaw/config/openclaw-agent.yml
 
 # 2. Enable output filtering
 security:
@@ -963,10 +965,10 @@ curl: (7) Failed to connect to localhost port 9090
 **Solution:**
 ```bash
 # 1. Check if metrics are enabled
-grep -A5 "metrics:" ~/.openclaw/config/clawdbot.yml
+grep -A5 "metrics:" ~/.openclaw/config/openclaw-agent.yml
 
 # 2. Enable metrics if disabled
-vim ~/.openclaw/config/clawdbot.yml
+vim ~/.openclaw/config/openclaw-agent.yml
 
 monitoring:
   metrics:
@@ -1007,10 +1009,10 @@ curl http://localhost:9090/metrics
 **Solution:**
 ```bash
 # 1. Check audit logging configuration
-grep -A10 "audit:" ~/.openclaw/config/clawdbot.yml
+grep -A10 "audit:" ~/.openclaw/config/openclaw-agent.yml
 
 # 2. Enable audit logging
-vim ~/.openclaw/config/clawdbot.yml
+vim ~/.openclaw/config/openclaw-agent.yml
 
 logging:
   components:
@@ -1062,7 +1064,7 @@ cat ~/.openclaw/logs/audit.jsonl | jq .
 **Solution:**
 ```bash
 # 1. Edit compliance configuration
-vim ~/.openclaw/config/clawdbot.yml
+vim ~/.openclaw/config/openclaw-agent.yml
 
 # 2. Add compliance settings
 compliance:
@@ -1240,7 +1242,7 @@ Set-AuthenticodeSignature -FilePath .\script.ps1 -Certificate $cert
 #### 1. **Enable Debug Logging**
 ```bash
 # Edit configuration
-vim ~/.openclaw/config/clawdbot.yml
+vim ~/.openclaw/config/openclaw-agent.yml
 
 # Set log level to DEBUG
 logging:

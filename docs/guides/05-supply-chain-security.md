@@ -91,6 +91,15 @@ Use the `skill_manifest.py` script:
   --output manifests/baseline-$(date +%Y%m%d).json
 ```
 
+**Verify:**
+```bash
+jq -r '.generated_at, (.skills | length)' manifests/baseline-$(date +%Y%m%d).json
+```
+
+Expected output:
+- First line is an ISO timestamp
+- Second line is the number of discovered skill files (must be >= 0)
+
 **Manifest structure:**
 
 ```json
@@ -292,6 +301,14 @@ skills:
       severity: "HIGH"
       reason: "XSS vulnerability"
 ```
+
+**Verify:**
+```bash
+grep -E "requireSignature:[[:space:]]*true|autoInstall:[[:space:]]*false|autoUpdate:[[:space:]]*false" ~/.openclaw/config/skills.yml
+```
+
+Expected output:
+- Three lines confirming `requireSignature: true`, `autoInstall: false`, and `autoUpdate: false`
 
 ### Dependency Allowlist
 

@@ -104,6 +104,7 @@ LOG_FILE="$LOG_DIR/credential_migration_${BACKUP_TIMESTAMP}.log"
 TEMP_DIR=$(mktemp -d)
 CREDENTIALS_FOUND="$TEMP_DIR/credentials_found.txt"
 MIGRATION_REPORT="$TEMP_DIR/migration_report.txt"
+BACKUP_MIGRATION_STATE_FILE="$TEMP_DIR/migration_state.json"
 
 # Options
 DRY_RUN=false
@@ -152,6 +153,33 @@ error() {
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+record_migration_state() {
+    local status=$1
+    local service=$2
+    local source=$3
+    local account=$4
+
+    if [ ! -f "$BACKUP_MIGRATION_STATE_FILE" ]; then
+        echo '[]' > "$BACKUP_MIGRATION_STATE_FILE"
+    fi
+
+    local tmp_state
+    tmp_state=$(mktemp)
+
+    if jq \
+        --arg status "$status" \
+        --arg service "$service" \
+        --arg source "$source" \
+        --arg account "$account" \
+        --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        '. += [{"status": $status, "service": $service, "source": $source, "account": $account, "timestamp": $ts}]' \
+        "$BACKUP_MIGRATION_STATE_FILE" > "$tmp_state"; then
+        mv "$tmp_state" "$BACKUP_MIGRATION_STATE_FILE"
+    else
+        rm -f "$tmp_state"
+    fi
 }
 
 verbose() {
@@ -397,6 +425,8 @@ create_backup() {
 
     # Create backup directory
     mkdir -p "$BACKUP_DIR/$BACKUP_NAME"
+    BACKUP_MIGRATION_STATE_FILE="$BACKUP_DIR/$BACKUP_NAME/migration_state.json"
+    echo '[]' > "$BACKUP_MIGRATION_STATE_FILE"
 
     # Copy configuration files
     for config_dir in "${CONFIG_DIRS[@]}"; do
@@ -414,17 +444,22 @@ create_backup() {
         fi
     done
 
-    # Create backup manifest
-    cat > "$BACKUP_DIR/$BACKUP_NAME/manifest.json" << EOF
-{
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "hostname": "$(hostname)",
-  "user": "$USER",
-  "backup_name": "$BACKUP_NAME",
-  "script_version": "$SCRIPT_VERSION",
-  "backend": "$DETECTED_BACKEND"
-}
-EOF
+        # Create backup manifest
+        jq -n \
+            --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg hostname "$(hostname)" \
+            --arg user "$USER" \
+            --arg backup_name "$BACKUP_NAME" \
+            --arg script_version "$SCRIPT_VERSION" \
+            --arg backend "$DETECTED_BACKEND" \
+            '{
+                timestamp: $timestamp,
+                hostname: $hostname,
+                user: $user,
+                backup_name: $backup_name,
+                script_version: $script_version,
+                backend: $backend
+            }' > "$BACKUP_DIR/$BACKUP_NAME/manifest.json"
 
     # Set restrictive permissions
     chmod 700 "$BACKUP_DIR/$BACKUP_NAME"
@@ -476,10 +511,12 @@ migrate_credential_to_keyring() {
     if [ $? -eq 0 ]; then
         success "Migrated: $service"
         echo "SUCCESS|$service|$source" >> "$MIGRATION_REPORT"
+        record_migration_state "SUCCESS" "$service" "$source" "$account"
         return 0
     else
         error "Failed to migrate: $service"
         echo "FAILED|$service|$source" >> "$MIGRATION_REPORT"
+        record_migration_state "FAILED" "$service" "$source" "$account"
         return 1
     fi
 }
@@ -678,12 +715,17 @@ rollback_migration() {
     # Remove credentials from keyring
     info "Removing credentials from keyring..."
 
-    while IFS='|' read -r status service source; do
-        if [ "$status" = "SUCCESS" ]; then
-            secret-tool clear service "$service" account "$USER" 2>/dev/null || true
-            verbose "Removed from keyring: $service"
-        fi
-    done < "$MIGRATION_REPORT" 2>/dev/null || true
+    local state_file="$BACKUP_DIR/$latest_backup/migration_state.json"
+    if [ -f "$state_file" ]; then
+        while IFS= read -r service; do
+            if [ -n "$service" ]; then
+                secret-tool clear service "$service" account "$USER" 2>/dev/null || true
+                verbose "Removed from keyring: $service"
+            fi
+        done < <(jq -r '.[] | select(.status == "SUCCESS") | .service' "$state_file" 2>/dev/null | sort -u)
+    else
+        warning "Migration state file not found in backup; skipping keyring cleanup"
+    fi
 
     success "Rollback complete"
 }
@@ -890,6 +932,7 @@ main() {
 
     # Create log directory
     mkdir -p "$LOG_DIR"
+    echo '[]' > "$BACKUP_MIGRATION_STATE_FILE"
 
     # Print header
     print_color "$BLUE" "========================================"

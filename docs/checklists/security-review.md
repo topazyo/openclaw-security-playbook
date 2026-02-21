@@ -103,7 +103,7 @@ docker inspect clawdbot | jq '.[0].HostConfig' | grep -E "(User|CapDrop|Readonly
 ### 3.2 Resource Limits
 - [ ] **CPU limits** defined (`cpus: "2"` or equivalent)
 - [ ] **Memory limits** defined (`memory: "4g"`)
-- [ ] **PID limits** defined (`pids_limit: 200`)
+- [ ] **PID limits** defined (`pids_limit: 100`)
 - [ ] **Restart policy** appropriate (`restart: on-failure:3`, NOT `always`)
 
 **Verification**:

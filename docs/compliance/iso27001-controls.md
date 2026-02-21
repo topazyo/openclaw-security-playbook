@@ -51,12 +51,14 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 | A.6 (People) | 8 | 8 | 8 | 100% |
 | A.7 (Physical) | 14 | 14 | 14 | 100% |
 | A.8 (Technological) | 34 | 34 | 34 | 100% |
-| **TOTAL** | **93** | **93** | **93** | **100%** |
+| **TOTAL** | **93** | **90** | **90** | **96.8%** |
 
 **Last Audit**: January 2026 (Certification Audit)  
 **Next Audit**: January 2027 (Surveillance Audit)  
 **Non-Conformities**: 0  
 **Opportunities for Improvement**: 3 (documented in CAR tracker)
+
+> **⚠️ Known Gap (Cycle 2):** Controls tied to skill signature validation and detection parity are under active remediation (`C2-DET-004`, `C2-DET-001`, `C2-DOC-002`). Dashboard totals are temporarily reduced until remediation evidence is complete.
 
 ---
 

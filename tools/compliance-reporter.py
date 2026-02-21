@@ -8,6 +8,37 @@ Run from repo root:
 import argparse
 import json
 from datetime import datetime
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _safe_repo_path(relative_path: str) -> Path:
+    candidate = (REPO_ROOT / relative_path).resolve()
+    if REPO_ROOT not in candidate.parents and candidate != REPO_ROOT:
+        raise ValueError(f"Path traversal detected: {relative_path}")
+    return candidate
+
+
+def _validate_output_path(output_path: str) -> Path:
+    path = Path(output_path).expanduser().resolve()
+    blocked_roots = [Path("/etc"), Path("/usr"), Path("/bin"), Path("/sbin"), Path("/var")]
+    blocked_roots.extend([
+        Path("C:/Windows"),
+        Path("C:/Program Files"),
+        Path("C:/Program Files (x86)"),
+    ])
+
+    for blocked in blocked_roots:
+        if blocked in path.parents or path == blocked:
+            raise ValueError(f"Refusing to write to system path: {path}")
+
+    config_root = (REPO_ROOT / "configs").resolve()
+    if config_root in path.parents:
+        raise ValueError(f"Refusing to overwrite configuration files: {path}")
+
+    return path
 
 
 class ComplianceReporter:
@@ -68,22 +99,28 @@ class ComplianceReporter:
     
     def _load_soc2_controls(self):
         """Load SOC 2 control status from configs."""
-        # Load from configs/organization-policies/soc2-compliance-mapping.json
-        try:
-            with open("configs/organization-policies/soc2-compliance-mapping.json") as f:
-                data = json.load(f)
-                return data.get("controls", [])
-        except Exception:
-            return []
+        controls_path = _safe_repo_path("configs/organization-policies/soc2-compliance-mapping.json")
+        with open(controls_path, encoding="utf-8") as f:
+            data = json.load(f)
+        controls = data.get("controls", [])
+        if not isinstance(controls, list):
+            raise ValueError("SOC2 controls format is invalid: expected list")
+        return controls
     
     def _load_iso27001_controls(self):
         """Load ISO 27001 control status."""
-        try:
-            with open("configs/organization-policies/iso27001-compliance-mapping.json") as f:
-                data = json.load(f)
-                return data.get("controls", [])
-        except Exception:
-            return []
+        controls_path = _safe_repo_path("configs/organization-policies/iso27001-compliance-mapping.json")
+        with open(controls_path, encoding="utf-8") as f:
+            data = json.load(f)
+        controls = data.get("controls", [])
+        if not isinstance(controls, list):
+            raise ValueError("ISO27001 controls format is invalid: expected list")
+        return controls
+
+
+def generate_report(framework="SOC2"):
+    """Module-level wrapper used by openclaw-cli."""
+    return ComplianceReporter().generate_report(framework)
 
 
 if __name__ == "__main__":
@@ -97,11 +134,17 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="Optional output path for JSON report")
     args = parser.parse_args()
 
-    reporter = ComplianceReporter()
-    report = reporter.generate_report(args.framework)
+    try:
+        reporter = ComplianceReporter()
+        report = reporter.generate_report(args.framework)
 
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(report, f, indent=2)
-    else:
-        print(json.dumps(report, indent=2))
+        if args.output:
+            output_path = _validate_output_path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2)
+        else:
+            print(json.dumps(report, indent=2))
+    except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError) as exc:
+        print(json.dumps({"error": str(exc)}, indent=2))
+        raise SystemExit(2)

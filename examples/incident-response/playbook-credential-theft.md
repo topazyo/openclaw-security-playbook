@@ -640,11 +640,11 @@ EOF
      --cap-drop ALL \
      --cap-add NET_BIND_SERVICE \
      --read-only \
-     --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-     --security-opt no-new-privileges \
+     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+     --security-opt no-new-privileges:true \
+     --pids-limit=100 \
      --security-opt seccomp=../../scripts/hardening/docker/seccomp-profiles/clawdbot.json \
      -p 127.0.0.1:18789:18789 \
-     -v /var/run/docker.sock:/var/run/docker.sock:ro \
      --env-file .env.secure \
      openclaw/agent:hardened-$(date +%Y%m%d)
    

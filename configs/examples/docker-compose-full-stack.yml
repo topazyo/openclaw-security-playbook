@@ -18,7 +18,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
     volumes:
       - ./config:/app/config:ro
       - ./skills:/app/skills:ro
@@ -54,7 +54,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
     pids_limit: 100
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -84,7 +84,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
     pids_limit: 100
     volumes:
       - grafana-data:/var/lib/grafana
@@ -114,7 +114,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
     pids_limit: 100
     volumes:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro

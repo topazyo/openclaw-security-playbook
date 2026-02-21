@@ -38,20 +38,24 @@ scripts/hardening/docker/
 git clone https://github.com/YOUR-ORG/clawdbot-security-playbook
 cd clawdbot-security-playbook/scripts/hardening/docker
 
-# 2. Create secrets directory
-mkdir -p secrets
-echo "${ANTHROPIC_API_KEY}" > secrets/anthropic_api_key.txt
-echo "${OPENAI_API_KEY}" > secrets/openai_api_key.txt
-echo "$(openssl rand -hex 32)" > secrets/gateway_secret_key.txt
-echo "$(openssl rand -hex 32)" > secrets/agent_auth_token.txt
-echo "$(openssl rand -hex 16)" > secrets/postgres_password.txt
+# 2. Create secrets directory (fail-secure permissions)
+(
+  umask 077
+  mkdir -p secrets
+  echo "${ANTHROPIC_API_KEY}" > secrets/anthropic_api_key.txt
+  echo "${OPENAI_API_KEY}" > secrets/openai_api_key.txt
+  echo "$(openssl rand -hex 32)" > secrets/gateway_secret_key.txt
+  echo "$(openssl rand -hex 32)" > secrets/agent_auth_token.txt
+  echo "$(openssl rand -hex 16)" > secrets/postgres_password.txt
+)
 
 # Generate missing values if needed:
 # export ANTHROPIC_API_KEY="$(openssl rand -base64 32)"
 # export OPENAI_API_KEY="$(openssl rand -base64 32)"
 
-# 3. Set permissions
-chmod 600 secrets/*.txt
+# 3. Verify permissions
+ls -la secrets/
+# Expected: -rw------- for all secret files
 
 # 4. Create data directories
 mkdir -p data/{redis,postgres,prometheus,grafana}
@@ -62,6 +66,11 @@ docker-compose up -d
 # 6. Check status
 docker-compose ps
 docker-compose logs -f clawdbot-gateway
+
+# 7. Backup generated local secrets (required for rollback)
+mkdir -p backup/secrets
+cp secrets/*.txt backup/secrets/
+chmod 600 backup/secrets/*.txt
 ```
 
 ---
@@ -156,7 +165,7 @@ deploy:
 ```yaml
 read_only: true           # Immutable root filesystem
 tmpfs:
-  - /tmp:rw,noexec,nosuid  # Temporary writable space
+  - /tmp:rw,noexec,nosuid,nodev,size=100m  # Temporary writable space
 ```
 
 **Benefits:**
@@ -486,6 +495,31 @@ docker-compose exec -T postgres psql -U clawdbot clawdbot < backup-20260214.sql
 docker cp backup-redis-20260214.rdb clawdbot-redis:/data/dump.rdb
 docker-compose restart redis
 ```
+
+### Secure Rollback
+
+If a hardening rollout fails mid-flight, use this rollback path:
+
+```bash
+# 1. Stop hardened stack
+docker-compose down
+
+# 2. Restore persisted data
+tar xzf backup-data-YYYYMMDD.tar.gz
+
+# 3. Restore locally generated secrets
+cp backup/secrets/*.txt secrets/
+chmod 600 secrets/*.txt
+
+# 4. Relaunch known-good configuration
+docker-compose up -d --force-recreate
+
+# 5. Validate service health
+docker-compose ps
+docker-compose logs --tail=100 clawdbot-gateway
+```
+
+Critical: `gateway_secret_key.txt`, `agent_auth_token.txt`, and `postgres_password.txt` are locally generated and must be backed up before any destructive maintenance.
 
 ### Logs Management
 

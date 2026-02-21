@@ -74,6 +74,11 @@ class ConfigMigrator:
         return config
 
 
+def migrate(config_path, from_version, to_version):
+    """Module-level wrapper used by openclaw-cli."""
+    return ConfigMigrator().migrate(config_path, from_version, to_version)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Migrate OpenClaw agent configuration versions")
     parser.add_argument(

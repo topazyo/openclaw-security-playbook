@@ -66,9 +66,11 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 | CC7 (System Operations) | 5 | 5 | 0 | 0 | 100% |
 | CC8 (Change Management) | 3 | 3 | 0 | 0 | 100% |
 | CC9 (Risk Mitigation) | 3 | 3 | 0 | 0 | 100% |
-| **TOTAL** | **36** | **36** | **0** | **0** | **100%** |
+| **TOTAL** | **36** | **34** | **2** | **0** | **94.4%** |
 
 **Last Updated**: 2026-02-14
+
+> **⚠️ Known Gap (Cycle 2):** Signature verification in `scripts/supply-chain/skill_integrity_monitor.sh` and Layer 6 detection parity are being remediated under `C2-DET-004`, `C2-DET-001`, and `C2-DOC-002`. Until full validation and CI evidence are complete, SOC 2 control coverage is tracked as partially implemented.
 
 ---
 

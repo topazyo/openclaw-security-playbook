@@ -307,7 +307,7 @@ Continue? [y/N] y
 ├── .openclaw/
 │   └── config/
 │       ├── gateway.yml
-│       └── clawdbot.yml
+│       └── openclaw-agent.yml
 ├── .bashrc
 ├── .zshrc
 └── .profile
@@ -384,7 +384,7 @@ NEXT STEPS
 
 ### 1. Update ClawdBot Configuration
 
-Edit `~/.openclaw/config/clawdbot.yml`:
+Edit `~/.openclaw/config/openclaw-agent.yml`:
 
 ```yaml
 credentials:

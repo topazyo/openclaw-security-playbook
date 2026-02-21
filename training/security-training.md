@@ -121,7 +121,7 @@ By the end of this training, you will:
    
 2. **Certificate Expiry Check**
    ```bash
-   python tools/certificate-manager.py
+   python tools/openclaw-cli.py scan certificates
    ```
    
 3. **Backup Verification**
@@ -330,20 +330,22 @@ python tools/openclaw-cli.py simulate incident --type credential-theft --severit
 
 ```bash
 # Policy validation
-python tools/policy-validator.py
+python tools/openclaw-cli.py scan compliance --policy SEC-002
 
 # Incident simulation
-python tools/incident-simulator.py
+python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
 
 # Compliance reporting
-python tools/compliance-reporter.py
+python tools/openclaw-cli.py report compliance --framework SOC2 --output reports/soc2-training.json
 
 # Certificate management
-python tools/certificate-manager.py
+python tools/openclaw-cli.py scan certificates --output reports/certificates-training.json
 
 # Configuration migration
-python tools/config-migrator.py
+python tools/openclaw-cli.py config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
 ```
+
+Standalone tool scripts under `tools/` remain available for debugging, but operational workflows should use `openclaw-cli.py` for consistent policy checks and exit codes.
 
 ---
 
@@ -416,7 +418,7 @@ After completing training, security team members should be able to:
 2. ✅ Execute incident response playbooks using openclaw-cli
 3. ✅ Monitor security events in Grafana dashboards
 4. ✅ Generate SOC 2/ISO 27001/GDPR compliance reports
-5. ✅ Validate configurations with policy-validator.py
+5. ✅ Validate configurations with openclaw-cli
 6. ✅ Simulate and respond to security incidents
 
 ---

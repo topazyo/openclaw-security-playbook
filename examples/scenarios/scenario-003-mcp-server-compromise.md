@@ -618,6 +618,14 @@ resource "vault_database_secret_backend_role" "clawdbot" {
 ```yaml
 # mcp-server-config.yaml
 security:
+  tls:
+    enabled: true
+    min_version: "1.3"
+    max_version: "1.3"
+    ciphersuites:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_CHACHA20_POLY1305_SHA256"
+
   authentication:
     enabled: true
     method: mutual_tls

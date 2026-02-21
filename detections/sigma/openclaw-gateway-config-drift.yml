@@ -1,0 +1,31 @@
+title: OpenClaw Gateway Binding Configuration Drift
+id: 95e1df4a-7dc1-447d-a22a-5f4f06726c04
+status: experimental
+description: >
+  Detects modifications to OpenClaw gateway configuration files that can
+  precede exposure of the gateway to non-local interfaces.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-02-21
+tags:
+  - attack.persistence
+  - attack.t1546
+logsource:
+  category: file_access
+  product: linux
+detection:
+  selection_gateway_config:
+    TargetFilename|endswith:
+      - '/config/gateway.yml'
+      - '/configs/templates/gateway.hardened.yml'
+  selection_write_actions:
+    EventType:
+      - 'FileModified'
+      - 'FileCreated'
+      - 'FileRenamed'
+      - 'FileDeleted'
+  condition: selection_gateway_config and selection_write_actions
+falsepositives:
+  - Approved gateway reconfiguration under change control
+level: high

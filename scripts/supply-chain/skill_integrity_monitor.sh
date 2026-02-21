@@ -146,6 +146,21 @@ log() {
     echo "[$timestamp] [$level] $*" >> "$LOG_FILE"
 }
 
+escape_regex() {
+    local value=$1
+    printf '%s' "$value" | sed 's/[.[\*^$()+?{}|\\]/\\&/g'
+}
+
+is_valid_ere() {
+    local pattern=$1
+    grep -E -- "$pattern" /dev/null >/dev/null 2>&1
+    local status=$?
+    if [ $status -eq 2 ]; then
+        return 1
+    fi
+    return 0
+}
+
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
@@ -350,21 +365,123 @@ check_integrity() {
 
 verify_signature() {
     local manifest_file=$1
+    local signature_required="true"
+    local verify_pgp="true"
+
+    if [ -f "$POLICY_FILE" ]; then
+        signature_required=$(jq -r '.validation.signature.required // true' "$POLICY_FILE" 2>/dev/null || echo "true")
+        verify_pgp=$(jq -r '.validation.signature.verify_pgp // true' "$POLICY_FILE" 2>/dev/null || echo "true")
+    fi
 
     if ! jq -e '.signature' "$manifest_file" &>/dev/null; then
-        info "No signature present (optional)"
+        if [ "$signature_required" = "true" ]; then
+            error "No signature present but signature validation is required"
+            audit "SIGNATURE_MISSING" "Skill: $manifest_file"
+            return 1
+        fi
+
+        info "No signature present (optional mode)"
+        return 0
+    fi
+
+    if [ "$verify_pgp" != "true" ]; then
+        warning "PGP verification disabled by policy"
+        audit "SIGNATURE_BYPASS" "Skill: $manifest_file | verify_pgp=false"
         return 0
     fi
 
     info "Verifying signature..."
 
-    local signature=$(jq -r '.signature.value' "$manifest_file")
-    local public_key=$(jq -r '.signature.public_key' "$manifest_file")
+    if ! command -v gpg &>/dev/null; then
+        error "gpg is required for signature verification"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | gpg_missing=true"
+        return 1
+    fi
 
-    # TODO: Implement GPG signature verification
-    # This is a placeholder for actual signature verification
+    local signature_value=$(jq -r '.signature.value // empty' "$manifest_file")
+    local public_key=$(jq -r '.signature.public_key // empty' "$manifest_file")
+    local trusted_keys
+    trusted_keys=$(jq -r '.validation.signature.trusted_keys[]?' "$POLICY_FILE" 2>/dev/null || true)
 
-    success "Signature verification passed (stub)"
+    if [ -z "$signature_value" ]; then
+        error "Signature block present but signature.value is missing"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=missing_signature_value"
+        return 1
+    fi
+
+    if [ -z "$public_key" ]; then
+        error "Signature block present but signature.public_key is missing"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=missing_public_key"
+        return 1
+    fi
+
+    if [ -n "$trusted_keys" ]; then
+        local key_trusted="false"
+        while IFS= read -r trusted_key; do
+            if [ -n "$trusted_key" ] && [ "$public_key" = "$trusted_key" ]; then
+                key_trusted="true"
+                break
+            fi
+        done <<< "$trusted_keys"
+
+        if [ "$key_trusted" != "true" ]; then
+            error "Signing key is not in policy trusted_keys allowlist"
+            audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=untrusted_key"
+            return 1
+        fi
+    fi
+
+    local temp_sig temp_payload
+    temp_sig=$(mktemp)
+    temp_payload=$(mktemp)
+
+    if ! echo "$signature_value" | base64 --decode > "$temp_sig" 2>/dev/null; then
+        if ! echo "$signature_value" | base64 -d > "$temp_sig" 2>/dev/null; then
+            rm -f "$temp_sig" "$temp_payload"
+            error "Invalid signature encoding (expected base64)"
+            audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=invalid_base64"
+            return 1
+        fi
+    fi
+
+    if ! jq -c 'del(.signature)' "$manifest_file" > "$temp_payload" 2>/dev/null; then
+        rm -f "$temp_sig" "$temp_payload"
+        error "Failed to prepare canonical payload for signature verification"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=canonicalization_failed"
+        return 1
+    fi
+
+    if ! gpg --list-keys "$public_key" &>/dev/null; then
+        rm -f "$temp_sig" "$temp_payload"
+        error "Public key not found in GPG keyring: $public_key"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=key_not_found"
+        return 1
+    fi
+
+    if gpg --list-keys "$public_key" 2>&1 | grep -qi "revoked"; then
+        rm -f "$temp_sig" "$temp_payload"
+        error "Signing key is revoked: $public_key"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=key_revoked"
+        return 1
+    fi
+
+    local verify_ok="false"
+    if gpg --verify "$temp_sig" "$temp_payload" &>/dev/null; then
+        verify_ok="true"
+    elif gpg --verify "$temp_sig" "$manifest_file" &>/dev/null; then
+        verify_ok="true"
+    fi
+
+    rm -f "$temp_sig" "$temp_payload"
+
+    if [ "$verify_ok" != "true" ]; then
+        error "GPG signature verification failed"
+        audit "SIGNATURE_FAILURE" "Skill: $manifest_file | reason=verify_failed"
+        return 1
+    fi
+
+    success "Signature verification passed"
+    audit "SIGNATURE_OK" "Skill: $manifest_file | key=$public_key"
     return 0
 }
 
@@ -377,12 +494,31 @@ scan_dangerous_patterns() {
 
     info "Scanning for dangerous patterns..."
 
-    local patterns=$(jq -r '.patterns[].pattern' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    local patterns=$(jq -r '.patterns[].pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    local exceptions=$(jq -r '.exceptions[]? // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
     local found_issues=0
 
     while IFS= read -r pattern; do
         if [ -n "$pattern" ]; then
-            local matches=$(grep -r -E "$pattern" "$skill_dir" 2>/dev/null || true)
+            if ! is_valid_ere "$pattern"; then
+                warning "Skipping invalid regex pattern: $pattern"
+                audit "PATTERN_INVALID" "Pattern: $pattern"
+                continue
+            fi
+
+            local matches
+            matches=$(grep -r -E -- "$pattern" "$skill_dir" 2>/dev/null || true)
+
+            if [ -n "$exceptions" ] && [ -n "$matches" ]; then
+                while IFS= read -r exception; do
+                    if [ -n "$exception" ]; then
+                        local escaped_exception
+                        escaped_exception=$(escape_regex "$exception")
+                        matches=$(echo "$matches" | grep -E -v -- "\\b${escaped_exception}\\s*\\(" || true)
+                    fi
+                done <<< "$exceptions"
+            fi
+
             if [ -n "$matches" ]; then
                 warning "Dangerous pattern detected: $pattern"
                 echo "$matches" | head -5

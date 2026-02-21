@@ -231,7 +231,7 @@ services:
     cap_add: [NET_BIND_SERVICE]
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
     security_opt:
       - no-new-privileges:true
       - seccomp=./scripts/hardening/docker/seccomp-profiles/clawdbot.json

@@ -95,6 +95,16 @@ class PolicyValidator:
             return {}
 
 
+def validate_policy(policy_name):
+    """Module-level wrapper used by openclaw-cli."""
+    return PolicyValidator().validate_policy(policy_name)
+
+
+def validate_config(config_path):
+    """Module-level wrapper used by openclaw-cli."""
+    return PolicyValidator().validate_config(config_path)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate OpenClaw policy compliance")
     parser.add_argument("--policy", default="SEC-002", help="Policy to validate (default: SEC-002)")
