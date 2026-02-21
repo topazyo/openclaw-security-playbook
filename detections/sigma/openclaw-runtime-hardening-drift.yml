@@ -1,0 +1,38 @@
+title: OpenClaw Runtime Hardening Drift in Container Launch
+id: 7f2d6b43-9a23-4f1e-9309-4b53c1a6d202
+status: experimental
+description: >
+  Detects docker run invocations for OpenClaw/Clawdbot/Moltbot that omit
+  required hardening flags such as read-only rootfs, no-new-privileges,
+  non-root user, and cap-drop ALL.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-02-21
+tags:
+  - attack.defense_evasion
+  - attack.t1562.001
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_docker_run:
+    Image|endswith:
+      - '/docker'
+    CommandLine|contains|all:
+      - 'docker run'
+  selection_target_workload:
+    CommandLine|contains:
+      - 'openclaw'
+      - 'clawdbot'
+      - 'moltbot'
+  filter_hardened_flags:
+    CommandLine|contains|all:
+      - '--cap-drop ALL'
+      - '--read-only'
+      - '--user 1000:1000'
+      - '--security-opt no-new-privileges:true'
+  condition: selection_docker_run and selection_target_workload and not filter_hardened_flags
+falsepositives:
+  - Local development containers intentionally launched without hardening flags
+level: high

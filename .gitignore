@@ -52,3 +52,12 @@ VIBE Debt Inventory — Active Ledger.md
 VIBE Implementation Baseline — Phase 1.md
 VIBE Risk Register.md
 .gitkeep
+
+# Cycle 2 audit tracking files (do not sync to GitHub)
+AUDIT_ROADMAP_v2.md
+AUDIT_ROADMAP.md
+DEBT_INVENTORY_ACTIVE.md
+BATCH_EXECUTION_PLAN.md
+C2-*.md
+Cycle 2 Audit Roadmap.md
+Cycle 2 Batch Execution Plan.md

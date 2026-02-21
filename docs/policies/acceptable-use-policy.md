@@ -156,10 +156,10 @@ docker run -d --name clawdbot \
    --cap-drop ALL \
    --cap-add NET_BIND_SERVICE \
    --read-only \
-   --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
    --security-opt no-new-privileges:true \
    --security-opt seccomp=./scripts/hardening/docker/seccomp-profiles/clawdbot.json \
-   --cpus "2.0" --memory "4g" --pids-limit 100 \
+   --cpus "2.0" --memory "4g" --pids-limit=100 \
    openclaw/clawdbot:1.2.3@sha256:abc123...
 ```
 

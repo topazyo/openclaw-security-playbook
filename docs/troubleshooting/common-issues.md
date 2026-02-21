@@ -160,7 +160,7 @@ pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org clawdb
 **Symptom:**
 ```bash
 $ clawdbot start
-Error: Configuration file not found: /home/user/.openclaw/config/clawdbot.yml
+Error: Configuration file not found: /home/user/.openclaw/config/openclaw-agent.yml
 ```
 
 **Cause:** Configuration file missing or in wrong location
@@ -175,7 +175,7 @@ ls -la ~/.config/openclaw/
 mkdir -p ~/.openclaw/config
 
 # Copy example configuration
-cp /path/to/clawdbot/examples/clawdbot.yml ~/.openclaw/config/
+cp /path/to/clawdbot/examples/openclaw-agent.yml ~/.openclaw/config/
 
 # Or specify custom config location
 clawdbot start --config /path/to/custom/config.yml
@@ -194,7 +194,7 @@ $ clawdbot start
 Error: Invalid YAML syntax in configuration file:
   while parsing a block mapping
   expected <block end>, but found '<block mapping start>'
-  in "/home/user/.openclaw/config/clawdbot.yml", line 15, column 3
+  in "/home/user/.openclaw/config/openclaw-agent.yml", line 15, column 3
 ```
 
 **Cause:** YAML indentation or syntax error
@@ -202,7 +202,7 @@ Error: Invalid YAML syntax in configuration file:
 **Solution:**
 ```bash
 # Validate YAML syntax
-python3 -c "import yaml; yaml.safe_load(open('~/.openclaw/config/clawdbot.yml'))"
+python3 -c "import yaml; yaml.safe_load(open('~/.openclaw/config/openclaw-agent.yml'))"
 
 # Common YAML issues:
 # 1. Mixed tabs and spaces (use spaces only)
@@ -228,7 +228,7 @@ api_key: "sk-ant-abc:def"  # Quoted
 
 # Use YAML linter
 pip install yamllint
-yamllint ~/.openclaw/config/clawdbot.yml
+yamllint ~/.openclaw/config/openclaw-agent.yml
 ```
 
 ---
@@ -269,7 +269,7 @@ source ~/.openclaw/.env
 set +a
 
 # Or specify in configuration file
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 credentials:
   anthropic:
     api_key: "${ANTHROPIC_API_KEY}"
@@ -468,7 +468,7 @@ ping api.anthropic.com
 curl -I https://api.anthropic.com
 
 # Increase timeout in configuration
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 api:
   timeout: 60  # Increase from 30 to 60 seconds
   retry:
@@ -528,14 +528,14 @@ export SSL_CERT_FILE=/path/to/corporate-ca-bundle.crt
 export REQUESTS_CA_BUNDLE=/path/to/corporate-ca-bundle.crt
 
 # Or in ClawdBot configuration
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 api:
   verify_ssl: true
   ca_bundle: /path/to/ca-bundle.crt
 EOF
 
 # TEMPORARY WORKAROUND (NOT for production)
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 api:
   verify_ssl: false  # WARNING: Insecure
 EOF
@@ -562,7 +562,7 @@ Retry-After: 60
 # OpenAI: https://platform.openai.com/account/rate-limits
 
 # Configure rate limiting in ClawdBot
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 api:
   rate_limiting:
     enabled: true
@@ -573,7 +573,7 @@ api:
 EOF
 
 # Implement exponential backoff
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 api:
   retry:
     max_attempts: 5
@@ -670,7 +670,7 @@ clawdbot invoke --model claude-3-sonnet-20240229
 # Or request access to specific models
 
 # Configure fallback models
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 models:
   primary: "claude-3-opus-20240229"
   fallback:
@@ -701,7 +701,7 @@ ping api.anthropic.com
 traceroute api.anthropic.com
 
 # 2. Reduce context size
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 agent:
   max_context_tokens: 4096  # Reduce from default
   streaming: true  # Enable streaming for faster perceived response
@@ -711,7 +711,7 @@ EOF
 clawdbot invoke --model claude-3-haiku-20240307
 
 # 4. Enable caching (if supported)
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 caching:
   enabled: true
   ttl: 3600
@@ -745,7 +745,7 @@ ps aux | grep clawdbot
 free -h
 
 # Configure memory limits
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 performance:
   memory:
     max_heap_size: "2G"
@@ -754,7 +754,7 @@ performance:
 EOF
 
 # Clear context periodically
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 agent:
   context:
     max_history: 10  # Keep only last 10 messages
@@ -802,26 +802,26 @@ sudo py-spy record -o profile.svg --pid $(pgrep clawdbot)
 # Common fixes:
 
 # 1. Disable polling (use webhooks)
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 server:
   mode: "webhook"  # Instead of "polling"
 EOF
 
 # 2. Increase sleep intervals
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 agent:
   poll_interval: 1.0  # Increase from 0.1
 EOF
 
 # 3. Limit concurrent requests
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 server:
   max_concurrent_requests: 10
   worker_threads: 4
 EOF
 
 # 4. Enable async mode
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 server:
   async: true
   async_workers: 4
@@ -874,7 +874,7 @@ docker run -p 8443:8443 clawdbot/clawdbot:latest
 **Symptom:**
 ```bash
 $ docker run -v ~/.openclaw:/app/.openclaw clawdbot/clawdbot
-Error: Permission denied: '/app/.openclaw/config/clawdbot.yml'
+Error: Permission denied: '/app/.openclaw/config/openclaw-agent.yml'
 ```
 
 **Cause:** User ID mismatch between host and container
@@ -963,7 +963,7 @@ export HTTPS_PROXY="http://username:password@proxy.corp:3128"
 export NO_PROXY="localhost,127.0.0.1"
 
 # Or in configuration
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 proxy:
   http: "http://username:password@proxy.corp:3128"
   https: "http://username:password@proxy.corp:3128"
@@ -1044,7 +1044,7 @@ mkdir -p ~/.openclaw/logs
 chmod 755 ~/.openclaw/logs
 
 # Configure logging
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 logging:
   level: INFO
   format: json
@@ -1063,7 +1063,7 @@ clawdbot start --log-level DEBUG
 tail -f ~/.openclaw/logs/clawdbot.log
 
 # Enable all debug logging
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 logging:
   level: DEBUG
   loggers:
@@ -1088,7 +1088,7 @@ $ ls -lh ~/.openclaw/logs/clawdbot.log
 **Solution:**
 ```bash
 # Reduce log level
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 logging:
   level: INFO  # Change from DEBUG
 
@@ -1099,7 +1099,7 @@ logging:
 EOF
 
 # Enable log rotation
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 logging:
   rotation:
     enabled: true
@@ -1163,7 +1163,7 @@ rm -rf ~/.openclaw/backups/credentials/credentials_backup_*
 find ~/.openclaw -type f -size +100M -exec ls -lh {} \;
 
 # Configure storage limits
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 storage:
   cache:
     max_size: 1G
@@ -1243,7 +1243,7 @@ sudo swapon /swapfile
 /swapfile none swap sw 0 0
 
 # Configure memory limits
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 performance:
   memory:
     max_heap_size: "1G"
@@ -1298,7 +1298,7 @@ clawdbot start \
   --no-daemon
 
 # Enable request logging
-cat >> ~/.openclaw/config/clawdbot.yml << 'EOF'
+cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
 debugging:
   log_requests: true
   log_responses: true
@@ -1321,7 +1321,7 @@ python --version
 pip list | grep clawdbot
 
 # Configuration (sanitize sensitive data)
-cat ~/.openclaw/config/clawdbot.yml | grep -v api_key
+cat ~/.openclaw/config/openclaw-agent.yml | grep -v api_key
 
 # Recent logs
 tail -100 ~/.openclaw/logs/clawdbot.log

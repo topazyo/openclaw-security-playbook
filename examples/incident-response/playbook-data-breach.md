@@ -651,8 +651,11 @@ This playbook provides step-by-step procedures for responding to data breach inc
    docker run -d \
      --name agent-prod-19-restored \
      --cap-drop ALL \
+     --cap-add NET_BIND_SERVICE \
      --read-only \
-     --security-opt no-new-privileges \
+     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+     --security-opt no-new-privileges:true \
+     --pids-limit=100 \
      -e DLP_ENFORCEMENT_MODE=strict \
      -e DATA_CLASSIFICATION_CHECK=enabled \
      openclaw/agent:hardened-data-protection-v2

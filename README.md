@@ -150,8 +150,11 @@ openclaw-cli scan vulnerability --target production
 docker run -d \
   --name clawdbot-secure \
   --cap-drop ALL \
+  --cap-add NET_BIND_SERVICE \
   --read-only \
-  --security-opt no-new-privileges \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
+  --security-opt no-new-privileges:true \
+  --pids-limit=100 \
   -p 127.0.0.1:18789:18789 \
   -v ~/.openclaw/config:/app/config:ro \
   anthropic/clawdbot:latest

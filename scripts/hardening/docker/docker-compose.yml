@@ -62,9 +62,9 @@ services:
 
     # Temporary filesystems for writable directories
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
-      - /var/run:rw,noexec,nosuid,size=10m
-      - /var/cache:rw,noexec,nosuid,size=50m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
+      - /var/run:rw,noexec,nosuid,nodev,size=10m
+      - /var/cache:rw,noexec,nosuid,nodev,size=50m
 
     # Environment Variables
     environment:
@@ -179,8 +179,8 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=200m
-      - /var/run:rw,noexec,nosuid,size=10m
+      - /tmp:rw,noexec,nosuid,nodev,size=200m
+      - /var/run:rw,noexec,nosuid,nodev,size=10m
 
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -255,7 +255,7 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=50m
+      - /tmp:rw,noexec,nosuid,nodev,size=50m
 
     command: >
       redis-server
@@ -312,8 +312,8 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
-      - /run/postgresql:rw,noexec,nosuid,size=10m
+      - /tmp:rw,noexec,nosuid,nodev,size=100m
+      - /run/postgresql:rw,noexec,nosuid,nodev,size=10m
 
     environment:
       - POSTGRES_DB=clawdbot
@@ -373,7 +373,7 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=50m
+      - /tmp:rw,noexec,nosuid,nodev,size=50m
 
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -436,8 +436,8 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=50m
-      - /var/lib/grafana/plugins:rw,noexec,nosuid,size=100m
+      - /tmp:rw,noexec,nosuid,nodev,size=50m
+      - /var/lib/grafana/plugins:rw,noexec,nosuid,nodev,size=100m
 
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
@@ -504,7 +504,7 @@ services:
     read_only: true
 
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=500m
+      - /tmp:rw,noexec,nosuid,nodev,size=500m
 
     # Container-internal bind; no host port mapping
     command: ["server", "--listen", "0.0.0.0:8080"]

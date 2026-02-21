@@ -68,6 +68,12 @@ pip install pysigma-backend-microsoft365defender
 sigma convert -t microsoft365defender detections/sigma/openclaw-*.yml
 ```
 
+**Verify:** Expected output:
+```text
+Sigma conversion completes without parser errors.
+Generated output includes openclaw rule names for the selected backend.
+```
+
 ### Step 3: Deploy Behavioral Hunting
 
 Once openclaw-telemetry is running and forwarding to your SIEM:

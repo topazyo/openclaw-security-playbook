@@ -28,6 +28,19 @@ Requires openclaw-telemetry (Part 2, Layer 6) to be deployed and forwarding to S
 **Tier 3 — Kill Chain Detection:** Map observed activity to specific MITRE ATLAS attack chains.
 See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
 
+## Sigma Rules (Current)
+
+| Rule | Purpose | Tier |
+|------|---------|------|
+| `openclaw-credential-harvest.yml` | Agent reading sensitive credential paths | Tier 2 |
+| `openclaw-gateway-exposure.yml` | Gateway bound to network-wide interfaces | Tier 1 |
+| `openclaw-skill-child-process.yml` | Skill/runtime spawning shell or interpreter | Tier 2 |
+| `openclaw-soul-md-modification.yml` | SOUL.md persistence injection behaviors | Tier 3 |
+| `openclaw-supply-chain-drift.yml` | Changes to supply-chain policy files (`skills.yml`, allowlist, enforcement policy) | Tier 1 |
+| `openclaw-runtime-hardening-drift.yml` | Container launch missing required hardening flags | Tier 1 |
+| `openclaw-tls-downgrade.yml` | TLS version below 1.3 on OpenClaw control ports | Tier 1 |
+| `openclaw-gateway-config-drift.yml` | Gateway config file modifications (pre-exposure drift signal) | Tier 1 |
+
 ## Prerequisites
 
 - Tier 1 queries: EDR agent deployed on target endpoints, no additional tooling required

@@ -131,6 +131,33 @@
       "recommendation": "Use array arguments for spawn/execFile"
     },
     {
+      "id": "dynamic-import-js",
+      "name": "Dynamic import execution",
+      "pattern": "\\bimport\\s*\\(",
+      "severity": "high",
+      "description": "Dynamic imports can be abused for runtime code loading",
+      "languages": ["javascript"],
+      "recommendation": "Restrict imports to static allowlisted modules"
+    },
+    {
+      "id": "reflective-invocation-js",
+      "name": "Reflective invocation",
+      "pattern": "\\bReflect\\s*\\.\\s*(apply|construct)\\s*\\(",
+      "severity": "high",
+      "description": "Reflective invocation can hide indirect execution flows",
+      "languages": ["javascript"],
+      "recommendation": "Disallow reflective execution for untrusted inputs"
+    },
+    {
+      "id": "indirect-global-call-js",
+      "name": "Indirect global invocation",
+      "pattern": "\\b(globalThis|window|self)\\s*\\[",
+      "severity": "high",
+      "description": "Bracket access on global objects can bypass direct call filters",
+      "languages": ["javascript"],
+      "recommendation": "Use direct, allowlisted function references"
+    },
+    {
       "id": "prototype-pollution",
       "name": "Prototype pollution",
       "pattern": "__proto__|constructor\\[\"prototype\"\\]",
@@ -177,5 +204,7 @@
       "description": "Direct IP connections bypass DNS-based security",
       "recommendation": "Use domain names instead of IP addresses"
     }
-  ]
+  ],
+
+  "exceptions": []
 }

@@ -1,0 +1,35 @@
+title: OpenClaw Supply Chain Policy Drift
+id: e3a7d8ac-5f2f-4f6f-9b1e-2a4c6ef9b101
+status: experimental
+description: >
+  Detects modifications to OpenClaw supply-chain policy files controlling
+  signature requirements and skill installation/update behavior.
+  Changes to these files may enable unsigned or untrusted skills.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-02-21
+tags:
+  - attack.persistence
+  - attack.t1553
+  - attack.t1195.002
+logsource:
+  category: file_access
+  product: linux
+detection:
+  selection_policy_files:
+    TargetFilename|endswith:
+      - '/config/skills.yml'
+      - '/skill-policies/allowlist.json'
+      - '/skill-policies/dangerous-patterns.json'
+      - '/skill-policies/enforcement-policy.json'
+  selection_write_actions:
+    EventType:
+      - 'FileModified'
+      - 'FileCreated'
+      - 'FileRenamed'
+      - 'FileDeleted'
+  condition: selection_policy_files and selection_write_actions
+falsepositives:
+  - Approved change-management updates to policy files
+level: critical

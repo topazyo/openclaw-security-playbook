@@ -73,6 +73,11 @@ class CertificateManager:
         return certs
 
 
+def list_certificates():
+    """Module-level wrapper used by openclaw-cli."""
+    return CertificateManager().list_certificates()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manage OpenClaw TLS certificates")
     parser.add_argument(

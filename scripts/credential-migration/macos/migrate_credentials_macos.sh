@@ -408,6 +408,15 @@ migrate_credential_to_keychain() {
         -A  # Allow access by all applications
 
     if [ $? -eq 0 ]; then
+        local stored_value=""
+        stored_value=$(security find-generic-password -s "$service" -a "$account" -w 2>/dev/null || true)
+
+        if [ "$stored_value" != "$password" ]; then
+            error "Keychain write verification failed: $service"
+            echo "FAILED|$service|$source" >> "$MIGRATION_REPORT"
+            return 1
+        fi
+
         success "Migrated: $service"
         echo "SUCCESS|$service|$source" >> "$MIGRATION_REPORT"
         return 0

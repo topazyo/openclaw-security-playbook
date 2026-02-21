@@ -29,6 +29,7 @@ Installation:
 import click
 import json
 import sys
+import importlib.util
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -39,6 +40,41 @@ except ModuleNotFoundError:
         rendered = [" | ".join(headers)]
         rendered.extend(" | ".join(str(cell) for cell in row) for row in rows)
         return "\n".join(rendered)
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TOOLS_DIR = Path(__file__).resolve().parent
+
+
+def _load_tool_module(filename: str, module_name: str):
+    module_path = (TOOLS_DIR / filename).resolve()
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load module: {filename}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _validate_output_path(output_path: str) -> Path:
+    path = Path(output_path).expanduser().resolve()
+
+    blocked_roots = [Path("/etc"), Path("/usr"), Path("/bin"), Path("/sbin"), Path("/var")]
+    blocked_roots.extend([
+        Path("C:/Windows"),
+        Path("C:/Program Files"),
+        Path("C:/Program Files (x86)"),
+    ])
+
+    for blocked in blocked_roots:
+        if blocked in path.parents or path == blocked:
+            raise click.ClickException(f"Cannot write to system directory: {path}")
+
+    config_root = (REPO_ROOT / "configs").resolve()
+    if config_root in path.parents:
+        raise click.ClickException(f"Refusing to overwrite configuration files: {path}")
+
+    return path
 
 
 # ============================================================================
@@ -114,13 +150,16 @@ def vulnerability(ctx, target, output):
         
         # Save to file if specified
         if output:
-            with open(output, "w") as f:
+            safe_output = _validate_output_path(output)
+            safe_output.parent.mkdir(parents=True, exist_ok=True)
+            with open(safe_output, "w", encoding="utf-8") as f:
                 json.dump(all_vulns, f, indent=2)
-            click.echo(f"\n[✓] Results saved to {output}")
+            click.echo(f"\n[✓] Results saved to {safe_output}")
     else:
         click.echo("[✓] No vulnerabilities found!")
     
-    return 0 if len(critical) == 0 else 1
+    if len(critical) != 0:
+        ctx.exit(1)
 
 
 @scan.command()
@@ -130,8 +169,7 @@ def compliance(ctx, policy):
     """Check compliance with security policies."""
     click.echo(f"[*] Checking compliance with {policy}...")
     
-    from tools import policy_validator
-    
+    policy_validator = _load_tool_module("policy-validator.py", "policy_validator")
     result = policy_validator.validate_policy(policy)
     
     if result["compliant"]:
@@ -142,7 +180,8 @@ def compliance(ctx, policy):
         for violation in result["violations"]:
             click.echo(f"  - {violation}")
     
-    return 0 if result["compliant"] else 1
+    if not result["compliant"]:
+        ctx.exit(1)
 
 
 @scan.command()
@@ -172,6 +211,31 @@ def access(ctx, days):
             click.echo(f"  - {user['username']} (last active: {user['last_active']})")
 
 
+@scan.command(name="certificates")
+@click.option("--output", type=click.Path(), help="Optional output file path")
+@click.pass_context
+def certificates(ctx, output):
+    """Review TLS certificate expiry status."""
+    certificate_manager = _load_tool_module("certificate-manager.py", "certificate_manager")
+    certs = certificate_manager.list_certificates()
+
+    if not certs:
+        click.echo("[!] No certificates found under /etc/openclaw/tls")
+    else:
+        rows = [
+            [c["cert_path"], c["days_until_expiry"], "YES" if c["needs_renewal"] else "NO"]
+            for c in certs
+        ]
+        click.echo(tabulate(rows, headers=["Certificate", "Days Until Expiry", "Needs Renewal"]))
+
+    if output:
+        safe_output = _validate_output_path(output)
+        safe_output.parent.mkdir(parents=True, exist_ok=True)
+        with open(safe_output, "w", encoding="utf-8") as f:
+            json.dump(certs, f, indent=2)
+        click.echo(f"\n[✓] Results saved to {safe_output}")
+
+
 # ============================================================================
 # PLAYBOOK COMMANDS
 # ============================================================================
@@ -199,7 +263,7 @@ def execute(ctx, playbook_id, severity, dry_run):
     
     if not playbook_path.exists():
         click.secho(f"[✗] Playbook not found: {playbook_path}", fg="red")
-        return 1
+        ctx.exit(1)
     
     # Execute phases
     phases = ["Detection", "Containment", "Eradication", "Recovery", "PIR"]
@@ -219,7 +283,6 @@ def execute(ctx, playbook_id, severity, dry_run):
             click.echo(f"    [DRY RUN] Would execute {phase} phase")
     
     click.secho(f"\n[✓] Playbook {playbook_id} executed successfully", fg="green")
-    return 0
 
 
 @playbook.command()
@@ -273,10 +336,10 @@ def weekly(ctx, start, end, output):
     click.echo(f"  - Patching velocity: {report_data['patching_velocity']}%")
     
     if output:
-        generate_weekly_report.export_pdf(report_data, output)
-        click.echo(f"\n[✓] Report saved to {output}")
-    
-    return 0
+        safe_output = _validate_output_path(output)
+        safe_output.parent.mkdir(parents=True, exist_ok=True)
+        generate_weekly_report.export_pdf(report_data, str(safe_output))
+        click.echo(f"\n[✓] Report saved to {safe_output}")
 
 
 @report.command()
@@ -287,8 +350,7 @@ def compliance(ctx, framework, output):
     """Generate compliance report."""
     click.echo(f"[*] Generating {framework} compliance report...")
     
-    from tools import compliance_reporter
-    
+    compliance_reporter = _load_tool_module("compliance-reporter.py", "compliance_reporter")
     report = compliance_reporter.generate_report(framework=framework)
     
     # Display control status
@@ -298,9 +360,11 @@ def compliance(ctx, framework, output):
     click.echo(f"  - Compliance: {report['compliance_percentage']}%")
     
     if output:
-        with open(output, "w") as f:
+        safe_output = _validate_output_path(output)
+        safe_output.parent.mkdir(parents=True, exist_ok=True)
+        with open(safe_output, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
-        click.echo(f"\n[✓] Report saved to {output}")
+        click.echo(f"\n[✓] Report saved to {safe_output}")
 
 
 # ============================================================================
@@ -320,8 +384,7 @@ def validate(ctx, config_file):
     """Validate configuration file."""
     click.echo(f"[*] Validating {config_file}...")
     
-    from tools import policy_validator
-    
+    policy_validator = _load_tool_module("policy-validator.py", "policy_validator")
     result = policy_validator.validate_config(config_file)
     
     if result["valid"]:
@@ -332,7 +395,8 @@ def validate(ctx, config_file):
         for error in result["errors"]:
             click.echo(f"  - {error}")
     
-    return 0 if result["valid"] else 1
+    if not result["valid"]:
+        ctx.exit(1)
 
 
 @config.command()
@@ -344,8 +408,7 @@ def migrate(ctx, config_file, from_version, to_version):
     """Migrate configuration between versions."""
     click.echo(f"[*] Migrating {config_file} from {from_version} to {to_version}...")
     
-    from tools import config_migrator
-    
+    config_migrator = _load_tool_module("config-migrator.py", "config_migrator")
     result = config_migrator.migrate(config_file, from_version, to_version)
     
     if result["success"]:
@@ -354,6 +417,7 @@ def migrate(ctx, config_file, from_version, to_version):
         click.echo(f"  - Migrated: {result['output_path']}")
     else:
         click.secho(f"[✗] Migration failed: {result['error']}", fg="red")
+        ctx.exit(1)
 
 
 # ============================================================================
@@ -374,8 +438,7 @@ def incident(ctx, type, severity):
     """Simulate security incident."""
     click.echo(f"[*] Simulating {type} incident (severity: {severity})...")
     
-    from tools import incident_simulator
-    
+    incident_simulator = _load_tool_module("incident-simulator.py", "incident_simulator")
     incident_data = incident_simulator.create_incident(
         incident_type=type,
         severity=severity,

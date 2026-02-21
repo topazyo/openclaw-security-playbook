@@ -40,11 +40,23 @@ See: docs/guides/07-community-tools-integration.md
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+
+try:
+    import fcntl
+except ModuleNotFoundError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ModuleNotFoundError:
+    msvcrt = None
 
 
 class SkillManifest:
@@ -73,6 +85,21 @@ class SkillManifest:
             "pattern": r"\bFunction\s*\(",
             "severity": "HIGH",
             "description": "Dynamic function creation"
+        },
+        {
+            "pattern": r"\bimport\s*\(",
+            "severity": "HIGH",
+            "description": "Dynamic module import execution"
+        },
+        {
+            "pattern": r"\bReflect\s*\.\s*(apply|construct)\s*\(",
+            "severity": "HIGH",
+            "description": "Indirect reflective code invocation"
+        },
+        {
+            "pattern": r"\b(globalThis|window|self)\s*\[",
+            "severity": "HIGH",
+            "description": "Indirect global-object invocation"
         },
         {
             "pattern": r"\.innerHTML\s*=",
@@ -225,8 +252,26 @@ class SkillManifest:
         sha256 = hashlib.sha256()
 
         with open(file_path, 'rb') as f:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                elif msvcrt is not None:
+                    size = max(1, os.path.getsize(file_path))
+                    msvcrt.locking(f.fileno(), msvcrt.LK_RLCK, size)
+            except OSError:
+                pass
+
             for chunk in iter(lambda: f.read(4096), b""):
                 sha256.update(chunk)
+
+            try:
+                if fcntl is not None:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                elif msvcrt is not None:
+                    size = max(1, os.path.getsize(file_path))
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, size)
+            except OSError:
+                pass
 
         return sha256.hexdigest()
 
@@ -262,10 +307,13 @@ class SkillManifest:
 
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+                content = unicodedata.normalize("NFKC", f.read())
 
                 for pattern_def in self.DANGEROUS_PATTERNS:
-                    matches = re.finditer(pattern_def["pattern"], content, re.IGNORECASE)
+                    try:
+                        matches = re.finditer(pattern_def["pattern"], content, re.IGNORECASE)
+                    except re.error:
+                        continue
 
                     for match in matches:
                         # Find line number
@@ -394,7 +442,7 @@ For runtime security enforcement, see:
 
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

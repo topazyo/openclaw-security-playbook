@@ -49,6 +49,11 @@ class IncidentSimulator:
         }
 
 
+def create_incident(incident_type, severity="P1"):
+    """Module-level wrapper used by openclaw-cli."""
+    return IncidentSimulator().create_incident(incident_type, severity)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulate OpenClaw security incidents")
     parser.add_argument(

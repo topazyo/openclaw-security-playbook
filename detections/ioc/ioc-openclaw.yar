@@ -50,10 +50,15 @@ rule OpenClaw_Skill_Dangerous_Patterns
         $exec_call   = "exec("         ascii
         $child_proc  = "child_process" ascii
         $base64_exec = /[A-Za-z0-9+\/]{40,}={0,2}/ ascii
-        $fetch_ext   = /https?:\/\/(?!openclaw\.ai|molt\.bot|clawd\.bot|anthropic\.com|openai\.com)/ ascii
+        $fetch_url   = /https?:\/\/[A-Za-z0-9.-]+/ ascii
+        $trusted1    = "openclaw.ai" ascii nocase
+        $trusted2    = "molt.bot" ascii nocase
+        $trusted3    = "clawd.bot" ascii nocase
+        $trusted4    = "anthropic.com" ascii nocase
+        $trusted5    = "openai.com" ascii nocase
 
     condition:
-        (any of ($eval, $inner_html, $exec_call, $child_proc)) and $fetch_ext
+        ((any of ($eval, $inner_html, $exec_call, $child_proc)) and $fetch_url and not any of ($trusted*)) or $base64_exec
 }
 
 rule OpenClaw_SOUL_Injection_Persistence
@@ -94,14 +99,24 @@ rule OpenClaw_Gateway_Exposed_Config
         reference   = "BrandDefense: 1,200+ exposed instances on port 18789"
         severity    = "CRITICAL"
         file_types  = "config.yml"
+        evasion_notes = "Includes IPv4/IPv6 wildcard and star/empty bind variants"
 
     strings:
         $bind_all1   = "address: \"0.0.0.0\""  ascii
         $bind_all2   = "address: '0.0.0.0'"    ascii
         $bind_all3   = "bind: 0.0.0.0"           ascii
+        $bind_all4   = "address: \"::\""       ascii
+        $bind_all5   = "address: '::'"         ascii
+        $bind_all6   = "bind: ::"                ascii
+        $bind_all7   = "address: \"[::]\""     ascii
+        $bind_all8   = "address: '[::]'"       ascii
+        $bind_all9   = "address: \"*\""        ascii
+        $bind_all10  = "address: '*'"          ascii
+        $bind_all11  = "address: \"\""         ascii
+        $bind_all12  = "bind: *"                 ascii
         $port        = "18789"                    ascii
         $autoapprove = "autoApprove: true"        ascii
 
     condition:
-        $port and (any of ($bind_all1, $bind_all2, $bind_all3) or $autoapprove)
+        $port and (any of ($bind_all*) or $autoapprove)
 }

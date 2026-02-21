@@ -302,7 +302,7 @@ tools:
         - "no-new-privileges:true"
         - "seccomp=scripts/hardening/docker/seccomp-profiles/default.json"
       tmpfs:
-        - "/tmp:rw,noexec,nosuid,size=100m"
+        - "/tmp:rw,noexec,nosuid,nodev,size=100m"
 
   confirmation:
     enabled: true

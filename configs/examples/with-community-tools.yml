@@ -130,7 +130,7 @@ container:
   tmpfs:
     - mount: "/tmp"
       size: "100m"
-      mode: "rw,noexec,nosuid"
+      mode: "rw,noexec,nosuid,nodev"
 
   # Network isolation
   network:
