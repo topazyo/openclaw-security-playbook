@@ -1,6 +1,6 @@
-# OpenClaw Agent Configuration
+﻿# OpenClaw Agent Configuration
 # Reference configuration template for openclaw-shield agent deployment
-# 
+#
 # Usage: openclaw-agent --config openclaw-agent.yml --env production
 #        (loads environment-specific overrides from environment-overrides.yml)
 #
@@ -23,7 +23,7 @@ agent:
   name: "openclaw-agent-prod"
   version: "2.1.0"
   environment: "production"  # Values: development, staging, production
-  
+
   # Agent capabilities and resource limits
   capabilities:
     max_concurrent_tasks: 10
@@ -34,22 +34,22 @@ agent:
 # Security Controls
 # SOC 2 CC6.1, ISO 27001 A.8.25 (Secure development lifecycle)
 security_controls:
-  
+
   # Input Validation
   # Protects against prompt injection, XSS, SQL injection, path traversal
   # References: examples/security-controls/input-validation.py
   input_validation:
     enabled: true
-    
+
     # Maximum payload size to prevent DoS
     max_payload_size_mb: 10
-    
+
     # Allowed content types for request payloads
     allowed_content_types:
       - "application/json"
       - "text/plain"
       - "text/markdown"
-    
+
     # Sanitization rules applied to all inputs
     # Patterns defined in configs/skill-policies/dangerous-patterns.json
     sanitization_rules:
@@ -58,55 +58,55 @@ security_controls:
       - "path_traversal"   # Directory traversal prevention
       - "command_injection" # OS command injection prevention
       - "nosql_injection"  # NoSQL injection prevention
-    
+
     # Character encoding normalization
     unicode_normalization: "NFC"  # Unicode Normalization Form C
-    
+
     # Maximum nesting depth for JSON/YAML
     max_nesting_depth: 10
-    
+
     # Reject inputs with null bytes
     reject_null_bytes: true
-  
+
   # Rate Limiting
   # SOC 2 CC6.1, ISO 27001 A.8.27 (Secure system architecture and engineering principles)
   # References: examples/security-controls/rate-limiting.py
   rate_limiting:
     enabled: true
-    
+
     # Token bucket algorithm parameters
     algorithm: "token_bucket"
-    
+
     # Global rate limits
     requests_per_minute: 100
     burst_size: 20  # Additional requests allowed in burst
-    
+
     # Redis for distributed rate limiting across multiple agents
     redis_url: ${REDIS_URL}
     redis_db: 0
     redis_key_prefix: "openclaw:ratelimit:"
-    
+
     # Per-user rate limits (stricter than global)
     per_user_limits:
       requests_per_minute: 50
       burst_size: 10
-    
+
     # Per-IP rate limits (prevent abuse from single source)
     per_ip_limits:
       requests_per_minute: 200
       burst_size: 40
-    
+
     # Rate limit response
     http_status_code: 429  # Too Many Requests
     retry_after_seconds: 60
-  
+
   # Authentication & Authorization
   # SOC 2 CC6.2, ISO 27001 A.5.16 (Identity management)
   # References: examples/security-controls/authentication.py
   authentication:
     # Supported methods: mTLS, OAuth2, API_Key
     method: "mTLS"
-    
+
     # Mutual TLS configuration
     mtls:
       enabled: true
@@ -115,7 +115,7 @@ security_controls:
       verify_depth: 3
       crl_check: true
       crl_url: "https://ca.openclaw.ai/crl"
-    
+
     # OAuth2 configuration (if method: OAuth2)
     oauth2:
       enabled: false
@@ -127,47 +127,47 @@ security_controls:
       jwks_uri: "https://auth.openclaw.ai/.well-known/jwks.json"
       audience: "openclaw-mcp"
       scopes: ["openid", "profile", "email"]
-    
+
     # API Key configuration (if method: API_Key)
     api_key:
       enabled: false
       header_name: "X-OpenClaw-API-Key"
       key_prefix: "oc_"
       min_key_length: 32
-    
+
     # Token/session settings
     token_expiry_seconds: 3600  # 1 hour
     refresh_token_expiry_seconds: 86400  # 24 hours
     token_cache_enabled: true
     token_cache_ttl_seconds: 300  # 5 minutes
-    
+
     # Multi-factor authentication
     mfa_required: true
     mfa_providers:
       - "totp"      # Time-based One-Time Password
       - "webauthn"  # WebAuthn/FIDO2
     mfa_grace_period_days: 7  # Days to enroll MFA for new users
-    
+
     # Session management
     max_concurrent_sessions: 3
     session_timeout_seconds: 3600
     idle_timeout_seconds: 1800  # 30 minutes
-  
+
   # Authorization (RBAC)
   # SOC 2 CC6.3, ISO 27001 A.5.18 (Access rights)
   authorization:
     enabled: true
     rbac_enabled: true
-    
+
     # Default role for unauthenticated users
     default_role: "guest"
-    
+
     # Admin roles with elevated privileges
     admin_roles:
       - "admin"
       - "security-ops"
       - "incident-response"
-    
+
     # Role-based permissions
     # Permissions: read, write, delete, execute, admin
     permissions:
@@ -186,50 +186,50 @@ security_controls:
         - "execute"
         - "delete"
         - "admin"
-  
+
   # Encryption
   # SOC 2 CC6.1, ISO 27001 A.8.24 (Use of cryptography)
   # References: examples/security-controls/encryption.py
   encryption:
     # Encryption algorithm for data at rest
     algorithm: "AES-256-GCM"
-    
+
     # Key management via HashiCorp Vault
     vault_url: ${VAULT_ADDR}
     vault_token: ${VAULT_TOKEN}
     vault_path: "secret/openclaw/agent/encryption_keys"
-    
+
     # Key rotation schedule (days)
     key_rotation_days: 90
-    
+
     # Encrypt sensitive data in logs/storage
     encrypt_pii: true
     encrypt_credentials: true
     encrypt_conversation_history: true
-    
+
     # TLS for data in transit
     tls_enabled: true
     tls_min_version: "1.3"
     tls_ciphersuites:
       - "TLS_AES_256_GCM_SHA384"
       - "TLS_CHACHA20_POLY1305_SHA256"
-  
+
   # Logging & Audit
   # SOC 2 CC7.2, ISO 27001 A.8.15 (Logging)
   # References: examples/security-controls/logging.py
   logging:
     # Log format (json for ECS compatibility)
     format: "json"
-    
+
     # Log level (DEBUG, INFO, WARN, ERROR, CRITICAL)
     level: "INFO"
-    
+
     # Log retention (7 years for SOC 2 Type II)
     retention_days: 2555
-    
+
     # Elasticsearch index pattern
     index_pattern: "openclaw-logs-*"
-    
+
     # Fields to log
     log_fields:
       - "timestamp"
@@ -242,7 +242,7 @@ security_controls:
       - "resource"
       - "outcome"
       - "duration_ms"
-    
+
     # PII redaction (replace sensitive data)
     redact_pii: true
     redact_patterns:
@@ -251,11 +251,11 @@ security_controls:
       - "email"        # Email addresses
       - "api_key"      # API keys
       - "password"     # Passwords
-    
+
     # Tamper-evident logging (SHA-256 hash chains)
     tamper_evident: true
     hash_algorithm: "SHA-256"
-    
+
     # Log security events
     log_authentication: true
     log_authorization: true
@@ -270,7 +270,7 @@ mcp_server:
   # Server connection
   host: ${MCP_SERVER_HOST}
   port: ${MCP_SERVER_PORT:-8443}
-  
+
   # TLS configuration
   tls_config:
     enabled: true
@@ -280,19 +280,19 @@ mcp_server:
     client_key_path: "/etc/openclaw/agent.key"
     min_version: "1.3"
     max_version: "1.3"
-  
+
   # API version
   api_version: "v1"
-  
+
   # Connection timeouts
   connect_timeout_seconds: 10
   request_timeout_seconds: 30
-  
+
   # Connection pooling
   max_connections: 100
   keepalive_enabled: true
   keepalive_interval_seconds: 60
-  
+
   # Retry configuration
   retry_enabled: true
   retry_max_attempts: 3
@@ -307,22 +307,22 @@ monitoring:
     username: ${ELASTICSEARCH_USERNAME}
     password: ${ELASTICSEARCH_PASSWORD}
     index_prefix: "openclaw-logs-"
-    
+
     # Bulk indexing settings
     bulk_size: 100
     bulk_flush_interval_seconds: 5
-    
+
     # TLS configuration
     tls_enabled: true
     verify_certs: true
     ca_cert_path: "/etc/openclaw/ca.crt"
-  
+
   # Prometheus metrics
   prometheus:
     enabled: true
     port: ${PROMETHEUS_PORT:-9090}
     path: "/metrics"
-    
+
     # Metrics to expose
     metrics:
       - "http_requests_total"
@@ -334,14 +334,14 @@ monitoring:
       - "rate_limit_exceeded_total"
       - "encryption_operations_total"
       - "encryption_operation_duration_seconds"
-  
+
   # Health checks
   health_check:
     enabled: true
     port: 8080
     path: "/health"
     interval_seconds: 30
-  
+
   # Tracing (OpenTelemetry)
   tracing:
     enabled: false
@@ -361,7 +361,7 @@ compliance:
     - "CC7.1"  # Threat detection and monitoring
     - "CC7.2"  # Event logging and analysis
     - "CC7.3"  # Incident response
-  
+
   # ISO 27001:2022 compliance
   iso27001_enabled: true
   iso27001_controls:
@@ -371,7 +371,7 @@ compliance:
     - "A.8.15"  # Logging
     - "A.8.25"  # Secure development lifecycle
     - "A.5.25"  # Assessment and decision on information security events
-  
+
   # GDPR compliance
   gdpr_enabled: true
   gdpr_settings:
@@ -380,7 +380,7 @@ compliance:
     data_portability: true
     breach_notification_hours: 72  # Article 33
     consent_required: true
-  
+
   # PCI DSS compliance (if processing payment data)
   pci_dss_enabled: false
   pci_dss_controls:
@@ -397,18 +397,18 @@ skills:
   auto_install: false
   auto_update: false
   require_signature: true
-  
+
   # Skill permissions (allowlist approach)
   allowlist_path: "configs/skill-policies/allowlist.json"
-  
+
   # Dangerous pattern detection
   dangerous_patterns_path: "configs/skill-policies/dangerous-patterns.json"
-  
+
   # Skill execution limits
   max_execution_time_seconds: 60
   max_memory_mb: 512
   max_cpu_percent: 50
-  
+
   # Network access restrictions
   network_restrictions:
     allow_outbound: false
@@ -419,7 +419,7 @@ skills:
       - 22    # SSH
       - 3306  # MySQL
       - 5432  # PostgreSQL
-  
+
   # File system restrictions
   filesystem_restrictions:
     read_only: true
@@ -435,15 +435,15 @@ skills:
 # SOC 2 CC9.1, ISO 27001 A.8.13 (Information backup)
 backup:
   enabled: true
-  
+
   # Backup schedule (cron format)
   schedule: "0 2 * * *"  # Daily 2 AM UTC
-  
+
   # Backup retention
   retention_daily: 7
   retention_weekly: 4
   retention_monthly: 12
-  
+
   # Backup storage
   storage:
     type: "s3"
@@ -451,11 +451,11 @@ backup:
     region: "us-east-1"
     encryption: "AES256"
     storage_class: "GLACIER"
-  
+
   # Backup verification
   verify_backups: true
   verify_schedule: "0 3 * * 0"  # Weekly Sunday 3 AM UTC
-  
+
   # Recovery objectives
   rto_hours: 4   # Recovery Time Objective
   rpo_minutes: 15  # Recovery Point Objective
@@ -465,7 +465,7 @@ backup:
 feature_flags:
   experimental_features_enabled: false
   beta_features_enabled: false
-  
+
   # Circuit breakers for external dependencies
   circuit_breaker:
     enabled: true

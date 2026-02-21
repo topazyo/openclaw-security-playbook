@@ -125,11 +125,11 @@ tls:
         enabled: true
         responder_url: "http://ocsp.company.com"  # <PLACEHOLDER>
 
-    # Additional certificates (SNI support)
-    #   - cert_file: "/etc/clawdbot/ssl/gateway-alt.crt"
-    #     key_file: "/etc/clawdbot/ssl/gateway-alt.key"
-    #     domains:
-    #       - "clawdbot-alt.company.internal"
+  # Additional certificates (SNI support)
+  #   - cert_file: "/etc/clawdbot/ssl/gateway-alt.crt"
+  #     key_file: "/etc/clawdbot/ssl/gateway-alt.key"
+  #     domains:
+  #       - "clawdbot-alt.company.internal"
 
   # Cipher suites (prioritized order)
   cipher_suites:
@@ -320,10 +320,10 @@ authentication:
         dsn: "postgresql://user:pass@localhost/clawdbot"  # <PLACEHOLDER>
         table: "api_keys"
 
-      # OR: File storage
-      #   file:
-      #     path: "~/.openclaw/config/api_keys.yml"
-      #     format: "yaml"  # yaml, json
+    # OR: File storage
+    #   file:
+    #     path: "~/.openclaw/config/api_keys.yml"
+    #     format: "yaml"  # yaml, json
 
     # Key metadata
     metadata:
@@ -1380,11 +1380,11 @@ ip_filtering:
       - "KP"  # North Korea
       - "IR"  # Iran
 
-    # OR: Allowed countries
-    #   allowed_countries:
-    #     - "US"
-    #     - "CA"
-    #     - "GB"
+# OR: Allowed countries
+#   allowed_countries:
+#     - "US"
+#     - "CA"
+#     - "GB"
 
 # ============================================================================
 # SESSION MANAGEMENT
