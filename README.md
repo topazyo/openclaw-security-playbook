@@ -139,8 +139,7 @@ openclaw-cli scan vulnerability --target production
 
 # 6. Deploy with Docker (hardened)
 docker run -d \
-
-...existing code...
+```
 
 ---
 
