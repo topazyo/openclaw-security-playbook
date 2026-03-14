@@ -148,66 +148,59 @@ openclaw-cli scan vulnerability --target production
 
 # 6. Deploy with Docker (hardened)
 docker run -d \
-  --name clawdbot-secure \
-  --cap-drop ALL \
-  --cap-add NET_BIND_SERVICE \
-  --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
-  --security-opt no-new-privileges:true \
-  --pids-limit=100 \
-  -p 127.0.0.1:18789:18789 \
-  -v ~/.openclaw/config:/app/config:ro \
-  anthropic/clawdbot:latest
 
-# 7. Verify security posture
-./scripts/verification/verify_openclaw_security.sh --deployed
-```
+  ## 📦 What's Included
 
-**✅ You now have a secured AI agent!**
+  This playbook provides a **comprehensive, production-ready security framework** for AI agents, with 110+ files and full scenario-to-detection coverage:
 
-For detailed instructions, see: **[Quick Start Guide →](docs/guides/01-quick-start.md)**
+  ### 📚 Documentation & Threat Modeling
+  - **Guides & Checklists:** Complete implementation guides, onboarding, security review, and production checklists (see `docs/guides/`, `docs/checklists/`)
+  - **Policies & Procedures:** Data classification, vulnerability management, access control, incident response, and operational policies (`docs/policies/`, `docs/procedures/`, `configs/organization-policies/`)
+  - **Threat Model:** MITRE ATLAS mapping, kill chains, and scenario cross-references (`docs/threat-model/`)
 
----
+  ### 💻 Implementation Examples & Scenarios
+  - **Security Controls:** Python implementations for authentication, input validation, encryption, logging, rate limiting, backup verification, and vulnerability scanning (`examples/security-controls/`)
+  - **Incident Response:** Playbooks for credential theft, data breach, DoS, prompt injection, skill compromise, and reporting templates (`examples/incident-response/`)
+  - **Monitoring:** Grafana dashboards, Prometheus/Alertmanager configs, alert rules, and executive/IR dashboards (`examples/monitoring/`, `configs/monitoring-config/`)
+  - **Attack Scenarios:** Seven mapped adversary scenarios with replay and detection validation (`examples/scenarios/`)
 
-## 📚 Documentation
+  ### 🔍 Detection Rules & Coverage
+  - **Sigma Rules:** 12+ platform-agnostic rules for credential harvest, gateway exposure, skill child process, SOUL.md modification, supply chain drift, TLS downgrade, impersonation, path traversal, RAG poisoning, and more (`detections/sigma/`)
+  - **KQL (MDE):** Discovery, behavioral hunting, and kill chain detection for Microsoft Defender for Endpoint (`detections/edr/mde/`)
+  - **Splunk SPL:** Discovery and behavioral hunting queries (`detections/siem/splunk/`)
+  - **YARA/IOC:** Indicators for credential exfiltration, malicious skills, SOUL.md injection (`detections/ioc/`)
+  - **Replay Validation:** Detection replay and regression workflows for hosted and local runners (`.github/workflows/detection-replay-validation.yml`)
 
-### 🎯 Security Guides (Complete Implementation)
+  ### 🤖 Automation Scripts & Tools
+  - **Discovery & Verification:** OS vulnerability scanning, dependency checking, IoC scanning, security posture assessment (`scripts/discovery/`, `scripts/verification/`)
+  - **Incident Response:** Auto-containment, forensics collection, notification, ticketing, timeline generation (`scripts/incident-response/`, `scripts/forensics/`)
+  - **Supply Chain:** Skill integrity monitoring, manifest validation (`scripts/supply-chain/`)
+  - **Operational Tools:** CLI, policy validator, incident simulator, compliance reporter, certificate manager, config migrator (`tools/`)
 
-| Guide | Topics | Time | Difficulty |
-|-------|--------|------|------------|
-| **[01. Quick Start](docs/guides/01-quick-start.md)** | Pre-flight checks, installation, essential hardening | 15 min | Beginner |
-| **[02. Credential Isolation](docs/guides/02-credential-isolation.md)** | OS keychain (macOS/Linux/Windows), backup file management | 30 min | Intermediate |
-| **[03. Network Segmentation](docs/guides/03-network-segmentation.md)** | Localhost binding, VPN setup, reverse proxy, firewall | 45 min | Intermediate |
-| **[04. Runtime Sandboxing](docs/guides/04-runtime-sandboxing.md)** | Docker security, capabilities, seccomp, AppArmor | 45 min | Intermediate |
-| **[05. Supply Chain Security](docs/guides/05-supply-chain-security.md)** | Skill integrity, cryptographic verification, monitoring | 40 min | Intermediate |
-| **[06. Incident Response](docs/guides/06-incident-response.md)** | 4 response playbooks, evidence collection, PIR process | 60 min | Advanced |
-| **[07. Community Tools](docs/guides/07-community-tools-integration.md)** | openclaw-telemetry, openclaw-shield, openclaw-detect | 90 min | Advanced |
-| **[08. Detection & Hunting](docs/guides/07-detection-and-hunting.md)** | 3-tier detection model, Sigma/KQL/SPL rules, forensic toolkit | 60 min | Advanced |
+  ### ⚙️ Configuration & Policy Files
+  - **Agent Config:** Hardened agent configs with environment overrides (`configs/agent-config/`)
+  - **MCP Server:** TLS 1.3+, mTLS, OAuth2, firewall rules (`configs/mcp-server-config/`)
+  - **Monitoring:** Prometheus, Grafana datasources, Alertmanager routing (`configs/monitoring-config/`)
+  - **Skill Policies:** Allowlist, dangerous patterns, enforcement, manifest schemas (`configs/skill-policies/`)
+  - **Templates:** Secure defaults for credentials, gateway, nginx (`configs/templates/`)
 
-**Total Reading Time:** ~7 hours | **Implementation Time:** ~10 hours for complete hardening
+  ### ✅ Testing Framework
+  - **Unit Tests:** Authentication, encryption, input validation, rate limiting, CLI smoke tests (`tests/unit/`)
+  - **Integration Tests:** Playbook procedures, backup/recovery, access review (`tests/integration/`)
+  - **Security Tests:** Detection replay, evidence snapshot, malicious skill chain, policy compliance, runtime regression, vulnerability scanning (`tests/security/`)
+  - **Fixtures:** Adversarial and evasion test cases (`tests/security/fixtures/`)
 
----
+  ### 🎓 Training Materials
+  - **Security Training:** 4-hour security team curriculum (architecture, operations, IR, monitoring) (`training/security-training.md`)
+  - **Developer Guide:** 2-hour onboarding for integration, testing, troubleshooting (`training/developer-guide.md`)
 
-### ⚙️ Configuration Examples (Production-Ready)
+  ### 🤖 CI/CD Workflows
+  - **Security Scan:** Trivy, Bandit, npm audit, pip-audit, Gitleaks, SBOM (`.github/workflows/security-scan.yml`)
+  - **Compliance Check:** Policy validation, YAML linting, security tests, compliance reports (`.github/workflows/compliance-check.yml`)
+  - **Runtime Regression:** Hosted runner validation and artifact archiving (`.github/workflows/runtime-security-regression.yml`)
+  - **Detection Replay:** Adversarial replay and evasion validation (`.github/workflows/detection-replay-validation.yml`)
 
-Copy-paste ready configurations for immediate deployment:
-
-| Configuration | Use Case | Platform |
-|---------------|----------|----------|
-| **[production-k8s.yml](configs/examples/production-k8s.yml)** | Production Kubernetes deployment | K8s 1.28+ |
-| **[docker-compose-full-stack.yml](configs/examples/docker-compose-full-stack.yml)** | Multi-service stack with monitoring | Docker Compose |
-| **[nginx-advanced.conf](configs/examples/nginx-advanced.conf)** | Reverse proxy with mTLS | Nginx |
-| **[monitoring-stack.yml](configs/examples/monitoring-stack.yml)** | Prometheus + Grafana + Alertmanager | Any |
-| **[backup-restore.sh](configs/examples/backup-restore.sh)** | Automated backup/restore | Bash |
-| **[with-community-tools.yml](configs/examples/with-community-tools.yml)** | Full security stack integration | Docker/K8s |
-
----
-
-### 🛠️ Automation Scripts
-
-Ready-to-use security automation:
-
-| Script | Purpose | Usage |
+  **Total: 110+ files providing enterprise-grade, scenario-complete AI agent security**
 |--------|---------|-------|
 | **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
 | **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
@@ -661,218 +654,82 @@ Be respectful, constructive, and focused on improving AI agent security for ever
 
 ---
 
+
 ## 📖 Repository Structure
 
 ```
 openclaw-security-playbook/
 │
-├── README.md                          # This file - project overview and quick start
+├── README.md                          # Project overview and quick start
 │
 ├── docs/                              # Core documentation
 │   ├── architecture/                  # System architecture and design
-│   │   ├── threat-model.md           # Comprehensive threat modeling
-│   │   ├── security-layers.md        # Defense-in-depth architecture
-│   │   └── zero-trust-design.md      # Zero-trust implementation guide
-│   │
-│   ├── threat-model/                  # Threat mapping and taxonomy
-│   │   └── ATLAS-mapping.md          # MITRE ATLAS kill chains and framework cross-refs
-│   │
-│   ├── policies/                      # Security policies and standards
-│   │   ├── access-control-policy.md  # IAM and access management
-│   │   ├── data-classification.md    # Data handling and classification
-│   │   ├── incident-response-policy.md # IR procedures and escalation
-│   │   └── acceptable-use-policy.md  # User behavior and responsibilities
-│   │
-│   ├── procedures/                    # Operational procedures
-│   │   ├── incident-response.md      # Step-by-step IR procedures
-│   │   ├── vulnerability-management.md # Vuln scanning and patching
-│   │   ├── access-review.md          # Quarterly access reviews
-│   │   └── backup-recovery.md        # BCP/DR procedures
-│   │
 │   ├── checklists/                    # Operational checklists
-│   │   ├── security-review.md        # Pre-deployment security review
-│   │   ├── onboarding-checklist.md   # New user/developer onboarding
-│   │   └── production-deployment.md  # Production deployment checklist ✨ NEW
-│   │
-│   └── compliance/                    # Compliance frameworks
-│       ├── soc2-controls.md          # SOC 2 Type II control mapping
-│       ├── iso27001-controls.md      # ISO 27001:2022 implementation
-│       ├── gdpr-compliance.md        # GDPR data protection
-│       └── audit-configuration.md    # Audit logging and monitoring
+│   ├── compliance/                    # Compliance frameworks
+│   ├── guides/                        # Implementation guides
+│   ├── plan/                          # Audit and execution plans
+│   ├── policies/                      # Security policies and standards
+│   ├── procedures/                    # Operational procedures
+│   ├── threat-model/                  # Threat mapping and taxonomy
+│   └── troubleshooting/               # Troubleshooting guides
 │
 ├── detections/                        # Detection rules and hunting queries
-│   ├── README.md                      # Detection content overview and telemetry schema
-│   ├── ioc/                           # Indicators of compromise
-│   │   ├── ioc-openclaw.txt          # Domains, ports, processes, file paths
-│   │   └── ioc-openclaw.yar          # YARA rules (credential exfiltration, malicious skills, SOUL.md injection)
+│   ├── README.md                      # Detection content overview
 │   ├── edr/                           # EDR platform queries
-│   │   └── mde/                       # Microsoft Defender for Endpoint
-│   │       ├── openclaw-discovery.kql        # Tier 1: Fleet-wide discovery
-│   │       ├── openclaw-behavioral-hunting.kql # Tier 2: Behavioral anomaly hunts
-│   │       └── openclaw-kill-chains.kql      # Tier 3: ATLAS kill chain detection
+│   │   └── mde/                       # Microsoft Defender for Endpoint (KQL)
+│   ├── ioc/                           # Indicators of compromise (YARA, IOC)
 │   ├── siem/                          # SIEM platform queries
 │   │   └── splunk/                    # Splunk SPL queries
-│   │       ├── openclaw-discovery.spl        # Tier 1: Process and network discovery
-│   │       └── openclaw-behavioral-hunting.spl # Tier 2: Behavioral hunts
 │   └── sigma/                         # Platform-agnostic Sigma rules
-│       ├── openclaw-credential-harvest.yml   # Credential path reads
-│       ├── openclaw-gateway-exposure.yml     # Internet-exposed gateway
-│       ├── openclaw-skill-child-process.yml  # Skill spawning shell
-│       └── openclaw-soul-md-modification.yml # SOUL.md persistence writes
 │
 ├── examples/                          # Real-world examples and scenarios
-│   ├── attack-scenarios/              # Known attack patterns
-│   │   ├── prompt-injection/          # Prompt injection attacks
-│   │   │   ├── direct-injection.md   # Direct prompt injection
-│   │   │   ├── indirect-injection.md # Indirect via documents/emails
-│   │   │   └── jailbreak-attempts.md # Prompt injection bypass techniques
-│   │   │
-│   │   ├── data-exfiltration/         # Data theft techniques
-│   │   │   ├── conversation-leakage.md # Leaking conversation history
-│   │   │   ├── skill-exfiltration.md  # Malicious skill data theft
-│   │   │   └── rag-poisoning.md      # RAG database poisoning
-│   │   │
-│   │   └── privilege-escalation/      # Privilege escalation
-│   │       ├── agent-impersonation.md # Spoofing agent identity
-│   │       └── skill-chaining.md     # Chaining skills for escalation
-│   │
-│   ├── scenarios/                     # Complete incident scenarios ✨ NEW
-│   │   ├── indirect-prompt-injection-attack.md        # Email-based prompt injection
-│   │   ├── malicious-skill-deployment.md              # Supply chain attack via npm
-│   │   ├── mcp-server-compromise.md                   # Infrastructure breach
-│   │   ├── multi-agent-coordination-attack.md         # Agent impersonation attack
-│   │   ├── rag-poisoning-data-exfiltration.md        # Vector DB poisoning
-│   │   ├── credential-theft-conversation-history.md   # S3 misconfiguration breach
-│   │   └── denial-of-service-resource-exhaustion.md   # Economic DoS attack
-│   │
-│   ├── incident-response/             # IR templates and playbooks
-│   │   ├── playbook-prompt-injection.md  # Prompt injection response
-│   │   ├── playbook-data-breach.md       # Data breach response
-│   │   ├── playbook-skill-compromise.md  # Compromised skill response
-│   │   └── reporting-template.md         # Incident report template ✨ NEW
-│   │
-│   ├── security-controls/             # Control implementations
-│   │   ├── input-validation.py       # Input sanitization examples
-│   │   ├── output-filtering.py       # Output validation examples
-│   │   ├── rate-limiting.py          # Rate limiting implementation
-│   │   └── authentication.py         # Auth/AuthZ examples
-│   │
-│   └── monitoring/                    # Monitoring configurations
-│       ├── siem-rules/                # SIEM detection rules
-│       │   ├── splunk-rules.conf     # Splunk detection rules
-│       │   ├── elastic-rules.json    # Elastic SIEM rules
-│       │   └── datadog-monitors.yaml # Datadog monitoring
-│       │
-│       └── dashboards/                # Monitoring dashboards
-│           ├── security-dashboard.json    # Security metrics dashboard
-│           └── compliance-dashboard.json  # Compliance reporting dashboard
+│   ├── incident-response/             # IR playbooks and templates
+│   ├── monitoring/                    # Dashboards and alert rules
+│   ├── scenarios/                     # Complete incident scenarios
+│   └── security-controls/             # Control implementations (Python)
 │
 ├── scripts/                           # Automation and tooling
-│   ├── security-scanning/             # Security scanning tools
-│   │   ├── prompt-injection-scanner.py   # Detect prompt injection
-│   │   ├── skill-validator.py            # Validate skill security
-│   │   └── dependency-checker.py         # Check for vulnerable deps
-│   │
+│   ├── credential-migration/          # Credential migration scripts
+│   ├── discovery/                     # Discovery and scanning scripts
+│   ├── forensics/                     # Forensics and evidence scripts
 │   ├── hardening/                     # System hardening scripts
-│   │   ├── agent-hardening.sh        # Agent security hardening
-│   │   ├── mcp-server-hardening.sh   # MCP server hardening
-│   │   └── docker/                    # Docker security ✨ NEW
-│   │       └── seccomp-profiles/      # Seccomp BPF filters
-│   │           ├── clawdbot.json     # ClawdBot seccomp profile
-│   │           └── README.md          # Seccomp documentation
-│   │
-│   ├── monitoring/                    # Monitoring automation
-│   │   ├── log-aggregation.py        # Centralized logging setup
-│   │   ├── anomaly-detection.py      # Behavioral anomaly detection
-│   │   └── alert-manager.py          # Alert routing and escalation
-│   │
-│   ├── forensics/                     # Post-incident forensic tools
-│   │   ├── collect_evidence.sh       # Volatile state + log preservation
-│   │   ├── build_timeline.sh         # Chronological attack timeline (TSV)
-│   │   ├── check_credential_scope.sh # Credential exposure assessment
-│   │   └── verify_hash_chain.py      # Telemetry tamper detection
-│   │
-│   └── incident-response/             # IR automation
-│       ├── auto-containment.py       # Automated threat containment
-│       ├── forensics-collector.py    # Evidence collection automation
-│       └── notification-manager.py   # Automated stakeholder notifications
+│   ├── incident-response/             # IR automation scripts
+│   ├── monitoring/                    # Monitoring automation scripts
+│   ├── supply-chain/                  # Supply chain validation scripts
+│   ├── verification/                  # Security verification scripts
+│   └── vulnerability-scanning/        # Vulnerability scanning scripts
 │
-├── config/                            # Configuration templates
-│   ├── agent-config/                  # Agent configurations
-│   │   ├── system-prompts.yaml       # Secure system prompt templates
-│   │   ├── skill-permissions.yaml    # Skill access control configs
-│   │   └── rate-limits.yaml          # Rate limiting configurations
-│   │
-│   ├── mcp-server-config/             # MCP server configurations
-│   │   ├── authentication.yaml       # Auth configuration
-│   │   ├── authorization.yaml        # AuthZ rules and policies
-│   │   └── security-headers.yaml     # HTTP security headers
-│   │
-│   └── monitoring-config/             # Monitoring configurations
-│       ├── cloudwatch-alarms.yaml    # AWS CloudWatch alarms
-│       ├── prometheus-rules.yaml     # Prometheus alerting rules
-│       └── grafana-dashboards.json   # Grafana dashboard configs
+├── configs/                           # Configuration and policy files
+│   ├── agent-config/                  # Agent configuration files
+│   ├── examples/                      # Example deployment configs
+│   ├── mcp-server-config/             # MCP server configuration
+│   ├── monitoring-config/             # Monitoring configuration
+│   ├── organization-policies/         # Org-level policy JSON
+│   ├── skill-policies/                # Skill allowlist, enforcement, schemas
+│   └── templates/                     # Secure config and gateway templates
 │
-├── tests/                             # Security testing
-│   ├── unit/                          # Unit tests for security controls
-│   │   ├── test_input_validation.py  # Input validation tests
-│   │   ├── test_authentication.py    # Auth mechanism tests
-│   │   └── test_rate_limiting.py     # Rate limiting tests
-│   │
+├── tests/                             # Test suite
 │   ├── integration/                   # Integration tests
-│   │   ├── test_agent_security.py    # End-to-end agent security
-│   │   ├── test_mcp_security.py      # MCP server security tests
-│   │   └── test_skill_isolation.py   # Skill sandboxing tests
-│   │
-│   └── penetration/                   # Pentest scenarios
-│       ├── prompt-injection-tests.py # Automated prompt injection tests
-│       ├── privilege-escalation-tests.py # Privilege escalation attempts
-│       └── data-exfiltration-tests.py    # Data leakage tests
+│   ├── security/                      # Security and adversarial tests
+│   └── unit/                          # Unit tests
 │
-├── tools/                             # Security tools and utilities
-│   ├── prompt-injection-detector/     # Prompt injection detection tool
-│   │   ├── detector.py               # Main detection engine
-│   │   ├── models/                    # ML models for detection
-│   │   └── README.md                  # Tool documentation
-│   │
-│   ├── skill-security-analyzer/       # Skill security analysis tool
-│   │   ├── analyzer.py               # Static analysis engine
-│   │   ├── rules/                     # Security rules database
-│   │   └── README.md                  # Tool documentation
-│   │
-│   └── conversation-sanitizer/        # PII/credential redaction tool
-│       ├── sanitizer.py              # Sanitization engine
-│       ├── patterns/                  # Detection patterns
-│       └── README.md                  # Tool documentation
+├── tools/                             # Operational tools (Python CLI, validators)
+│   ├── certificate-manager.py
+│   ├── compliance-reporter.py
+│   ├── config-migrator.py
+│   ├── incident-simulator.py
+│   ├── openclaw-cli.py
+│   └── policy-validator.py
 │
-├── training/                          # Security training materials
-│   ├── developer-training/            # Developer security training
-│   │   ├── secure-coding-guide.md    # Secure coding practices
-│   │   ├── threat-modeling-workshop.md # Threat modeling training
-│   │   └── hands-on-labs/             # Practical exercises
-│   │
-│   ├── operations-training/           # Operations security training
-│   │   ├── incident-response-drill.md # IR tabletop exercises
-│   │   ├── security-monitoring.md     # SIEM and monitoring training
-│   │   └── forensics-basics.md        # Digital forensics basics
-│   │
-│   └── awareness/                     # General security awareness
-│       ├── ai-security-101.md        # Introduction to AI security
-│       ├── prompt-injection-awareness.md # Prompt injection risks
-│       └── phishing-simulation.md     # Phishing awareness training
+├── training/                          # Security and developer training
+│   ├── developer-guide.md
+│   └── security-training.md
 │
 ├── .github/                           # GitHub automation
-│   ├── workflows/                     # CI/CD workflows
-│   │   ├── security-scan.yml         # Automated security scanning
-│   │   ├── dependency-check.yml      # Dependency vulnerability check
-│   │   └── compliance-check.yml      # Compliance validation
-│   │
-│   └── ISSUE_TEMPLATE/                # Issue templates
-│       ├── security-incident.md      # Security incident report
-│       ├── vulnerability-report.md   # Vulnerability disclosure
-│       └── feature-request.md        # Security feature request
+│   ├── copilot-instructions.md        # Copilot/agent instructions
+│   └── workflows/                     # CI/CD workflows (security-scan, compliance-check, etc)
 │
-├── LICENSE                            # Repository license (MIT/Apache 2.0)
+├── LICENSE                            # Repository license
 ├── CONTRIBUTING.md                    # Contribution guidelines
 ├── SECURITY.md                        # Security policy and disclosure
 └── CHANGELOG.md                       # Version history and updates
@@ -935,7 +792,7 @@ publish, distribute, sublicense, and/or sell copies of the Software.
 
 This playbook was developed based on:
 
-- **Real-world incident research** from 2023-2024 exposed AI agent discoveries
+- **Real-world incident research** from 2024-2025 exposed AI agent discoveries
 - **Community contributions** from security researchers and practitioners
 - **Best practices** from OWASP, NIST, CIS, and other security frameworks
 - **Open-source tools** from the AI security community (Knostic, Anthropic, etc.)
