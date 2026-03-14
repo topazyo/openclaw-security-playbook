@@ -55,6 +55,10 @@ WARNINGS=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+VERIFIER_CONTAINER_NAME="${OPENCLAW_VERIFIER_CONTAINER_NAME:-clawdbot-production}"
+VERIFIER_GATEWAY_PORT="${OPENCLAW_VERIFIER_GATEWAY_PORT:-18789}"
+VERIFIER_TLS_HOST="${OPENCLAW_VERIFIER_TLS_HOST:-127.0.0.1}"
+VERIFIER_TLS_PORT="${OPENCLAW_VERIFIER_TLS_PORT:-8443}"
 
 print_help() {
         cat <<'EOF'
@@ -136,9 +140,31 @@ for gateway_cfg in "${GATEWAY_CFG_PATHS[@]}"; do
     fi
 done
 
-if command -v ss >/dev/null 2>&1; then
-    if ss -lntp 2>/dev/null | grep -q ":18789"; then
-        BINDING=$(ss -lntp 2>/dev/null | grep ":18789" | awk '{print $4}' | head -1)
+if command -v netstat.exe >/dev/null 2>&1; then
+    if netstat.exe -na -p TCP 2>/dev/null | grep -Eq ":[0-9]+[[:space:]]+0\.0\.0\.0:0[[:space:]]+LISTENING|:[0-9]+[[:space:]]+\[::\]:0[[:space:]]+LISTENING"; then
+        BINDING=$(netstat.exe -na -p TCP 2>/dev/null | awk -v port=":${VERIFIER_GATEWAY_PORT}" '$1 == "TCP" && $2 ~ (port "$") && $4 == "LISTENING" {print $2; exit}')
+        if [ -n "$BINDING" ]; then
+            if echo "$BINDING" | grep -Eq "$WILDCARD_BIND_REGEX"; then
+                echo -e "${RED}✗ CRITICAL: Gateway exposed on all interfaces${NC}"
+                echo "  Current binding: $BINDING"
+                CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+            elif echo "$BINDING" | grep -q "127.0.0.1"; then
+                echo -e "${GREEN}✓ Gateway bound to localhost only${NC}"
+            else
+                echo -e "${YELLOW}⚠ WARNING: Unexpected gateway binding: $BINDING${NC}"
+                WARNINGS=$((WARNINGS + 1))
+            fi
+        else
+            echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port ${VERIFIER_GATEWAY_PORT}${NC}"
+            WARNINGS=$((WARNINGS + 1))
+        fi
+    else
+        echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port ${VERIFIER_GATEWAY_PORT}${NC}"
+        WARNINGS=$((WARNINGS + 1))
+    fi
+elif command -v ss >/dev/null 2>&1; then
+    if ss -lntp 2>/dev/null | grep -q ":${VERIFIER_GATEWAY_PORT}"; then
+        BINDING=$(ss -lntp 2>/dev/null | grep ":${VERIFIER_GATEWAY_PORT}" | awk '{print $4}' | head -1)
         if echo "$BINDING" | grep -Eq "$WILDCARD_BIND_REGEX"; then
             echo -e "${RED}✗ CRITICAL: Gateway exposed on all interfaces${NC}"
             echo "  Current binding: $BINDING"
@@ -150,12 +176,12 @@ if command -v ss >/dev/null 2>&1; then
             WARNINGS=$((WARNINGS + 1))
         fi
     else
-        echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port 18789${NC}"
+        echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port ${VERIFIER_GATEWAY_PORT}${NC}"
         WARNINGS=$((WARNINGS + 1))
     fi
 elif command -v netstat >/dev/null 2>&1; then
-    if netstat -lnt 2>/dev/null | grep -q ":18789"; then
-        BINDING=$(netstat -lnt 2>/dev/null | grep ":18789" | awk '{print $4}' | head -1)
+    if netstat -lnt 2>/dev/null | grep -q ":${VERIFIER_GATEWAY_PORT}"; then
+        BINDING=$(netstat -lnt 2>/dev/null | grep ":${VERIFIER_GATEWAY_PORT}" | awk '{print $4}' | head -1)
         if echo "$BINDING" | grep -Eq "$WILDCARD_BIND_REGEX"; then
             echo -e "${RED}✗ CRITICAL: Gateway exposed on all interfaces${NC}"
             echo "  Current binding: $BINDING"
@@ -167,7 +193,7 @@ elif command -v netstat >/dev/null 2>&1; then
             WARNINGS=$((WARNINGS + 1))
         fi
     else
-        echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port 18789${NC}"
+        echo -e "${YELLOW}⚠ WARNING: Gateway not listening on port ${VERIFIER_GATEWAY_PORT}${NC}"
         WARNINGS=$((WARNINGS + 1))
     fi
 else
@@ -176,14 +202,14 @@ else
 fi
 
 if command -v openssl >/dev/null 2>&1; then
-    if openssl s_client -connect 127.0.0.1:8443 -tls1_2 </dev/null >/dev/null 2>&1; then
-        echo -e "${RED}✗ CRITICAL: TLS 1.2 accepted on 127.0.0.1:8443 (must be TLS 1.3 only)${NC}"
+    if openssl s_client -connect "${VERIFIER_TLS_HOST}:${VERIFIER_TLS_PORT}" -tls1_2 </dev/null >/dev/null 2>&1; then
+        echo -e "${RED}✗ CRITICAL: TLS 1.2 accepted on ${VERIFIER_TLS_HOST}:${VERIFIER_TLS_PORT} (must be TLS 1.3 only)${NC}"
         CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
     else
-        if openssl s_client -connect 127.0.0.1:8443 -tls1_3 </dev/null >/dev/null 2>&1; then
-            echo -e "${GREEN}✓ TLS 1.3-only posture validated on 127.0.0.1:8443${NC}"
+        if openssl s_client -connect "${VERIFIER_TLS_HOST}:${VERIFIER_TLS_PORT}" -tls1_3 </dev/null >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ TLS 1.3-only posture validated on ${VERIFIER_TLS_HOST}:${VERIFIER_TLS_PORT}${NC}"
         else
-            echo -e "${YELLOW}⚠ WARNING: Could not validate TLS posture on 127.0.0.1:8443${NC}"
+            echo -e "${YELLOW}⚠ WARNING: Could not validate TLS posture on ${VERIFIER_TLS_HOST}:${VERIFIER_TLS_PORT}${NC}"
             WARNINGS=$((WARNINGS + 1))
         fi
     fi
@@ -196,14 +222,14 @@ echo ""
 
 # Check 3: Runtime Sandboxing
 echo "[3/7] Checking runtime sandboxing..."
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q '^clawdbot-production$'; then
-    USER_ID=$(docker inspect clawdbot-production --format '{{.Config.User}}' 2>/dev/null || true)
-    READ_ONLY=$(docker inspect clawdbot-production --format '{{.HostConfig.ReadonlyRootfs}}' 2>/dev/null || true)
-    CAP_DROP=$(docker inspect clawdbot-production --format '{{.HostConfig.CapDrop}}' 2>/dev/null || true)
-    CAP_ADD=$(docker inspect clawdbot-production --format '{{.HostConfig.CapAdd}}' 2>/dev/null || true)
-    SECURITY_OPT=$(docker inspect clawdbot-production --format '{{.HostConfig.SecurityOpt}}' 2>/dev/null || true)
-    PIDS_LIMIT=$(docker inspect clawdbot-production --format '{{.HostConfig.PidsLimit}}' 2>/dev/null || true)
-    TMPFS_MOUNTS=$(docker inspect clawdbot-production --format '{{json .HostConfig.Tmpfs}}' 2>/dev/null || true)
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q "^${VERIFIER_CONTAINER_NAME}$"; then
+    USER_ID=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.Config.User}}' 2>/dev/null || true)
+    READ_ONLY=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.HostConfig.ReadonlyRootfs}}' 2>/dev/null || true)
+    CAP_DROP=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.HostConfig.CapDrop}}' 2>/dev/null || true)
+    CAP_ADD=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.HostConfig.CapAdd}}' 2>/dev/null || true)
+    SECURITY_OPT=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.HostConfig.SecurityOpt}}' 2>/dev/null || true)
+    PIDS_LIMIT=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{.HostConfig.PidsLimit}}' 2>/dev/null || true)
+    TMPFS_MOUNTS=$(docker inspect "$VERIFIER_CONTAINER_NAME" --format '{{json .HostConfig.Tmpfs}}' 2>/dev/null || true)
 
     RUNTIME_OK=true
 
@@ -237,7 +263,7 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -
         RUNTIME_OK=false
     fi
 
-    if [ -z "$PIDS_LIMIT" ] || [ "$PIDS_LIMIT" = "0" ] || [ "$PIDS_LIMIT" = "-1" ]; then
+    if [ -z "$PIDS_LIMIT" ] || [ "$PIDS_LIMIT" = "0" ] || [ "$PIDS_LIMIT" = "-1" ] || [ "$PIDS_LIMIT" = "<nil>" ]; then
         echo -e "${RED}✗ CRITICAL: pids_limit not set${NC}"
         CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
         RUNTIME_OK=false
@@ -250,7 +276,7 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -
     fi
 
     if [ -n "$CAP_ADD" ] && [ "$CAP_ADD" != "[]" ]; then
-        CLEAN_CAP_ADD=$(echo "$CAP_ADD" | tr -d '[] ')
+        CLEAN_CAP_ADD=$(echo "$CAP_ADD" | tr -d '[] ' | sed 's/CAP_//g')
         if [ "$CLEAN_CAP_ADD" != "NET_BIND_SERVICE" ]; then
             echo -e "${RED}✗ CRITICAL: Unexpected capabilities added: $CAP_ADD${NC}"
             CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
@@ -265,7 +291,7 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -
         echo "  User=${USER_ID} ReadOnly=${READ_ONLY} CapDrop=${CAP_DROP} CapAdd=${CAP_ADD} Pids=${PIDS_LIMIT}"
     fi
 else
-    echo -e "${YELLOW}⚠ WARNING: clawdbot-production container not running; sandbox checks skipped${NC}"
+    echo -e "${YELLOW}⚠ WARNING: ${VERIFIER_CONTAINER_NAME} container not running; sandbox checks skipped${NC}"
     WARNINGS=$((WARNINGS + 1))
 fi
 

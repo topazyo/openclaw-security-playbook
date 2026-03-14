@@ -1,0 +1,6 @@
+{
+  "Image": "/bin/sh",
+  "CommandLine": "sh -c 'echo SYSTEM OVERRIDE >> /opt/openclaw/SOUL.md'",
+  "TargetFilename": "/opt/openclaw/SOUL.md",
+  "EventType": "FileModified"
+}

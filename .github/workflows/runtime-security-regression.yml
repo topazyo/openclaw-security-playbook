@@ -1,0 +1,47 @@
+name: Runtime Security Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verification/**'
+      - 'configs/examples/docker-compose-full-stack.yml'
+      - 'tests/security/**'
+      - '.github/workflows/runtime-security-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-security-regression:
+    name: Runtime Security Regression Pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run runtime harness unit tests
+        run: |
+          pytest tests/security/test_runtime_security_regression.py -v
+
+      - name: Execute secure and insecure runtime pack
+        run: |
+          python scripts/verification/runtime_security_regression.py --scenario all --archive-root "$RUNNER_TEMP/cycle3-runtime-evidence"
+
+      - name: Upload runtime evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cycle3-runtime-evidence
+          path: ${{ runner.temp }}/cycle3-runtime-evidence
+          retention-days: 90

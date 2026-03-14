@@ -1,0 +1,4 @@
+{
+  "Image": "/usr/bin/docker",
+  "CommandLine": "docker run --cap-drop ALL --read-only --user 1000:1000 --security-opt no-new-privileges:true --name clawdbot-prod openclaw-agent:latest"
+}

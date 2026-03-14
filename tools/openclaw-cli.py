@@ -29,9 +29,10 @@ Installation:
 import click
 import json
 import sys
+import subprocess
 import importlib.util
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 try:
     from tabulate import tabulate
@@ -75,6 +76,17 @@ def _validate_output_path(output_path: str) -> Path:
         raise click.ClickException(f"Refusing to overwrite configuration files: {path}")
 
     return path
+
+
+def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.CompletedProcess[str]:
+    script_path = (REPO_ROOT / relative_script).resolve()
+    return subprocess.run(
+        [sys.executable, str(script_path), *args],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 # ============================================================================
@@ -371,6 +383,103 @@ def compliance(ctx, framework, output):
         with open(safe_output, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         click.echo(f"\n[✓] Report saved to {safe_output}")
+
+
+@report.command(name="evidence-snapshot")
+@click.option("--output-dir", required=True, type=click.Path(), help="Directory for the evidence snapshot")
+@click.option("--skip-runtime", is_flag=True, help="Skip runtime security regression evidence")
+@click.option("--skip-detection-replay", is_flag=True, help="Skip detection replay evidence")
+@click.option("--skip-compliance", is_flag=True, help="Skip compliance report evidence")
+@click.option("--skip-yara", is_flag=True, help="Skip YARA replay during detection validation")
+@click.pass_context
+def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip_compliance, skip_yara):
+    """Generate a Cycle 3 evidence snapshot."""
+    snapshot_root = _validate_output_path(output_dir)
+    snapshot_root.mkdir(parents=True, exist_ok=True)
+
+    manifest: dict[str, object] = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "snapshot_root": str(snapshot_root),
+        "steps": [],
+    }
+    failures: list[str] = []
+
+    if not skip_runtime:
+        runtime_dir = snapshot_root / "runtime"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        click.echo("[*] Capturing runtime regression evidence...")
+        runtime_result = _run_python_tool(
+            "scripts/verification/runtime_security_regression.py",
+            ["--scenario", "all", "--archive-root", str(runtime_dir)],
+        )
+        (runtime_dir / "execution.log").write_text(
+            runtime_result.stdout + runtime_result.stderr,
+            encoding="utf-8",
+        )
+        manifest["steps"].append(
+            {
+                "name": "runtime-regression",
+                "exit_code": runtime_result.returncode,
+                "output": str(runtime_dir),
+            }
+        )
+        if runtime_result.returncode != 0:
+            failures.append("runtime-regression")
+
+    if not skip_detection_replay:
+        replay_dir = snapshot_root / "detection-replay"
+        replay_dir.mkdir(parents=True, exist_ok=True)
+        click.echo("[*] Capturing detection replay evidence...")
+        replay_args = []
+        if skip_yara:
+            replay_args.append("--skip-yara")
+        replay_result = _run_python_tool(
+            "scripts/verification/validate_detection_replay.py",
+            replay_args,
+        )
+        (replay_dir / "execution.log").write_text(
+            replay_result.stdout + replay_result.stderr,
+            encoding="utf-8",
+        )
+        manifest["steps"].append(
+            {
+                "name": "detection-replay",
+                "exit_code": replay_result.returncode,
+                "output": str(replay_dir / "execution.log"),
+                "skip_yara": skip_yara,
+            }
+        )
+        if replay_result.returncode != 0:
+            failures.append("detection-replay")
+
+    if not skip_compliance:
+        compliance_dir = snapshot_root / "compliance"
+        compliance_dir.mkdir(parents=True, exist_ok=True)
+        click.echo("[*] Capturing compliance evidence...")
+        compliance_reporter = _load_tool_module("compliance-reporter.py", "compliance_reporter")
+        for framework in ("SOC2", "ISO27001"):
+            report_data = compliance_reporter.generate_report(framework=framework)
+            output_path = compliance_dir / f"{framework.lower()}-report.json"
+            with open(output_path, "w", encoding="utf-8") as handle:
+                json.dump(report_data, handle, indent=2)
+            manifest["steps"].append(
+                {
+                    "name": f"compliance-{framework.lower()}",
+                    "exit_code": 0,
+                    "output": str(output_path),
+                }
+            )
+
+    manifest_path = snapshot_root / "manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+
+    if failures:
+        raise click.ClickException(
+            f"Evidence snapshot completed with failures: {', '.join(failures)}. See {manifest_path}"
+        )
+
+    click.echo(f"[✓] Evidence snapshot saved to {snapshot_root}")
 
 
 # ============================================================================
