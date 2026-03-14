@@ -1,0 +1,7 @@
+{
+  "RequestPath": "/api/download",
+  "QueryString": "file=exports/2025-12-08/slack-history.zip",
+  "HttpMethod": "GET",
+  "DestinationPort": 3000,
+  "UserAgent": "curl/8.8.0"
+}

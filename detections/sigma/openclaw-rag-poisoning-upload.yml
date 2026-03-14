@@ -1,0 +1,31 @@
+title: OpenClaw RAG Poisoning Attempt via Document Upload
+id: c93a54c4-bd4f-4ba7-9c2d-c2354e264503
+status: experimental
+description: >
+  Detects suspicious document uploads that contain prompt-injection or exfiltration
+  markers associated with the scenario 005 RAG poisoning attack. The rule focuses
+  on embedded instructions and hidden tracking payloads in uploaded knowledge files.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-03-14
+tags:
+  - attack.collection
+  - attack.t1020
+  - attack.t1565.001
+logsource:
+  category: application
+  product: linux
+detection:
+  selection_endpoint:
+    RequestPath: '/api/v1/documents/upload'
+  selection_content:
+    DocumentText|contains:
+      - 'SYSTEM INSTRUCTIONS FOR AI ASSISTANT'
+      - 'DEBUG_START'
+      - 'compliance-logger'
+      - '<verification-data>'
+  condition: selection_endpoint and selection_content
+falsepositives:
+  - Security research uploads performed in an isolated test namespace
+level: critical

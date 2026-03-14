@@ -5,18 +5,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
-import sys
+import unicodedata
+import urllib.parse
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASES_PATH = REPO_ROOT / "tests" / "security" / "fixtures" / "detection-replay" / "replay_cases.json"
+SIGMA_REGEX_MODIFIERS = {"re", "regex", "match"}
+HIGH_RISK_YARA_PATTERNS = (
+    re.compile(r"\(\.\*\)\+"),
+    re.compile(r"\(\.\+\)\+"),
+    re.compile(r"\(\.\*\)\*"),
+    re.compile(r"\(\.\+\)\*"),
+)
 
 
 @dataclass
@@ -29,15 +39,54 @@ class ReplayResult:
 
 def load_cases(cases_path: Path) -> list[dict[str, Any]]:
     with open(cases_path, encoding="utf-8") as handle:
-        cases = json.load(handle)
-    if not isinstance(cases, list):
+        raw_cases: Any = json.load(handle)
+    if not isinstance(raw_cases, list):
         raise ValueError("Replay case file must contain a JSON list")
+    raw_case_list = cast(list[Any], raw_cases)
+    cases: list[dict[str, Any]] = []
+    for case in raw_case_list:
+        if not isinstance(case, dict):
+            raise ValueError("Each replay case must be a JSON object")
+        cases.append(cast(dict[str, Any], case))
     return cases
 
 
 def parse_field_expression(expression: str) -> tuple[str, list[str]]:
     parts = expression.split("|")
     return parts[0], parts[1:]
+
+
+def normalize_text(value: str) -> str:
+    normalized = value
+    for _ in range(3):
+        decoded = urllib.parse.unquote(normalized)
+        if decoded == normalized:
+            break
+        normalized = decoded
+    normalized = normalized.replace("\x00", "")
+    normalized = unicodedata.normalize("NFC", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized.casefold()
+
+
+def validate_sigma_detection(detection: dict[str, Any]) -> None:
+    for expression in detection:
+        if expression == "condition":
+            continue
+        _, modifiers = parse_field_expression(expression)
+        unsupported = sorted(SIGMA_REGEX_MODIFIERS.intersection(modifiers))
+        if unsupported:
+            raise ValueError(
+                f"Regex-style Sigma modifiers are not allowed in replay validation: {expression} ({', '.join(unsupported)})"
+            )
+
+
+def find_high_risk_yara_patterns(rule_text: str) -> list[str]:
+    matches: list[str] = []
+    for pattern in HIGH_RISK_YARA_PATTERNS:
+        for match in pattern.finditer(rule_text):
+            matches.append(match.group(0))
+    return matches
 
 
 def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool:
@@ -52,21 +101,24 @@ def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool
         if modifier in {"contains", "endswith"}:
             operation = modifier
 
-    expected_values = expected if isinstance(expected, list) else [expected]
+    expected_values: list[Any] = cast(list[Any], expected) if isinstance(expected, list) else [expected]
 
     if operation == "equals":
+        if isinstance(actual, str) or any(isinstance(value, str) for value in expected_values):
+            actual_normalized = normalize_text(str(actual))
+            return any(actual_normalized == normalize_text(str(value)) for value in expected_values)
         return any(actual == value for value in expected_values)
 
-    actual_text = str(actual)
+    actual_text = normalize_text(str(actual))
     if operation == "contains":
         if require_all:
-            return all(str(value) in actual_text for value in expected_values)
-        return any(str(value) in actual_text for value in expected_values)
+            return all(normalize_text(str(value)) in actual_text for value in expected_values)
+        return any(normalize_text(str(value)) in actual_text for value in expected_values)
 
     if operation == "endswith":
         if require_all:
-            return all(actual_text.endswith(str(value)) for value in expected_values)
-        return any(actual_text.endswith(str(value)) for value in expected_values)
+            return all(actual_text.endswith(normalize_text(str(value))) for value in expected_values)
+        return any(actual_text.endswith(normalize_text(str(value))) for value in expected_values)
 
     raise ValueError(f"Unsupported Sigma field modifier chain: {expression}")
 
@@ -77,7 +129,7 @@ def selector_matches(event: dict[str, Any], selector: dict[str, Any]) -> bool:
 
 def tokenize_condition(condition: str) -> list[str]:
     tokens: list[str] = []
-    current = []
+    current: list[str] = []
     for char in condition:
         if char.isspace():
             if current:
@@ -163,6 +215,7 @@ def evaluate_sigma_case(case: dict[str, Any]) -> ReplayResult:
         event = json.load(handle)
 
     detection = rule["detection"]
+    validate_sigma_detection(detection)
     selector_results = {
         name: selector_matches(event, selector)
         for name, selector in detection.items()
@@ -228,15 +281,57 @@ def run_validation(cases_path: Path, *, skip_yara: bool, require_yara: bool) -> 
     return results
 
 
+def archive_results(
+    archive_root: Path,
+    cases_path: Path,
+    *,
+    skip_yara: bool,
+    require_yara: bool,
+    yara_command: str | None,
+    results: list[ReplayResult],
+) -> None:
+    archive_root.mkdir(parents=True, exist_ok=True)
+    summary: dict[str, Any] = {
+        "created_at": datetime.now(UTC).isoformat(),
+        "cases_path": str(cases_path),
+        "skip_yara": skip_yara,
+        "require_yara": require_yara,
+        "yara_command": yara_command,
+        "results": [
+            {
+                "name": result.name,
+                "kind": result.kind,
+                "passed": result.passed,
+                "details": result.details,
+            }
+            for result in results
+        ],
+    }
+    (archive_root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate detection replay fixtures")
     parser.add_argument("--cases", default=str(DEFAULT_CASES_PATH), help="Replay case definition JSON file")
     parser.add_argument("--skip-yara", action="store_true", help="Skip YARA replay cases")
     parser.add_argument("--require-yara", action="store_true", help="Fail if YARA is unavailable")
+    parser.add_argument("--archive-root", help="Directory where replay evidence should be written")
     args = parser.parse_args(argv)
 
-    results = run_validation(Path(args.cases), skip_yara=args.skip_yara, require_yara=args.require_yara)
+    cases_path = Path(args.cases)
+    yara_command = None if args.skip_yara else resolve_yara_command()
+    results = run_validation(cases_path, skip_yara=args.skip_yara, require_yara=args.require_yara)
     failures = [result for result in results if not result.passed]
+
+    if args.archive_root:
+        archive_results(
+            Path(args.archive_root).resolve(),
+            cases_path,
+            skip_yara=args.skip_yara,
+            require_yara=args.require_yara,
+            yara_command=yara_command,
+            results=results,
+        )
 
     for result in results:
         status = "PASS" if result.passed else "FAIL"

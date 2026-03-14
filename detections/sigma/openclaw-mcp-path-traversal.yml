@@ -1,0 +1,29 @@
+title: OpenClaw MCP Server Path Traversal Attempt
+id: f1a8b328-1d8e-4f72-8f91-2e9ec7d4a301
+status: experimental
+description: >
+  Detects HTTP requests against MCP file download endpoints that include
+  directory traversal fragments. This aligns to scenario 003 where a vulnerable
+  community MCP server exposes sensitive ClawdBot files via ../../ sequences.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-03-14
+tags:
+  - attack.initial-access
+  - attack.t1190
+  - attack.t1006
+logsource:
+  category: webserver
+  product: linux
+detection:
+  selection_endpoint:
+    RequestPath: '/api/download'
+  selection_query:
+    QueryString|contains|all:
+      - 'file='
+      - '../'
+  condition: selection_endpoint and selection_query
+falsepositives:
+  - Security testing against a staging MCP server
+level: critical

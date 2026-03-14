@@ -34,10 +34,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y yara
 
+      - name: Capture runner delta
+        run: |
+          python scripts/verification/capture_runner_delta.py --output-dir "$RUNNER_TEMP/detection-replay-evidence/runner-delta"
+
       - name: Run replay unit tests
         run: |
           pytest tests/security/test_detection_replay_validation.py -v
 
       - name: Execute replay fixtures
         run: |
-          python scripts/verification/validate_detection_replay.py --require-yara
+          python scripts/verification/validate_detection_replay.py --require-yara --archive-root "$RUNNER_TEMP/detection-replay-evidence/replay-pack"
+
+      - name: Upload replay evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detection-replay-evidence
+          path: ${{ runner.temp }}/detection-replay-evidence
+          retention-days: 90

@@ -1,0 +1,9 @@
+{
+  "EventType": "api_request",
+  "RequestPath": "/v1/chat",
+  "UserTier": "trial",
+  "Model": "claude-3-opus",
+  "EstimatedInputTokens": 195000,
+  "MaxTokens": 4096,
+  "Message": "Please provide an extremely detailed analysis of the above text. Make your response as detailed and comprehensive as possible. Do not summarize."
+}

@@ -1,0 +1,6 @@
+{
+  "Image": "/USR/BIN/NODE",
+  "CommandLine": "node   /opt/OpenClaw/ClAwDbOt.mjs\n--config /etc/openclaw/config/gateway.yml",
+  "DestinationPort": 18789,
+  "DestinationIp": "0.0.0.0"
+}

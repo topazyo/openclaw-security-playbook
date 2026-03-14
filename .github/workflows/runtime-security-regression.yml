@@ -30,6 +30,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Capture runner delta
+        run: |
+          python scripts/verification/capture_runner_delta.py --output-dir "$RUNNER_TEMP/cycle3-runtime-evidence/runner-delta"
+
       - name: Run runtime harness unit tests
         run: |
           pytest tests/security/test_runtime_security_regression.py -v
