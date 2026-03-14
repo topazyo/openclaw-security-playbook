@@ -14,11 +14,15 @@ import json
 import sys
 import argparse
 from pathlib import Path
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
+
+
+JsonObject = dict[str, Any]
 
 
 def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
-    events = []
+    events: list[JsonObject] = []
     path = Path(input_path)
 
     if not path.exists():
@@ -40,16 +44,16 @@ def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
         print("WARNING: No events found in telemetry file", file=sys.stderr)
         return True
 
-    results = {
+    results: JsonObject = {
         "total_events": len(events),
         "chain_intact": True,
         "breaks": [],
-        "checked_at": datetime.utcnow().isoformat() + "Z",
+        "checked_at": datetime.now(UTC).isoformat(),
         "first_event": events[0].get("timestamp"),
         "last_event": events[-1].get("timestamp"),
     }
 
-    prev_hash = None
+    prev_hash: str | None = None
 
     for i, event in enumerate(events):
         current_hash = event.get("chain_hash")
@@ -60,7 +64,7 @@ def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
             continue
 
         if prev_hash is not None and event_prev_hash != prev_hash:
-            break_info = {
+            break_info: JsonObject = {
                 "position": i,
                 "timestamp": event.get("timestamp"),
                 "expected_prev_hash": prev_hash,
