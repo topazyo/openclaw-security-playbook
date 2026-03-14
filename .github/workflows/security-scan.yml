@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   security-events: write
   pull-requests: write
 
@@ -168,6 +168,7 @@ jobs:
         with:
           format: cyclonedx-json
           output-file: sbom.cyclonedx.json
+          dependency-snapshot: true
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
@@ -175,11 +176,6 @@ jobs:
           name: sbom
           path: sbom.cyclonedx.json
           retention-days: 90
-
-      - name: Upload SBOM to Dependency Graph
-        uses: advanced-security/sbom-dependency-submission-action@v0.0.1
-        with:
-          sbom-file: sbom.cyclonedx.json
 
   vulnerability-summary:
     name: Generate Vulnerability Summary
