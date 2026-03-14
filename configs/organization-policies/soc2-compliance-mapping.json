@@ -41,7 +41,8 @@
         "Training completion records",
         "Ethics policy documentation"
       ],
-      "policy_references": ["ENG-001", "SEC-001"]
+      "policy_references": ["ENG-001", "SEC-001"],
+      "status": "implemented"
     },
 
     "CC1.2": {
@@ -55,7 +56,8 @@
         "Committee meeting minutes",
         "Security dashboard reports",
         "Board presentation materials"
-      ]
+      ],
+      "status": "implemented"
     },
 
     "CC1.4": {
@@ -70,7 +72,8 @@
         "Assessment scores",
         "Job descriptions with security requirements"
       ],
-      "policy_references": ["ENG-001:training", "SEC-001"]
+      "policy_references": ["ENG-001:training", "SEC-001"],
+      "status": "implemented"
     },
 
     "CC6.1": {
@@ -93,7 +96,8 @@
         "authentication": "Okta/Auth0 SSO with MFA",
         "authorization": "Attribute-based access control",
         "monitoring": "Access logs retained 2 years"
-      }
+      },
+      "status": "implemented"
     },
 
     "CC6.2": {
@@ -109,7 +113,8 @@
         "Approval email chains",
         "Provisioning audit logs"
       ],
-      "policy_references": ["ENG-001:access_control"]
+      "policy_references": ["ENG-001:access_control"],
+      "status": "implemented"
     },
 
     "CC6.3": {
@@ -124,7 +129,8 @@
         "Termination tickets",
         "Suspended account lists"
       ],
-      "policy_references": ["SEC-001:access_reviews"]
+      "policy_references": ["SEC-001:access_reviews"],
+      "status": "implemented"
     },
 
     "CC6.6": {
@@ -141,7 +147,8 @@
         "Trivy scan results",
         "SBOM artifacts"
       ],
-      "policy_references": ["SEC-001:vulnerability_management", "SEC-001:supply_chain_security"]
+      "policy_references": ["SEC-001:vulnerability_management", "SEC-001:supply_chain_security"],
+      "status": "implemented"
     },
 
     "CC6.7": {
@@ -157,7 +164,8 @@
         "TLS certificate inventory",
         "Key rotation logs"
       ],
-      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"]
+      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"],
+      "status": "implemented"
     },
 
     "CC6.8": {
@@ -173,7 +181,8 @@
         "DLP policy rules",
         "Redaction test results"
       ],
-      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"]
+      "policy_references": ["ENG-001:data_handling", "SEC-001:data_protection"],
+      "status": "implemented"
     },
 
     "CC7.1": {
@@ -190,7 +199,8 @@
         "Security bulletin reviews",
         "Bug bounty submissions"
       ],
-      "policy_references": ["SEC-001:threat_monitoring", "SEC-001:vulnerability_management"]
+      "policy_references": ["SEC-001:threat_monitoring", "SEC-001:vulnerability_management"],
+      "status": "implemented"
     },
 
     "CC7.2": {
@@ -207,7 +217,8 @@
         "SOC shift reports",
         "Dashboard screenshots"
       ],
-      "policy_references": ["SEC-001:threat_monitoring", "OPS-001:monitoring"]
+      "policy_references": ["SEC-001:threat_monitoring", "OPS-001:monitoring"],
+      "status": "implemented"
     },
 
     "CC7.3": {
@@ -224,7 +235,8 @@
         "Post-mortem reports",
         "Drill exercise results"
       ],
-      "policy_references": ["ENG-001:incident_response", "SEC-001:incident_response"]
+      "policy_references": ["ENG-001:incident_response", "SEC-001:incident_response"],
+      "status": "implemented"
     },
 
     "CC7.4": {
@@ -241,7 +253,8 @@
         "Forensic reports",
         "Evidence chain of custody"
       ],
-      "policy_references": ["SEC-001:incident_response"]
+      "policy_references": ["SEC-001:incident_response"],
+      "status": "implemented"
     },
 
     "CC8.1": {
@@ -258,7 +271,8 @@
         "Deployment logs",
         "Rollback test results"
       ],
-      "policy_references": ["OPS-001:change_management", "OPS-001:deployment"]
+      "policy_references": ["OPS-001:change_management", "OPS-001:deployment"],
+      "status": "implemented"
     },
 
     "A1.2": {
@@ -274,7 +288,8 @@
         "DR test reports",
         "Recovery time measurements"
       ],
-      "policy_references": ["OPS-001:backup_and_recovery"]
+      "policy_references": ["OPS-001:backup_and_recovery"],
+      "status": "implemented"
     },
 
     "C1.1": {
@@ -290,7 +305,8 @@
         "Data access logs",
         "Disposal certificates"
       ],
-      "policy_references": ["SEC-001:data_protection"]
+      "policy_references": ["SEC-001:data_protection"],
+      "status": "implemented"
     },
 
     "PI1.2": {
@@ -305,7 +321,8 @@
         "Privacy policy documents",
         "Consent logs",
         "Policy change notifications"
-      ]
+      ],
+      "status": "implemented"
     }
   },
 

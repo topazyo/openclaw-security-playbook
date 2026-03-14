@@ -15,8 +15,6 @@ date: 2026-02-21
 tags:
   - attack.persistence
   - attack.t1546
-  - atlas.aml.ta0005
-  - atlas.t-persist-005
 logsource:
   category: file_event
   product: linux

@@ -9,6 +9,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +44,59 @@ def _validate_output_path(output_path: str) -> Path:
 
 class ComplianceReporter:
     """Generates compliance reports for audits."""
+
+    @staticmethod
+    def _calculate_summary(controls: list[dict[str, Any]]) -> tuple[int, int, float]:
+        if not controls:
+            raise ValueError("Compliance mapping did not yield any controls")
+
+        implemented = sum(1 for control in controls if control.get("status") == "implemented")
+        pending = len(controls) - implemented
+        percentage = round((implemented / len(controls)) * 100, 2)
+        return implemented, pending, percentage
+
+    @staticmethod
+    def _normalize_mapping_controls(mapping_name: str, mapping: dict[str, Any]) -> list[dict[str, Any]]:
+        controls: list[dict[str, Any]] = []
+        for control_id, details in mapping.items():
+            if not isinstance(details, dict):
+                continue
+
+            control = {"control_id": control_id, **details}
+            controls.append(control)
+
+        if not controls:
+            raise ValueError(f"{mapping_name} mapping is empty or invalid")
+
+        if any("status" not in control for control in controls):
+            raise ValueError(
+                f"{mapping_name} mapping schema drift: expected explicit status for each control"
+            )
+
+        return controls
+
+    @staticmethod
+    def _normalize_nested_control_groups(mapping_name: str, groups: dict[str, Any]) -> list[dict[str, Any]]:
+        controls: list[dict[str, Any]] = []
+        for group_name, group_controls in groups.items():
+            if not isinstance(group_controls, dict):
+                continue
+
+            for control_id, details in group_controls.items():
+                if not isinstance(details, dict):
+                    continue
+
+                control = {
+                    "group": group_name,
+                    "control_id": control_id,
+                    **details,
+                }
+                controls.append(control)
+
+        if not controls:
+            raise ValueError(f"{mapping_name} mapping is empty or invalid")
+
+        return controls
     
     def generate_report(self, framework="SOC2"):
         """Generate compliance report for specified framework."""
@@ -58,9 +112,7 @@ class ComplianceReporter:
     def _generate_soc2_report(self):
         """Generate SOC 2 compliance report."""
         controls = self._load_soc2_controls()
-        
-        implemented = sum(1 for c in controls if c["status"] == "implemented")
-        pending = len(controls) - implemented
+        implemented, pending, percentage = self._calculate_summary(controls)
         
         return {
             "framework": "SOC 2 Type II",
@@ -68,15 +120,13 @@ class ComplianceReporter:
             "controls": controls,
             "implemented_count": implemented,
             "pending_count": pending,
-            "compliance_percentage": round((implemented / len(controls)) * 100, 2),
+            "compliance_percentage": percentage,
         }
     
     def _generate_iso27001_report(self):
         """Generate ISO 27001 compliance report."""
         controls = self._load_iso27001_controls()
-        
-        implemented = sum(1 for c in controls if c["status"] == "implemented")
-        pending = len(controls) - implemented
+        implemented, pending, percentage = self._calculate_summary(controls)
         
         return {
             "framework": "ISO 27001:2022",
@@ -84,7 +134,7 @@ class ComplianceReporter:
             "controls": controls,
             "implemented_count": implemented,
             "pending_count": pending,
-            "compliance_percentage": round((implemented / len(controls)) * 100, 2),
+            "compliance_percentage": percentage,
         }
     
     def _generate_gdpr_report(self):
@@ -102,20 +152,30 @@ class ComplianceReporter:
         controls_path = _safe_repo_path("configs/organization-policies/soc2-compliance-mapping.json")
         with open(controls_path, encoding="utf-8") as f:
             data = json.load(f)
-        controls = data.get("controls", [])
-        if not isinstance(controls, list):
-            raise ValueError("SOC2 controls format is invalid: expected list")
-        return controls
+        controls = data.get("controls")
+        if isinstance(controls, list):
+            return controls
+
+        control_mappings = data.get("control_mappings")
+        if isinstance(control_mappings, dict):
+            return self._normalize_mapping_controls("SOC2", control_mappings)
+
+        raise ValueError("SOC2 controls format is invalid: expected controls list or control_mappings object")
     
     def _load_iso27001_controls(self):
         """Load ISO 27001 control status."""
         controls_path = _safe_repo_path("configs/organization-policies/iso27001-compliance-mapping.json")
         with open(controls_path, encoding="utf-8") as f:
             data = json.load(f)
-        controls = data.get("controls", [])
-        if not isinstance(controls, list):
-            raise ValueError("ISO27001 controls format is invalid: expected list")
-        return controls
+        controls = data.get("controls")
+        if isinstance(controls, list):
+            return controls
+
+        annex_a_controls = data.get("annex_a_controls")
+        if isinstance(annex_a_controls, dict):
+            return self._normalize_nested_control_groups("ISO27001", annex_a_controls)
+
+        raise ValueError("ISO27001 controls format is invalid: expected controls list or annex_a_controls object")
 
 
 def generate_report(framework="SOC2"):

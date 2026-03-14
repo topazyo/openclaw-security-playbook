@@ -93,7 +93,7 @@ docker inspect clawdbot | jq '.[0].HostConfig' | grep -E "(User|CapDrop|Readonly
 # "User": "1000:1000"
 # "CapDrop": ["ALL"]
 # "ReadonlyRootfs": true
-# "SecurityOpt": ["no-new-privileges=true", "seccomp=/path/to/profile.json"]
+# "SecurityOpt": ["no-new-privileges:true", "seccomp=/path/to/profile.json"]
 ```
 
 **Reference**: [Runtime Sandboxing Guide](../guides/04-runtime-sandboxing.md)

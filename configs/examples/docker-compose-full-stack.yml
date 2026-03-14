@@ -19,6 +19,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=100m
+      - /var/run:rw,noexec,nosuid,nodev,size=10m
+    pids_limit: 100
     volumes:
       - ./config:/app/config:ro
       - ./skills:/app/skills:ro
@@ -35,7 +37,6 @@ services:
         limits:
           cpus: '2.0'
           memory: 2G
-          pids: 100
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
       interval: 30s

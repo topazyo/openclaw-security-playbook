@@ -43,22 +43,24 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 
 ---
 
-### Compliance Dashboard
+### Validated Mapping Dashboard
 
-| Annex A Section | Total Controls | Implemented | Evidence Available | Compliance % |
-|-----------------|----------------|-------------|-------------------|--------------|
-| A.5 (Organizational) | 37 | 37 | 37 | 100% |
-| A.6 (People) | 8 | 8 | 8 | 100% |
-| A.7 (Physical) | 14 | 14 | 14 | 100% |
-| A.8 (Technological) | 34 | 34 | 34 | 100% |
-| **TOTAL** | **93** | **90** | **90** | **96.8%** |
+| Annex A Section | Mapped Controls | Implemented | Evidence Available | Compliance % |
+|-----------------|-----------------|-------------|-------------------|--------------|
+| A.5 (Organizational) | 3 | 3 | 3 | 100% |
+| A.6 (People) | 3 | 3 | 3 | 100% |
+| A.7 (Physical) | 2 | 2 | 2 | 100% |
+| A.8 (Technological) | 11 | 11 | 11 | 100% |
+| **TOTAL** | **19** | **19** | **19** | **100.0%** |
 
 **Last Audit**: January 2026 (Certification Audit)  
 **Next Audit**: January 2027 (Surveillance Audit)  
 **Non-Conformities**: 0  
 **Opportunities for Improvement**: 3 (documented in CAR tracker)
 
-> **⚠️ Known Gap (Cycle 2):** Controls tied to skill signature validation and detection parity are under active remediation (`C2-DET-004`, `C2-DET-001`, `C2-DOC-002`). Dashboard totals are temporarily reduced until remediation evidence is complete.
+> **Validation Basis:** This dashboard reflects the 19 Annex A controls explicitly represented in `configs/organization-policies/iso27001-compliance-mapping.json` and validated by `tools/openclaw-cli.py report compliance --framework ISO27001` during Batch H evidence collection.
+
+> **Scope Note:** This is the source-backed control set currently modeled in-repo. It does not claim full Annex A coverage beyond the controls that are explicitly mapped and evidence-backed in the repository.
 
 ---
 
