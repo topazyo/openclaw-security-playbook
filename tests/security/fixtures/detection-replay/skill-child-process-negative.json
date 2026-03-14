@@ -1,0 +1,5 @@
+{
+  "ParentImage": "/usr/bin/node",
+  "Image": "/usr/bin/python3",
+  "CommandLine": "python3 -m pip install clawdbot-plugin"
+}

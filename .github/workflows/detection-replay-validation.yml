@@ -1,0 +1,43 @@
+name: Detection Replay Validation
+
+on:
+  pull_request:
+    paths:
+      - 'detections/**'
+      - 'scripts/verification/validate_detection_replay.py'
+      - 'tests/security/fixtures/detection-replay/**'
+      - 'tests/security/test_detection_replay_validation.py'
+      - 'docs/threat-model/detection-replay-matrix.md'
+      - '.github/workflows/detection-replay-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detection-replay-validation:
+    name: Detection Replay Pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install replay dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml
+          sudo apt-get update
+          sudo apt-get install -y yara
+
+      - name: Run replay unit tests
+        run: |
+          pytest tests/security/test_detection_replay_validation.py -v
+
+      - name: Execute replay fixtures
+        run: |
+          python scripts/verification/validate_detection_replay.py --require-yara

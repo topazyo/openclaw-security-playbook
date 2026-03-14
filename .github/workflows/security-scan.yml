@@ -87,9 +87,9 @@ jobs:
   npm-audit:
     name: NPM Security Audit
     runs-on: ubuntu-latest
-    if: hashFiles('package.json') != ''
     steps:
       - name: Checkout repository
+        if: ${{ hashFiles('package.json') != '' }}
         uses: actions/checkout@v4
 
       - name: Set up Node.js

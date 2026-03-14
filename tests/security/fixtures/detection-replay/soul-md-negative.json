@@ -1,0 +1,6 @@
+{
+  "Image": "/usr/bin/node",
+  "CommandLine": "node /opt/openclaw/openclaw.mjs --bootstrap-soul",
+  "TargetFilename": "/opt/openclaw/SOUL.md",
+  "EventType": "FileModified"
+}

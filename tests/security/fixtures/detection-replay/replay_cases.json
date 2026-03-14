@@ -1,0 +1,121 @@
+[
+  {
+    "name": "gateway-exposure-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-gateway-exposure.yml",
+    "fixture": "tests/security/fixtures/detection-replay/gateway-exposure-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "gateway-exposure-negative-localhost",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-gateway-exposure.yml",
+    "fixture": "tests/security/fixtures/detection-replay/gateway-exposure-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "skill-child-process-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-skill-child-process.yml",
+    "fixture": "tests/security/fixtures/detection-replay/skill-child-process-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "skill-child-process-negative-pip-install",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-skill-child-process.yml",
+    "fixture": "tests/security/fixtures/detection-replay/skill-child-process-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "credential-harvest-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-credential-harvest.yml",
+    "fixture": "tests/security/fixtures/detection-replay/credential-harvest-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "credential-harvest-negative-benign-read",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-credential-harvest.yml",
+    "fixture": "tests/security/fixtures/detection-replay/credential-harvest-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "soul-md-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-soul-md-modification.yml",
+    "fixture": "tests/security/fixtures/detection-replay/soul-md-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "soul-md-negative-agent-write",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-soul-md-modification.yml",
+    "fixture": "tests/security/fixtures/detection-replay/soul-md-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "tls-downgrade-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-tls-downgrade.yml",
+    "fixture": "tests/security/fixtures/detection-replay/tls-downgrade-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "tls-downgrade-negative-tls13",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-tls-downgrade.yml",
+    "fixture": "tests/security/fixtures/detection-replay/tls-downgrade-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "runtime-hardening-drift-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "runtime-hardening-drift-negative-hardened",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "supply-chain-drift-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-supply-chain-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/supply-chain-drift-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "gateway-config-drift-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-gateway-config-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/gateway-config-drift-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "yara-malicious-skill-positive",
+    "kind": "yara",
+    "rule": "detections/ioc/ioc-openclaw.yar",
+    "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill.md",
+    "expected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+  },
+  {
+    "name": "yara-soul-injection-positive",
+    "kind": "yara",
+    "rule": "detections/ioc/ioc-openclaw.yar",
+    "fixture": "tests/security/fixtures/detection-replay/yara-soul-injection.md",
+    "expected_rules": ["OpenClaw_SOUL_Injection_Persistence"]
+  },
+  {
+    "name": "yara-gateway-config-positive",
+    "kind": "yara",
+    "rule": "detections/ioc/ioc-openclaw.yar",
+    "fixture": "tests/security/fixtures/detection-replay/yara-gateway-config.yml",
+    "expected_rules": ["OpenClaw_Gateway_Exposed_Config"]
+  }
+]

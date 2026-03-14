@@ -1,0 +1,4 @@
+{
+  "Image": "/usr/bin/docker",
+  "CommandLine": "docker run --name clawdbot-prod openclaw-agent:latest"
+}
