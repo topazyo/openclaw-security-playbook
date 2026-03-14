@@ -15,8 +15,6 @@ date: 2026-02-21
 tags:
   - attack.execution
   - attack.t1059
-  - atlas.aml.ta0003
-  - atlas.t-exec-005
 logsource:
   category: process_creation
   product: linux

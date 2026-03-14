@@ -47,6 +47,21 @@ See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
 - Tier 2/3 queries: openclaw-telemetry installed and configured with SIEM CEF/syslog forwarding
 - Sigma rules: sigmac or pySigma installed for conversion to your target platform
 
+## Validation
+
+Detection content can be validated locally or in CI with:
+
+```bash
+python scripts/verification/validate_detection_rules.py
+```
+
+Requirements:
+
+- `sigma` in `PATH` for Sigma rule validation
+- `yarac` in `PATH` for YARA compilation
+
+The GitHub Actions lint workflow installs both toolchains on Ubuntu runners and executes this validation automatically.
+
 ## Telemetry Schema
 
 Tier 2 and 3 queries assume the openclaw-telemetry JSONL schema:

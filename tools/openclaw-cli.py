@@ -349,9 +349,16 @@ def weekly(ctx, start, end, output):
 def compliance(ctx, framework, output):
     """Generate compliance report."""
     click.echo(f"[*] Generating {framework} compliance report...")
+
+    safe_output = None
+    if output:
+        safe_output = _validate_output_path(output)
     
     compliance_reporter = _load_tool_module("compliance-reporter.py", "compliance_reporter")
-    report = compliance_reporter.generate_report(framework=framework)
+    try:
+        report = compliance_reporter.generate_report(framework=framework)
+    except (FileNotFoundError, ValueError, json.JSONDecodeError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
     
     # Display control status
     click.echo(f"\n[*] Control Status:")
@@ -359,8 +366,7 @@ def compliance(ctx, framework, output):
     click.echo(f"  -Pending: {report['pending_count']}")
     click.echo(f"  - Compliance: {report['compliance_percentage']}%")
     
-    if output:
-        safe_output = _validate_output_path(output)
+    if safe_output:
         safe_output.parent.mkdir(parents=True, exist_ok=True)
         with open(safe_output, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)

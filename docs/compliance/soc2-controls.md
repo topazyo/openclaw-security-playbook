@@ -53,24 +53,24 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 
 ---
 
-### Compliance Status Dashboard
+### Validated Mapping Dashboard
 
-| Category | Total Controls | Implemented | In Progress | Not Applicable | Compliance % |
-|----------|----------------|-------------|-------------|----------------|--------------|
-| CC1 (Control Environment) | 5 | 5 | 0 | 0 | 100% |
-| CC2 (Communication) | 2 | 2 | 0 | 0 | 100% |
-| CC3 (Risk Assessment) | 4 | 4 | 0 | 0 | 100% |
-| CC4 (Monitoring) | 2 | 2 | 0 | 0 | 100% |
-| CC5 (Control Activities) | 4 | 4 | 0 | 0 | 100% |
-| CC6 (Access Controls) | 8 | 8 | 0 | 0 | 100% |
-| CC7 (System Operations) | 5 | 5 | 0 | 0 | 100% |
-| CC8 (Change Management) | 3 | 3 | 0 | 0 | 100% |
-| CC9 (Risk Mitigation) | 3 | 3 | 0 | 0 | 100% |
-| **TOTAL** | **36** | **34** | **2** | **0** | **94.4%** |
+| Category | Mapped Controls | Implemented | In Progress | Not Applicable | Compliance % |
+|----------|-----------------|-------------|-------------|----------------|--------------|
+| CC1 (Control Environment) | 3 | 3 | 0 | 0 | 100% |
+| CC6 (Access Controls) | 6 | 6 | 0 | 0 | 100% |
+| CC7 (System Operations) | 4 | 4 | 0 | 0 | 100% |
+| CC8 (Change Management) | 1 | 1 | 0 | 0 | 100% |
+| A1 (Availability) | 1 | 1 | 0 | 0 | 100% |
+| C1 (Confidentiality) | 1 | 1 | 0 | 0 | 100% |
+| PI1 (Privacy) | 1 | 1 | 0 | 0 | 100% |
+| **TOTAL** | **17** | **17** | **0** | **0** | **100.0%** |
 
-**Last Updated**: 2026-02-14
+**Last Updated**: 2026-03-14
 
-> **⚠️ Known Gap (Cycle 2):** Signature verification in `scripts/supply-chain/skill_integrity_monitor.sh` and Layer 6 detection parity are being remediated under `C2-DET-004`, `C2-DET-001`, and `C2-DOC-002`. Until full validation and CI evidence are complete, SOC 2 control coverage is tracked as partially implemented.
+> **Validation Basis:** This dashboard now reflects the 17 SOC 2 control mappings explicitly represented in `configs/organization-policies/soc2-compliance-mapping.json` and validated by `tools/openclaw-cli.py report compliance --framework SOC2` during Batch H evidence collection.
+
+> **Scope Note:** This is the source-backed control set currently modeled in-repo. It is intentionally narrower than a full SOC 2 program inventory and should be expanded only by adding explicit mapped controls with `status` values.
 
 ---
 

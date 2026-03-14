@@ -7,11 +7,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: YAML Lint
         run: |
-          pip install yamllint
+          pip install yamllint sigma-cli
           yamllint configs/
       - name: ShellCheck
         run: |
-          sudo apt install shellcheck
+          sudo apt-get update
+          sudo apt-get install -y shellcheck yara
           shellcheck scripts/**/*.sh
+      - name: Validate Detection Rules
+        run: |
+          python scripts/verification/validate_detection_rules.py
