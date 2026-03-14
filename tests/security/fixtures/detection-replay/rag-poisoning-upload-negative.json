@@ -1,0 +1,5 @@
+{
+  "RequestPath": "/api/v1/documents/upload",
+  "Filename": "Employee_Onboarding_Guide.pdf",
+  "DocumentText": "EMPLOYEE ONBOARDING GUIDE\nWelcome to the company. This document covers benefits enrollment, workstation setup, and training schedules."
+}

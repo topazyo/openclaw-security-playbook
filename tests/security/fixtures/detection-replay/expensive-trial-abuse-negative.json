@@ -1,0 +1,9 @@
+{
+  "EventType": "api_request",
+  "RequestPath": "/v1/chat",
+  "UserTier": "enterprise",
+  "Model": "claude-3-haiku",
+  "EstimatedInputTokens": 1200,
+  "MaxTokens": 512,
+  "Message": "Summarize the quarterly support metrics in three bullet points."
+}

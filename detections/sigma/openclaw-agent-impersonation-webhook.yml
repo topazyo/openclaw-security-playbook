@@ -1,0 +1,31 @@
+title: OpenClaw Agent Impersonation via Webhook Skill
+id: 2a1dc58f-ff1d-43f5-a7ec-bad93cf4cf02
+status: experimental
+description: >
+  Detects an agent webhook skill posting directly to an internal queue endpoint
+  with payload fragments that impersonate the approval agent and request admin
+  user creation. This matches the scenario 004 multi-agent coordination attack.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-03-14
+tags:
+  - attack.privilege-escalation
+  - attack.t1068
+  - attack.t1136
+logsource:
+  category: application
+  product: linux
+detection:
+  selection_skill:
+    SkillName: 'webhook_sender'
+  selection_target:
+    Url|contains: 'internal-rabbitmq.clawdbot.local:15672/api/queues/admin-agent-queue/publish'
+  selection_payload:
+    RequestBody|contains|all:
+      - '"from":"approval-agent-01"'
+      - '"action":"create_admin_user"'
+  condition: selection_skill and selection_target and selection_payload
+falsepositives:
+  - Approved integration testing that publishes signed administrative queue messages
+level: critical

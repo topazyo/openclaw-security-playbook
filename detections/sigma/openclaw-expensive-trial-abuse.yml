@@ -1,0 +1,32 @@
+title: OpenClaw Expensive Trial Account Request Burst
+id: 8df63d7e-f5c1-45cd-bbc8-9b16d7671504
+status: experimental
+description: >
+  Detects trial-account chat requests that combine the most expensive model,
+  near-maximum context size, and maximum output budget. This is a replay-backed
+  proxy for the scenario 007 resource exhaustion attack path.
+references:
+  - https://github.com/topazyo/openclaw-security-playbook
+author: openclaw-security-playbook
+date: 2026-03-14
+tags:
+  - attack.impact
+  - attack.t1499
+  - attack.t1496
+logsource:
+  category: application
+  product: linux
+detection:
+  selection_endpoint:
+    EventType: 'api_request'
+    RequestPath: '/v1/chat'
+  selection_trial:
+    UserTier: 'trial'
+  selection_expensive:
+    Model: 'claude-3-opus'
+    EstimatedInputTokens: 195000
+    MaxTokens: 4096
+  condition: selection_endpoint and selection_trial and selection_expensive
+falsepositives:
+  - Explicit load testing executed under a documented trial-abuse simulation
+level: high

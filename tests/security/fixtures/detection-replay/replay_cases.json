@@ -1,5 +1,89 @@
 [
   {
+    "name": "mcp-path-traversal-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-negative-benign-download",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "mcp-path-traversal-evasion-encoded-null",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-negative-slack-notify",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "rag-poisoning-upload-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-rag-poisoning-upload.yml",
+    "fixture": "tests/security/fixtures/detection-replay/rag-poisoning-upload-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "rag-poisoning-upload-negative-benign-policy",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-rag-poisoning-upload.yml",
+    "fixture": "tests/security/fixtures/detection-replay/rag-poisoning-upload-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "rag-poisoning-upload-evasion-case-whitespace-null",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-rag-poisoning-upload.yml",
+    "fixture": "tests/security/fixtures/detection-replay/rag-poisoning-upload-evasion.json",
+    "should_match": true
+  },
+  {
+    "name": "expensive-trial-abuse-positive",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-expensive-trial-abuse.yml",
+    "fixture": "tests/security/fixtures/detection-replay/expensive-trial-abuse-positive.json",
+    "should_match": true
+  },
+  {
+    "name": "expensive-trial-abuse-evasion-case",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-expensive-trial-abuse.yml",
+    "fixture": "tests/security/fixtures/detection-replay/expensive-trial-abuse-evasion.json",
+    "should_match": true
+  },
+  {
+    "name": "expensive-trial-abuse-negative-enterprise-summary",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-expensive-trial-abuse.yml",
+    "fixture": "tests/security/fixtures/detection-replay/expensive-trial-abuse-negative.json",
+    "should_match": false
+  },
+  {
+    "name": "gateway-exposure-evasion-case-whitespace",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-gateway-exposure.yml",
+    "fixture": "tests/security/fixtures/detection-replay/gateway-exposure-evasion.json",
+    "should_match": true
+  },
+  {
     "name": "gateway-exposure-positive",
     "kind": "sigma",
     "rule": "detections/sigma/openclaw-gateway-exposure.yml",

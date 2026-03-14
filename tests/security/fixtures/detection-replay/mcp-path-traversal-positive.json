@@ -1,0 +1,7 @@
+{
+  "RequestPath": "/api/download",
+  "QueryString": "file=../../../../home/clawdbot/.env",
+  "HttpMethod": "GET",
+  "DestinationPort": 3000,
+  "UserAgent": "Mozilla/5.0 (exploit-scanner)"
+}
