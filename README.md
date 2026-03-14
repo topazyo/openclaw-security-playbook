@@ -63,94 +63,6 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 
 ## 📦 What's Included
 
-This playbook provides a **complete, production-ready security framework** with 90+ files:
-
-### 📚 Documentation (20 files)
-- **Policies:** 4 security policies (data classification, vulnerability management, access control, incident response)
-- **Procedures:** 4 operational procedures (incident response, vulnerability management, access review, backup/recovery)
-- **Guides:** 8 implementation guides (quick start through detection & hunting)
-- **Checklists:** 3 operational checklists (security review, onboarding, production deployment)
-- **Threat Model:** MITRE ATLAS attack chain mapping with 5 kill chains and framework cross-references
-
-### 💻 Implementation Examples (32 files)
-- **Security Controls:** 5 Python implementations (input validation, rate limiting, authentication, encryption, logging)
-- **Incident Response:** 6 playbooks + templates (IRP-001 through IRP-006)
-- **Monitoring:** 8 Grafana dashboards + 3 alert rule sets
-- **Compliance:** 2 compliance mapping files (SOC 2, ISO 27001)
-
-### 🔍 Detection Rules (18 files)
-- **IOCs:** Domain, port, process, and file path indicators + YARA rules for credential exfiltration, malicious skills, and SOUL.md injection
-- **Sigma:** 4 platform-agnostic rules (credential harvest, gateway exposure, skill child process, SOUL.md modification)
-- **MDE (KQL):** Discovery, behavioral hunting (5 hunts), and kill chain detection (5 chains) for Microsoft Defender for Endpoint
-- **Splunk (SPL):** Discovery and behavioral hunting queries
-- **Telemetry Schema:** JSONL event format for openclaw-telemetry integration
-
-### 🤖 Automation Scripts (15 files)
-- **Discovery:** OS vulnerability scanning, dependency checking, IoC scanning
-- **Incident Response:** Auto-containment, forensics collection, notification management, ticket creation, timeline generation
-- **Forensics:** Evidence preservation, attack timeline reconstruction, credential scope assessment, hash chain verification
-- **Supply Chain:** Skill integrity monitoring, manifest validation
-- **Verification:** Security posture assessment
-
-### ⚙️ Configuration Files (9 files)
-- **Agent Config:** openclaw-agent.yml with dev/staging/prod overrides
-- **MCP Server:** mcp-server-hardening.yml with TLS 1.3+, mTLS, OAuth2
-- **Monitoring:** Prometheus, Grafana datasources, Alertmanager routing
-- **Authentication:** Certificate management, key rotation
-- **Templates:** Secure defaults for credentials, gateway, nginx
-
-### ✅ Testing Framework (9 files)
-- **Unit Tests (4):** Input validation, rate limiting, authentication, encryption
-- **Integration Tests (3):** Playbook procedures, backup/recovery, access review
-- **Security Tests (2):** Policy compliance, vulnerability scanning
-- **Coverage:** pytest with mocking for isolated testing
-
-### 🛠️ Operational Tools (6 files)
-- **openclaw-cli.py:** Comprehensive CLI (scan/playbook/report/config/simulate)
-- **policy-validator.py:** SEC-002/003/004/005 compliance validation
-- **incident-simulator.py:** Credential exfiltration, MCP compromise, DoS scenarios
-- **compliance-reporter.py:** SOC 2/ISO 27001/GDPR report generation
-- **certificate-manager.py:** Let's Encrypt ACME automation
-- **config-migrator.py:** Zero-downtime configuration upgrades
-
-### 🎓 Training Materials (2 files)
-- **security-training.md:** 4-hour security team training (architecture, operations, incident response, monitoring)
-- **developer-guide.md:** 2-hour developer onboarding (integration, testing, troubleshooting)
-
-### 🤖 CI/CD Workflows (2 files)
-- **security-scan.yml:** Trivy, Bandit, npm audit, pip-audit, Gitleaks, SBOM generation
-- **compliance-check.yml:** Policy validation, YAML linting, security tests, compliance reports
-
-**Total: 110+ files providing enterprise-grade AI agent security**
-
----
-
-## 🚀 Quick Start (15 Minutes)
-
-Get a hardened AI agent running in 15 minutes:
-
-```bash
-# 1. Clone repository
-git clone https://github.com/YOUR-ORG/clawdbot-security-playbook.git
-cd clawdbot-security-playbook
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Run security verification (pre-flight check)
-./scripts/verification/verify_openclaw_security.sh
-
-# 4. Validate configuration
-openclaw-cli config validate configs/agent-config/openclaw-agent.yml
-
-# 5. Scan for vulnerabilities
-openclaw-cli scan vulnerability --target production
-
-# 6. Deploy with Docker (hardened)
-docker run -d \
-
-  ## 📦 What's Included
-
   This playbook provides a **comprehensive, production-ready security framework** for AI agents, with 110+ files and full scenario-to-detection coverage:
 
   ### 📚 Documentation & Threat Modeling
@@ -201,6 +113,33 @@ docker run -d \
   - **Detection Replay:** Adversarial replay and evasion validation (`.github/workflows/detection-replay-validation.yml`)
 
   **Total: 110+ files providing enterprise-grade, scenario-complete AI agent security**
+
+---
+
+## 🚀 Quick Start (15 Minutes)
+
+Get a hardened AI agent running in 15 minutes:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/YOUR-ORG/clawdbot-security-playbook.git
+cd clawdbot-security-playbook
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Run security verification (pre-flight check)
+./scripts/verification/verify_openclaw_security.sh
+
+# 4. Validate configuration
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
+
+# 5. Scan for vulnerabilities
+openclaw-cli scan vulnerability --target production
+
+# 6. Deploy with Docker (hardened)
+docker run -d \
+
 |--------|---------|-------|
 | **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
 | **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
