@@ -140,14 +140,7 @@ openclaw-cli scan vulnerability --target production
 # 6. Deploy with Docker (hardened)
 docker run -d \
 
-|--------|---------|-------|
-| **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
-| **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
-| **[backup-restore.sh](configs/examples/backup-restore.sh)** | Backup and restore | `./backup-restore.sh backup` |
-| **[collect_evidence.sh](scripts/forensics/collect_evidence.sh)** | Incident evidence preservation | `./collect_evidence.sh [--containment]` |
-| **[build_timeline.sh](scripts/forensics/build_timeline.sh)** | Attack timeline reconstruction | `./build_timeline.sh --incident-dir ~/openclaw-incident-*` |
-| **[check_credential_scope.sh](scripts/forensics/check_credential_scope.sh)** | Credential exposure assessment | `./check_credential_scope.sh [YYYY-MM-DD]` |
-| **[verify_hash_chain.py](scripts/forensics/verify_hash_chain.py)** | Telemetry tamper detection | `python verify_hash_chain.py --input telemetry.jsonl` |
+...existing code...
 
 ---
 
@@ -374,6 +367,18 @@ External Request
 ---
 
 ## 🛠️ Operational Tools & CLI
+
+### Operational Scripts
+
+| Script | Purpose | Example Command |
+|--------|---------|-------|
+| **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
+| **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
+| **[backup-restore.sh](configs/examples/backup-restore.sh)** | Backup and restore | `./backup-restore.sh backup` |
+| **[collect_evidence.sh](scripts/forensics/collect_evidence.sh)** | Incident evidence preservation | `./collect_evidence.sh [--containment]` |
+| **[build_timeline.sh](scripts/forensics/build_timeline.sh)** | Attack timeline reconstruction | `./build_timeline.sh --incident-dir ~/openclaw-incident-*` |
+| **[check_credential_scope.sh](scripts/forensics/check_credential_scope.sh)** | Credential exposure assessment | `./check_credential_scope.sh [YYYY-MM-DD]` |
+| **[verify_hash_chain.py](scripts/forensics/verify_hash_chain.py)** | Telemetry tamper detection | `python verify_hash_chain.py --input telemetry.jsonl` |
 
 ### openclaw-cli Command-Line Tool
 
