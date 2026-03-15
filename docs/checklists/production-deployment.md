@@ -68,7 +68,8 @@ This checklist MUST be completed and approved before ANY production deployment o
 - [ ] **Gateway binds to localhost** (`127.0.0.1:18789`, NOT `0.0.0.0`)
 - [ ] **VPN required for access** (Tailscale/WireGuard configured and tested)
 - [ ] **Firewall rules applied** (block public internet, allow VPN only)
-- [ ] **TLS 1.3 enforced** (AES-256-GCM or equivalent approved TLS 1.3 ciphers, valid certificates)
+- [ ] **TLS 1.3 enforced** (AES-256-GCM or equivalent approved TLS 1.3 ciphers, valid certificates)  
+  _Certificate provisioning: use `openclaw-cli scan certificates` to check expiry; `tools/certificate-manager.py` for renewal automation._
 
 **Network Engineer Sign-Off**: ______________________________ Date: ______
 
@@ -85,7 +86,8 @@ This checklist MUST be completed and approved before ANY production deployment o
 
 ### 2.4 Supply Chain Security
 - [ ] **Container image scanned** (Trivy: 0 critical, <5 high vulnerabilities)
-- [ ] **Image pinned by digest** (`openclaw/clawdbot:1.2.3@sha256:abc123...`)
+- [ ] **Image pinned by digest** (paste the full digest from your build output, e.g. `openclaw/clawdbot:1.2.3@sha256:<64-char-hex-from-build>`)  
+  _Do not use a placeholder digest — copy the actual 64-character SHA-256 from `docker buildx imagetools inspect` or your CI artifact._
 - [ ] **SBOM generated and reviewed** (Syft output attached)
 - [ ] **Dependencies audited** (`pip-audit`, `npm audit`: 0 critical)
 - [ ] **Skills on allowlist** (no unapproved skills installed)
@@ -110,7 +112,7 @@ This checklist MUST be completed and approved before ANY production deployment o
 
 ### 3.2 Testing
 - [ ] **Unit tests passed** (100% in critical modules)
-- [ ] **Integration tests passed** (all 247 tests green)
+- [ ] **Integration tests passed** (run `pytest tests/integration/` and confirm all tests in `tests/integration/` pass)
 - [ ] **Smoke tests passed** (critical user flows verified)
 - [ ] **Load tests passed** (if performance-sensitive change)
 - [ ] **Security regression tests passed** (exploit tests fail as expected)
@@ -247,7 +249,7 @@ kubectl scale deployment clawdbot --replicas=0
 kubectl apply -f configs/examples/production-k8s.yml
 
 # Or Docker Compose
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Wait for rollout
 kubectl rollout status deployment/clawdbot
@@ -343,9 +345,9 @@ Monitor for:
 kubectl rollout undo deployment/clawdbot
 
 # Or Docker Compose (with previous-stable tag)
-docker-compose -f configs/examples/docker-compose-full-stack.yml down
+docker compose -f configs/examples/docker-compose-full-stack.yml down
 docker pull openclaw/clawdbot:previous-stable
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 ```
 
 #### Step 2: Restore Data (if needed)

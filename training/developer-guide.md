@@ -37,7 +37,7 @@ Audience: Application developers, DevOps engineers
 
 ```bash
 # Development environment
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Production environment (Kubernetes)
 kubectl apply -f configs/examples/production-k8s.yml

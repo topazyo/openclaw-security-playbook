@@ -10,7 +10,7 @@
 [![SOC 2 Type II](https://img.shields.io/badge/SOC%202-17%20mapped%20controls-green.svg)](configs/organization-policies/soc2-compliance-mapping.json)
 [![ISO 27001:2022](https://img.shields.io/badge/ISO%2027001-19%20mapped%20controls-green.svg)](configs/organization-policies/iso27001-compliance-mapping.json)
 [![GDPR](https://img.shields.io/badge/GDPR-policy%20mapped-green.svg)](docs/policies/data-classification.md)
-[![Tests](https://img.shields.io/badge/tests-9%20suites%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-15%20files%2C%203%20dirs-brightgreen.svg)](tests/)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue.svg)](.github/workflows/)
 
 ---
@@ -19,12 +19,10 @@
 
 AI agents like OpenClaw/ClawdBot face critical security vulnerabilities:
 
-- **90% credential exposure rate** due to plaintext config files and backup file persistence
+- **Credential exposure** via plaintext config files and backup file persistence
 - **Localhost authentication bypass** via SSH tunneling and reverse proxies
 - **Supply chain attacks** through malicious skill installation
 - **Prompt injection** leading to unauthorized tool execution
-
-**Real-world impact:** 1,200+ exposed instances discovered in 2023-2024 research.
 
 ---
 
@@ -43,8 +41,9 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 │  Layer 5: Supply Chain Security                             │
 │  • Skill integrity • GPG verification • Allowlists          │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 4: Runtime Security Enforcement                      │
-│  • Prompt injection guards • PII redaction • openclaw-shield│
+│  Layer 4: Runtime Security Enforcement (Optional)          │
+│  • Prompt injection guards • PII redaction                 │
+│  • openclaw-shield (external, not vendored by this repo)   │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Runtime Sandboxing                                │
 │  • Docker security • Read-only FS • Capability dropping     │
@@ -57,7 +56,7 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Result:** Zero successful attacks when all layers are deployed.
+**Result:** Layers 1–3 and 5–7 are fully covered by this repo's guidance, configs, and validation tooling. Layers 4, 6, and 7 include optional integrations with external community tools (`openclaw-shield`, `openclaw-telemetry`, `openclaw-detect`) documented in `docs/guides/08-community-tools-integration.md` — these are not vendored or verified by this repo.
 
 ---
 

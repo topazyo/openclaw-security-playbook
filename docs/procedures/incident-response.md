@@ -23,6 +23,10 @@ This runbook provides step-by-step procedures for responding to security inciden
 
 ## Quick Reference
 
+> **⚠️ FILL IN BEFORE OPERATIONAL USE** — the contact details below are placeholder examples.
+> Replace every `@company.com` address and phone number with your organisation's real contacts
+> before distributing this runbook to your incident response team.
+
 ### Emergency Contacts
 
 | Role | Contact | Availability |
@@ -351,9 +355,9 @@ pkill -f evil-miner
 **For severely compromised systems** (e.g., container escape, rootkit):
 ```bash
 # Full rebuild from clean images
-docker-compose -f configs/examples/docker-compose-full-stack.yml down
+docker compose -f configs/examples/docker-compose-full-stack.yml down
 docker system prune -a --volumes  # Remove all containers/images
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Verify integrity of the deployed skill set
 ./scripts/supply-chain/skill_integrity_monitor.sh --skills-dir ~/.openclaw/skills
@@ -423,7 +427,7 @@ kubectl rollout status deployment/clawdbot
 ```bash
 # Increase log verbosity
 sed -i 's/LOG_LEVEL=INFO/LOG_LEVEL=DEBUG/' .env
-docker-compose restart
+docker compose restart
 
 # Run anomaly detection in follow mode during the recovery watch window
 python scripts/monitoring/anomaly_detector.py \
@@ -593,7 +597,7 @@ docker kill <container-id>
 rm -rf /path/to/malicious-components
 
 # Rebuild from clean images
-docker-compose down && docker system prune -a && docker-compose up -d
+docker compose down && docker system prune -a && docker compose up -d
 
 # Verify integrity
 ./scripts/verification/verify_openclaw_security.sh
@@ -609,6 +613,8 @@ python scripts/incident-response/notification-manager.py --incident SEC-INC-XXX 
 ---
 
 ## Escalation Matrix
+
+> **⚠️ FILL IN BEFORE OPERATIONAL USE** — names, emails, and phone numbers below are placeholder examples.
 
 ### Security Team
 

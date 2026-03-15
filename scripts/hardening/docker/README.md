@@ -63,11 +63,11 @@ ls -la secrets/
 mkdir -p data/{redis,postgres,prometheus,grafana}
 
 # 5. Start services
-docker-compose up -d
+docker compose up -d
 
 # 6. Check status
-docker-compose ps
-docker-compose logs -f clawdbot-gateway
+docker compose ps
+docker compose logs -f clawdbot-gateway
 
 # 7. Backup generated local secrets (required for rollback)
 mkdir -p backup/secrets
@@ -348,33 +348,33 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Start specific service
-docker-compose up -d clawdbot-gateway
+docker compose up -d clawdbot-gateway
 
 # Scale agent workers
-docker-compose up -d --scale clawdbot-agent=3
+docker compose up -d --scale clawdbot-agent=3
 
 # View logs
-docker-compose logs -f
-docker-compose logs -f clawdbot-gateway
+docker compose logs -f
+docker compose logs -f clawdbot-gateway
 
 # Check service health
-docker-compose ps
+docker compose ps
 ```
 
 ### Stopping Services
 
 ```bash
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes (WARNING: data loss)
-docker-compose down -v
+docker compose down -v
 
 # Stop specific service
-docker-compose stop clawdbot-gateway
+docker compose stop clawdbot-gateway
 ```
 
 ### Managing Secrets
@@ -386,10 +386,10 @@ chmod 600 secrets/new_secret.txt
 
 # Rotate secrets
 echo "new-api-key" > secrets/anthropic_api_key.txt
-docker-compose up -d --force-recreate clawdbot-gateway
+docker compose up -d --force-recreate clawdbot-gateway
 
 # View secret (requires root access to container)
-docker-compose exec clawdbot-gateway cat /run/secrets/anthropic_api_key
+docker compose exec clawdbot-gateway cat /run/secrets/anthropic_api_key
 ```
 
 ### Monitoring
@@ -475,23 +475,23 @@ EOF
 
 ```bash
 # Pull latest images
-docker-compose pull
+docker compose pull
 
 # Rebuild custom images
-docker-compose build --pull
+docker compose build --pull
 
 # Restart with new images
-docker-compose up -d --force-recreate
+docker compose up -d --force-recreate
 ```
 
 ### Backups
 
 ```bash
 # Backup PostgreSQL
-docker-compose exec postgres pg_dump -U clawdbot clawdbot > backup-$(date +%Y%m%d).sql
+docker compose exec postgres pg_dump -U clawdbot clawdbot > backup-$(date +%Y%m%d).sql
 
 # Backup Redis
-docker-compose exec redis redis-cli --rdb /data/dump.rdb
+docker compose exec redis redis-cli --rdb /data/dump.rdb
 docker cp clawdbot-redis:/data/dump.rdb ./backup-redis-$(date +%Y%m%d).rdb
 
 # Backup all data volumes
@@ -502,11 +502,11 @@ tar czf backup-data-$(date +%Y%m%d).tar.gz data/
 
 ```bash
 # Restore PostgreSQL
-docker-compose exec -T postgres psql -U clawdbot clawdbot < backup-20260214.sql
+docker compose exec -T postgres psql -U clawdbot clawdbot < backup-20260214.sql
 
 # Restore Redis
 docker cp backup-redis-20260214.rdb clawdbot-redis:/data/dump.rdb
-docker-compose restart redis
+docker compose restart redis
 ```
 
 ### Secure Rollback
@@ -515,7 +515,7 @@ If a hardening rollout fails mid-flight, use this rollback path:
 
 ```bash
 # 1. Stop hardened stack
-docker-compose down
+docker compose down
 
 # 2. Restore persisted data
 tar xzf backup-data-YYYYMMDD.tar.gz
@@ -525,11 +525,11 @@ cp backup/secrets/*.txt secrets/
 chmod 600 secrets/*.txt
 
 # 4. Relaunch known-good configuration
-docker-compose up -d --force-recreate
+docker compose up -d --force-recreate
 
 # 5. Validate service health
-docker-compose ps
-docker-compose logs --tail=100 clawdbot-gateway
+docker compose ps
+docker compose logs --tail=100 clawdbot-gateway
 ```
 
 Critical: `gateway_secret_key.txt`, `agent_auth_token.txt`, and `postgres_password.txt` are locally generated and must be backed up before any destructive maintenance.
@@ -538,15 +538,15 @@ Critical: `gateway_secret_key.txt`, `agent_auth_token.txt`, and `postgres_passwo
 
 ```bash
 # View logs
-docker-compose logs --tail=100 -f
+docker compose logs --tail=100 -f
 
 # Save logs to file
-docker-compose logs > logs-$(date +%Y%m%d).txt
+docker compose logs > logs-$(date +%Y%m%d).txt
 
 # Clear logs (rotate)
-docker-compose down
+docker compose down
 rm -rf $(docker inspect clawdbot-gateway | jq -r '.[0].LogPath')
-docker-compose up -d
+docker compose up -d
 ```
 
 ---
@@ -557,13 +557,13 @@ docker-compose up -d
 
 ```bash
 # Check logs
-docker-compose logs clawdbot-gateway
+docker compose logs clawdbot-gateway
 
 # Check health status
-docker-compose ps
+docker compose ps
 
 # Recreate service
-docker-compose up -d --force-recreate clawdbot-gateway
+docker compose up -d --force-recreate clawdbot-gateway
 
 # Check resource usage
 docker stats
@@ -577,8 +577,8 @@ docker network ls
 docker network inspect clawdbot-backend
 
 # Test connectivity
-docker-compose exec clawdbot-gateway ping postgres
-docker-compose exec clawdbot-agent curl https://clawdbot-gateway:8443/health
+docker compose exec clawdbot-gateway ping postgres
+docker compose exec clawdbot-agent curl https://clawdbot-gateway:8443/health
 ```
 
 ### Permission Issues
@@ -593,7 +593,7 @@ chmod 600 secrets/*.txt
 chown -R 1000:1000 data/
 
 # Check container user
-docker-compose exec clawdbot-gateway id
+docker compose exec clawdbot-gateway id
 ```
 
 ### High Resource Usage
@@ -607,7 +607,7 @@ docker inspect clawdbot-gateway | jq '.[0].HostConfig.Memory'
 
 # Adjust limits in docker-compose.yml
 # Then restart:
-docker-compose up -d --force-recreate
+docker compose up -d --force-recreate
 ```
 
 ---

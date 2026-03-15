@@ -66,10 +66,10 @@ find ~ -name "*.bak*" -o -name "credentials*.yml" 2>/dev/null
 git clone https://github.com/openclaw/openclaw-security-playbook.git
 cd openclaw-security-playbook
 
-# Create a virtual environment and install dependencies
+# Create a virtual environment and install the package (installs the openclaw-cli entry point)
 python -m venv .venv
 source .venv/bin/activate  # Windows (PowerShell): .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -e .
 
 # Validate the canonical hardened runtime definition
 docker compose -f configs/examples/docker-compose-full-stack.yml config
@@ -160,7 +160,8 @@ skills:
 
   sources:
     allowedRepositories:
-      - "https://github.com/your-approved-org/openclaw-skills"
+      # REQUIRED: replace with your own approved skill repository before deploying
+      - "https://github.com/<your-org>/<your-approved-skills-repo>"
 
   verification:
     requireSignature: true
@@ -182,7 +183,9 @@ Run the automated security verification:
 
 **Verify:** Expected behavior:
 - Output starts with `OpenClaw Security Verification` and seven checks (`[1/7]` through `[7/7]`).
-- On a fresh clone without a running deployment, runtime sandboxing and TLS checks can warn and exit with code `2`.
+- **Exit code 0** — all seven checks passed.
+- **Exit code 1** — one or more critical issues found; do not proceed to deployment.
+- **Exit code 2** — warnings only (no critical issues), or an unknown argument was passed. On a fresh clone without a running deployment, runtime sandboxing and TLS checks will warn rather than fail hard, so code `2` is normal until a compatible deployment is running.
 - After a compatible hardened deployment is running and bound as expected, the script should exit `0` with all seven layers passing.
 
 **If checks fail:**

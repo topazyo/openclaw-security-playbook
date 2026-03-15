@@ -716,7 +716,7 @@ tail -50 ~/.openclaw/logs/credential_migration_*.log
 ```
 
 ### Support Channels
-- **GitHub Issues:** https://github.com/YOUR-ORG/clawdbot-security-playbook/issues
+- **GitHub Issues:** https://github.com/openclaw/openclaw-security-playbook/issues
 - **Documentation:** docs/guides/02-credential-isolation.md
 - **Migration README:** scripts/credential-migration/README.md
 

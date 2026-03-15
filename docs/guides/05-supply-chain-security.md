@@ -268,7 +268,8 @@ skills:
   sources:
     allowedRepositories:
       - "https://github.com/anthropic-ai/openclaw-skills"
-      - "https://github.com/your-org/internal-skills"
+      # REQUIRED: replace with your own approved skill repository before deploying
+      - "https://github.com/<your-org>/<your-approved-skills-repo>"
 
     blockedRepositories:
       - "https://github.com/evil-actor/*"
