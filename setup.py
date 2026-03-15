@@ -8,5 +8,17 @@ setup(
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     include_package_data=True,
-    install_requires=["PyYAML>=6.0"],
+    install_requires=[
+        "PyYAML>=6.0",
+        "click>=8.1",
+        "tabulate>=0.9",
+        "requests>=2.32",
+        "cryptography>=44.0",
+        "boto3>=1.35",
+    ],
+    entry_points={
+        "console_scripts": [
+            "openclaw-cli=clawdbot.openclaw_cli:main",
+        ]
+    },
 )

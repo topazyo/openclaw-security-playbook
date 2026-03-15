@@ -42,6 +42,16 @@ By the end of this training, you will:
 - Experience with Linux command line
 - Python 3.11+ installed
 
+### Environment Setup
+
+Install the package in a virtual environment before running the CLI examples in this guide:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows (PowerShell): .venv\Scripts\Activate.ps1
+pip install -e .
+```
+
 ---
 
 ## Architecture Overview
@@ -99,29 +109,29 @@ By the end of this training, you will:
 
 2. **Scan for New Vulnerabilities**
    ```bash
-   python tools/openclaw-cli.py scan vulnerability --target production
+   openclaw-cli scan vulnerability --target production
    ```
    
 3. **Review Compliance Status**
    ```bash
-   python tools/openclaw-cli.py scan compliance --policy SEC-003
+   openclaw-cli scan compliance --policy SEC-003
    ```
 
 4. **Generate Daily Security Summary**
    ```bash
-   python tools/openclaw-cli.py report weekly --start $(date -d '1 day ago' +%Y-%m-%d) --end $(date +%Y-%m-%d)
+   openclaw-cli report weekly --start $(date -d '1 day ago' +%Y-%m-%d) --end $(date +%Y-%m-%d)
    ```
 
 ### Weekly Tasks
 
 1. **Quarterly Access Review** (every 90 days)
    ```bash
-   python tools/openclaw-cli.py scan access --days 90
+   openclaw-cli scan access --days 90
    ```
    
 2. **Certificate Expiry Check**
    ```bash
-   python tools/openclaw-cli.py scan certificates
+   openclaw-cli scan certificates
    ```
    
 3. **Backup Verification**
@@ -133,7 +143,7 @@ By the end of this training, you will:
 
 1. **SOC 2 Compliance Report**
    ```bash
-   python tools/openclaw-cli.py report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m).json
+   openclaw-cli report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m).json
    ```
    
 2. **Skill Integrity Audit**
@@ -201,10 +211,10 @@ python scripts/vulnerability-scanning/generate-weekly-report.py --output reports
 
 ```bash
 # Execute playbook
-python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
+openclaw-cli playbook execute playbook-credential-theft --severity P0 --dry-run
 
 # Simulate incident for testing
-python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
+openclaw-cli simulate incident --type credential-theft --severity P1
 ```
 
 ---
@@ -268,7 +278,7 @@ Access dashboards at [https://grafana.openclaw.ai](https://grafana.openclaw.ai):
 **Evidence Collection**:
 ```bash
 # Generate SOC 2 report
-python tools/openclaw-cli.py report compliance --framework SOC2 --output audits/soc2-2026-Q1.json
+openclaw-cli report compliance --framework SOC2 --output audits/soc2-2026-Q1.json
 
 # Export audit logs (7-year retention)
 python scripts/monitoring/anomaly_detector.py --logfile ~/.openclaw/logs/telemetry.jsonl --output-json
@@ -284,10 +294,10 @@ python scripts/monitoring/anomaly_detector.py --logfile ~/.openclaw/logs/telemet
 
 **Compliance Check**:
 ```bash
-python tools/openclaw-cli.py scan compliance --policy SEC-002  # Data classification
-python tools/openclaw-cli.py scan compliance --policy SEC-003  # Vulnerability management
-python tools/openclaw-cli.py scan compliance --policy SEC-004  # Access control
-python tools/openclaw-cli.py scan compliance --policy SEC-005  # Incident response
+openclaw-cli scan compliance --policy SEC-002  # Data classification
+openclaw-cli scan compliance --policy SEC-003  # Vulnerability management
+openclaw-cli scan compliance --policy SEC-004  # Access control
+openclaw-cli scan compliance --policy SEC-005  # Incident response
 ```
 
 ### GDPR
@@ -306,43 +316,43 @@ python tools/openclaw-cli.py scan compliance --policy SEC-005  # Incident respon
 
 ```bash
 # Scan operations
-python tools/openclaw-cli.py scan vulnerability --target production
-python tools/openclaw-cli.py scan compliance --policy SEC-003
-python tools/openclaw-cli.py scan access --days 90
+openclaw-cli scan vulnerability --target production
+openclaw-cli scan compliance --policy SEC-003
+openclaw-cli scan access --days 90
 
 # Playbook execution
-python tools/openclaw-cli.py playbook list
-python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
+openclaw-cli playbook list
+openclaw-cli playbook execute playbook-credential-theft --severity P0 --dry-run
 
 # Report generation
-python tools/openclaw-cli.py report weekly --start 2026-02-01 --end 2026-02-21
-python tools/openclaw-cli.py report compliance --framework SOC2
+openclaw-cli report weekly --start 2026-02-01 --end 2026-02-21
+openclaw-cli report compliance --framework SOC2
 
 # Configuration management
-python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
-python tools/openclaw-cli.py config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
+openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
 
 # Incident simulation
-python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
+openclaw-cli simulate incident --type credential-theft --severity P1
 ```
 
 ### Python Tools
 
 ```bash
 # Policy validation
-python tools/openclaw-cli.py scan compliance --policy SEC-002
+openclaw-cli scan compliance --policy SEC-002
 
 # Incident simulation
-python tools/openclaw-cli.py simulate incident --type credential-theft --severity P1
+openclaw-cli simulate incident --type credential-theft --severity P1
 
 # Compliance reporting
-python tools/openclaw-cli.py report compliance --framework SOC2 --output reports/soc2-training.json
+openclaw-cli report compliance --framework SOC2 --output reports/soc2-training.json
 
 # Certificate management
-python tools/openclaw-cli.py scan certificates --output reports/certificates-training.json
+openclaw-cli scan certificates --output reports/certificates-training.json
 
 # Configuration migration
-python tools/openclaw-cli.py config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
+openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
 ```
 
 Standalone tool scripts under `tools/` remain available for debugging, but operational workflows should use `openclaw-cli.py` for consistent policy checks and exit codes.
@@ -369,12 +379,12 @@ Standalone tool scripts under `tools/` remain available for debugging, but opera
 
 1. Simulate credential exfiltration incident:
    ```bash
-   python tools/openclaw-cli.py simulate incident --type credential-theft --severity P0
+   openclaw-cli simulate incident --type credential-theft --severity P0
    ```
 
 2. Execute credential exfiltration playbook:
    ```bash
-   python tools/openclaw-cli.py playbook execute playbook-credential-theft --severity P0 --dry-run
+   openclaw-cli playbook execute playbook-credential-theft --severity P0 --dry-run
    ```
 
 3. Review incident timeline:
@@ -386,15 +396,15 @@ Standalone tool scripts under `tools/` remain available for debugging, but opera
 
 1. Run SOC 2 compliance check:
    ```bash
-python tools/openclaw-cli.py scan compliance --policy SEC-002
-python tools/openclaw-cli.py scan compliance --policy SEC-003
-python tools/openclaw-cli.py scan compliance --policy SEC-004
-python tools/openclaw-cli.py scan compliance --policy SEC-005
+openclaw-cli scan compliance --policy SEC-002
+openclaw-cli scan compliance --policy SEC-003
+openclaw-cli scan compliance --policy SEC-004
+openclaw-cli scan compliance --policy SEC-005
    ```
 
 2. Generate report:
    ```bash
-   python tools/openclaw-cli.py report compliance --framework SOC2 --output soc2-report.json
+   openclaw-cli report compliance --framework SOC2 --output soc2-report.json
    ```
 
 3. Review control status (should be 100% compliant)

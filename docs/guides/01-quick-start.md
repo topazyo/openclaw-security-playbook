@@ -9,9 +9,9 @@ difficulty: Beginner
 
 **Estimated Time:** 15 minutes  
 **Difficulty:** Beginner  
-**Prerequisites:** Docker, basic command-line knowledge
+**Prerequisites:** Docker, Docker Compose v2, Python 3.11+, basic command-line knowledge
 
-This guide gets you from zero to a hardened AI agent deployment in 15 minutes.
+This guide gets you from a fresh clone to a validated reference security configuration in about 15 minutes.
 
 ## Platform Notes
 
@@ -22,7 +22,7 @@ Use the commands as written.
 Use the commands as written; install GNU tools if a command differs from BSD behavior.
 
 ### Windows
-Use PowerShell equivalents where needed, or run shell commands via WSL2.
+Use WSL2 for the shell-based steps in this guide. The Windows Credential Manager example below is the only native PowerShell path documented here.
 
 ## Table of Contents
 
@@ -38,6 +38,8 @@ Use PowerShell equivalents where needed, or run shell commands via WSL2.
 ## Pre-Flight Security Check
 
 Before installing, verify your environment is secure:
+
+These commands assume a POSIX shell. On Windows, run them from WSL2.
 
 ```bash
 # Check for existing insecure installations
@@ -57,52 +59,23 @@ find ~ -name "*.bak*" -o -name "credentials*.yml" 2>/dev/null
 
 ---
 
-## Install OpenClaw/ClawdBot
-
-### Option A: Docker (Recommended)
+## Install the Playbook Tooling
 
 ```bash
-# Create secure configuration directory
-mkdir -p ~/.openclaw/{config,skills,logs}
-chmod 700 ~/.openclaw
+# Clone the repository
+git clone https://github.com/openclaw/openclaw-security-playbook.git
+cd openclaw-security-playbook
 
-# Pull official image
-docker pull anthropic/clawdbot:latest
+# Create a virtual environment and install dependencies
+python -m venv .venv
+source .venv/bin/activate  # Windows (PowerShell): .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-# Run with security hardening
-docker run -d \
-  --name clawdbot-secure \
-  --cap-drop ALL \
-  --cap-add NET_BIND_SERVICE \
-  --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
-  --security-opt no-new-privileges:true \
-  --pids-limit=100 \
-  -v ~/.openclaw/config:/app/config:ro \
-  -v ~/.openclaw/skills:/app/skills:ro \
-  -v ~/.openclaw/logs:/app/logs:rw \
-  -p 127.0.0.1:18789:18789 \
-  -e CREDENTIALS_STORE=keychain \
-  anthropic/clawdbot:latest
+# Validate the canonical hardened runtime definition
+docker compose -f configs/examples/docker-compose-full-stack.yml config
 ```
 
-**Security Notes:**
-- `--cap-drop ALL`: Removes all Linux capabilities
-- `--read-only`: Filesystem cannot be modified
-- `--tmpfs`: Temporary files in memory only
-- `-p 127.0.0.1:18789`: Binds to localhost only (not 0.0.0.0)
-
-### Option B: Native Installation
-
-```bash
-# Install from package manager
-npm install -g @anthropic/clawdbot
-# OR
-pip install clawdbot
-
-# Create configuration
-clawdbot init --secure
-```
+This repository provides security tooling, hardened reference configuration, and verification scripts. For runtime deployment, prefer the canonical service definition in `configs/examples/docker-compose-full-stack.yml` or the hardened Docker guidance in `scripts/hardening/docker/README.md` instead of an ad hoc `docker run` command.
 
 ---
 
@@ -132,12 +105,11 @@ chmod 600 ~/.openclaw/.env
 
 **macOS:**
 ```bash
-# Store Anthropic API key in Keychain
+# Set ANTHROPIC_API_KEY in your shell before running this command
 security add-generic-password \
   -s "ai.openclaw.anthropic" \
   -a "$USER" \
-  -w "sk-ant-api03-..." \
-  -T /usr/local/bin/clawdbot
+  -w "$ANTHROPIC_API_KEY"
 ```
 
 **Linux:**
@@ -155,8 +127,8 @@ secret-tool store \
 
 **Windows:**
 ```powershell
-# Store in Windows Credential Manager
-cmdkey /generic:openclaw_anthropic /user:$env:USERNAME /pass:"sk-ant-api03-..."
+# Set $env:ANTHROPIC_API_KEY for the current session first
+cmdkey /generic:openclaw_anthropic /user:$env:USERNAME /pass:$env:ANTHROPIC_API_KEY
 ```
 
 ### Step 3: Configure Credential Storage
@@ -188,7 +160,7 @@ skills:
 
   sources:
     allowedRepositories:
-      - "https://github.com/anthropic-ai/openclaw-skills"
+      - "https://github.com/your-approved-org/openclaw-skills"
 
   verification:
     requireSignature: true
@@ -204,29 +176,14 @@ EOF
 Run the automated security verification:
 
 ```bash
-# Download verification script
-curl -fsSL https://raw.githubusercontent.com/YOUR-ORG/clawdbot-security-playbook/main/scripts/verification/verify_openclaw_security.sh -o verify.sh
-chmod +x verify.sh
-
-# Run verification
-./verify.sh
+# Run verification from the repository root
+./scripts/verification/verify_openclaw_security.sh
 ```
 
-**Verify:** Expected output:
-```
-[1/3] Checking network binding...
-✓ Gateway bound to localhost only
-  Binding: 127.0.0.1:18789
-
-[2/3] Checking for backup files...
-✓ No backup files found
-
-[3/3] Checking logging configuration...
-✓ Tool execution logging enabled
-
-==============================
-✓ All checks passed!
-```
+**Verify:** Expected behavior:
+- Output starts with `OpenClaw Security Verification` and seven checks (`[1/7]` through `[7/7]`).
+- On a fresh clone without a running deployment, runtime sandboxing and TLS checks can warn and exit with code `2`.
+- After a compatible hardened deployment is running and bound as expected, the script should exit `0` with all seven layers passing.
 
 **If checks fail:**
 - Review the error messages
@@ -243,21 +200,26 @@ chmod +x verify.sh
 # Should succeed (localhost)
 curl http://127.0.0.1:18789/health
 
-# Should fail (external access)
-curl http://$(hostname -I | awk '{print $1}'):18789/health
-# Expected: Connection refused
+# From another machine or by using a non-loopback host address,
+# the same request should fail.
+curl http://YOUR_HOST_IP:18789/health
+# Expected: connection refused or timeout
 ```
 
 ### Test 2: Verify Credential Storage
 
 ```bash
 # macOS
-security find-generic-password -s "ai.openclaw.anthropic" -w
-# Should output your API key
+security find-generic-password -s "ai.openclaw.anthropic" >/dev/null && echo "Keychain entry exists"
 
 # Linux
-secret-tool lookup service ai.openclaw.anthropic username $USER
-# Should output your API key
+secret-tool lookup service ai.openclaw.anthropic username $USER >/dev/null && echo "Secret Service entry exists"
+```
+
+```powershell
+# Windows
+cmdkey /list:openclaw_anthropic
+# Should list the stored credential target
 ```
 
 ### Test 3: Send Test Request
@@ -358,11 +320,10 @@ curl -X POST http://127.0.0.1:18789/v1/completions \
 **Solution:**
 ```bash
 # Check logs
-docker logs clawdbot-secure
+docker logs clawdbot-production
 
 # Common issue: Missing credentials
-# Verify keychain entry exists:
-security find-generic-password -s "ai.openclaw.anthropic"
+# Verify the configured credential entry exists in your OS store.
 ```
 
 ### Cannot Access Gateway
@@ -372,10 +333,10 @@ security find-generic-password -s "ai.openclaw.anthropic"
 **Solution:**
 ```bash
 # Verify gateway is running
-docker ps | grep clawdbot
+docker ps | grep clawdbot-production
 
 # Check binding
-docker exec clawdbot-secure netstat -tuln | grep 18789
+docker port clawdbot-production 18789
 # Should show: 127.0.0.1:18789
 ```
 
@@ -416,16 +377,16 @@ Before going to production, verify:
 
 ```bash
 # Start
-docker start clawdbot-secure
+docker start clawdbot-production
 
 # Stop
-docker stop clawdbot-secure
+docker stop clawdbot-production
 
 # Restart (after config changes)
-docker restart clawdbot-secure
+docker restart clawdbot-production
 
 # View logs
-docker logs -f clawdbot-secure
+docker logs -f clawdbot-production
 ```
 
 ### Configuration Locations
@@ -464,5 +425,5 @@ security add-generic-password -s "ai.openclaw.anthropic" -a "$USER" -w "NEW_KEY"
 
 ---
 
-**Last Updated:** February 14, 2026  
-**Tested On:** macOS 14.0+, Ubuntu 22.04+, Docker 24.0+
+**Last Updated:** March 15, 2026  
+**Tested On:** macOS 14.0+, Ubuntu 22.04+, Docker 24.0+ (Windows users should use WSL2 for shell-based steps)

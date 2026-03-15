@@ -19,11 +19,11 @@ Audience: Application developers, DevOps engineers
    cd openclaw-security-playbook
    ```
 
-2. **Install dependencies**:
+2. **Install the package and dependencies**:
    ```bash
   python -m venv .venv
   source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-  pip install click pyyaml boto3 requests jinja2 matplotlib pandas reportlab elasticsearch
+  pip install -e .
    ```
 
 3. **Run verification script**:
@@ -69,7 +69,7 @@ security_controls:
 **Step 3: Test Configuration**
 
 ```bash
-python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 ```
 
 ---
@@ -96,7 +96,7 @@ security_controls:
 ```
 
 ```bash
-python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 ```
 
 ### Rate Limiting
@@ -239,7 +239,7 @@ repos:
     hooks:
       - id: openclaw-config-validate
         name: Validate OpenClaw Config
-        entry: python tools/openclaw-cli.py config validate configs/agent-config/openclaw-agent.yml
+        entry: openclaw-cli config validate configs/agent-config/openclaw-agent.yml
         language: system
         files: \\.yml$
 ```
