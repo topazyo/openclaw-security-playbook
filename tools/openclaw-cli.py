@@ -29,7 +29,7 @@ Installation:
 import click
 import json
 import sys
-import subprocess
+import subprocess  # nosec B404
 import importlib.util
 from pathlib import Path
 from datetime import UTC, datetime, timedelta
@@ -80,7 +80,7 @@ def _validate_output_path(output_path: str) -> Path:
 
 def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.CompletedProcess[str]:
     script_path = (REPO_ROOT / relative_script).resolve()
-    return subprocess.run(
+    return subprocess.run(  # nosec B603
         [sys.executable, str(script_path), *args],
         cwd=REPO_ROOT,
         capture_output=True,

@@ -14,7 +14,7 @@ import os
 import shutil
 import socket
 import ssl
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import textwrap
@@ -75,7 +75,7 @@ SCENARIOS: dict[str, ScenarioDefinition] = {
         cap_add=("NET_BIND_SERVICE",),
         security_opt=(f"seccomp={SECCOMP_PROFILE}", "no-new-privileges:true"),
         tmpfs_mounts=(
-            "/tmp:rw,noexec,nosuid,nodev,size=100m",
+            "/tmp:rw,noexec,nosuid,nodev,size=100m",  # nosec
             "/var/run:rw,noexec,nosuid,nodev,size=10m",
         ),
         pids_limit=100,
@@ -91,7 +91,7 @@ SCENARIOS: dict[str, ScenarioDefinition] = {
     ),
     "insecure": ScenarioDefinition(
         name="insecure",
-        bind_address="0.0.0.0",
+        bind_address="0.0.0.0",  # nosec
         tls_mode="tls1_2",
         skills_auto_install=True,
         skills_auto_update=True,
@@ -232,7 +232,7 @@ def resolve_git_bash_command(name: str) -> str | None:
 
 
 def run_command(command: list[str], *, env: dict[str, str] | None = None, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, env=env, cwd=cwd, capture_output=True, text=True, check=False)
+    return subprocess.run(command, env=env, cwd=cwd, capture_output=True, text=True, check=False)  # nosec B603
 
 
 def scenario_names(selection: str) -> list[str]:

@@ -661,12 +661,15 @@ def test_classification_detection():
     
     # Test SSN detection
     label = classifier.classify_text("SSN: 123-45-6789")
-    assert label.classification == DataClassification.RESTRICTED
-    assert 'SSN' in label.detected_patterns
+    if label.classification != DataClassification.RESTRICTED:
+        raise AssertionError("SSN input should be classified as Restricted")
+    if 'SSN' not in label.detected_patterns:
+        raise AssertionError("SSN pattern should be detected")
     
     # Test public marking
     label = classifier.classify_text("Public press release")
-    assert label.classification == DataClassification.PUBLIC
+    if label.classification != DataClassification.PUBLIC:
+        raise AssertionError("Public content should be classified as Public")
     
     print("✓ test_classification_detection passed")
 
@@ -677,15 +680,19 @@ def test_handling_requirements():
     requirements = HandlingRequirementsManager.get_requirements(
         DataClassification.RESTRICTED
     )
-    assert requirements.encryption_at_rest == True
-    assert requirements.access_control == "mfa"
+    if requirements.encryption_at_rest is not True:
+        raise AssertionError("Restricted data should require encryption at rest")
+    if requirements.access_control != "mfa":
+        raise AssertionError("Restricted data should require MFA access control")
     
     # Public data has no restrictions
     requirements = HandlingRequirementsManager.get_requirements(
         DataClassification.PUBLIC
     )
-    assert requirements.encryption_at_rest == False
-    assert requirements.access_control == "public"
+    if requirements.encryption_at_rest is not False:
+        raise AssertionError("Public data should not require encryption at rest")
+    if requirements.access_control != "public":
+        raise AssertionError("Public data should keep public access control")
     
     print("✓ test_handling_requirements passed")
 
@@ -701,8 +708,10 @@ def test_dlp_blocking():
         "external-partner"
     )
     
-    assert not allowed, "DLP should block Restricted data to external"
-    assert reason is not None
+    if allowed:
+        raise AssertionError("DLP should block Restricted data to external destinations")
+    if reason is None:
+        raise AssertionError("DLP rejection should include a reason")
     
     print("✓ test_dlp_blocking passed")
 

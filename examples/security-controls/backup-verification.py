@@ -37,9 +37,9 @@ References:
 import os
 import json
 import hashlib
-import subprocess
+import subprocess  # nosec B404
 from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass, asdict
 from enum import Enum
 import tempfile
@@ -268,7 +268,7 @@ class BackupVerifier:
             self.logger.info("Restoring to test database...")
             
             # Example for PostgreSQL
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 B607
                 ['psql', database_url, '-f', backup_file],
                 capture_output=True,
                 text=True,
@@ -322,6 +322,7 @@ class BackupVerifier:
             Dictionary of table_name -> record_count
         """
         import psycopg2
+        from psycopg2 import sql
         
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
@@ -337,7 +338,8 @@ class BackupVerifier:
         # Count records in each table
         counts = {}
         for table in tables:
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            query = sql.SQL("SELECT COUNT(*) FROM {}" ).format(sql.Identifier(table))
+            cursor.execute(query)
             counts[table] = cursor.fetchone()[0]
         
         cursor.close()
@@ -400,13 +402,13 @@ class BackupStrategy:
         os.makedirs(backup_dir, exist_ok=True)
         
         # Dump database (PostgreSQL example)
-        subprocess.run(
+        subprocess.run(  # nosec B603 B607
             ['pg_dump', database_url, '-f', backup_path],
             check=True
         )
         
         # Compress
-        subprocess.run(
+        subprocess.run(  # nosec B603 B607
             ['gzip', backup_path],
             check=True
         )
@@ -610,10 +612,10 @@ class DisasterRecoveryManager:
         
         # Decompress backup
         decompressed_path = backup_path.replace('.gz', '')
-        subprocess.run(['gunzip', '-c', backup_path], stdout=open(decompressed_path, 'wb'), check=True)
+        subprocess.run(['gunzip', '-c', backup_path], stdout=open(decompressed_path, 'wb'), check=True)  # nosec
         
         # Restore to database
-        subprocess.run(
+        subprocess.run(  # nosec B603 B607
             ['psql', target_database_url, '-f', decompressed_path],
             check=True,
             timeout=3600  # 1 hour timeout
@@ -678,7 +680,8 @@ class DisasterRecoveryManager:
             WHERE table_schema = 'public'
         """)
         table_count = cursor.fetchone()[0]
-        assert table_count > 0, "No tables found in restored database"
+        if table_count <= 0:
+            raise AssertionError("No tables found in restored database")
         
         # Test 2: Spot-check data integrity
         # (Example: check users table)
@@ -686,8 +689,8 @@ class DisasterRecoveryManager:
             cursor.execute("SELECT COUNT(*) FROM users WHERE created_at IS NOT NULL")
             user_count = cursor.fetchone()[0]
             self.logger.info(f"  Users with valid timestamps: {user_count}")
-        except:
-            pass  # Table might not exist in test DB
+        except psycopg2.Error as error:
+            self.logger.info(f"  Users table check skipped: {error}")
         
         cursor.close()
         conn.close()
@@ -821,7 +824,8 @@ def test_backup_verification():
     verifier = BackupVerifier()
     is_valid, errors = verifier.verify_backup_integrity(backup_path)
     
-    assert is_valid, f"Verification should pass: {errors}"
+    if not is_valid:
+        raise AssertionError(f"Verification should pass: {errors}")
     
     # Cleanup
     os.unlink(backup_path)
@@ -841,8 +845,10 @@ def test_rto_compliance():
         meets_rpo=True
     )
     
-    assert metrics.actual_recovery_time <= metrics.rto_hours
-    assert metrics.actual_data_loss <= metrics.rpo_minutes
+    if metrics.actual_recovery_time > metrics.rto_hours:
+        raise AssertionError("Recovery time exceeded the RTO target")
+    if metrics.actual_data_loss > metrics.rpo_minutes:
+        raise AssertionError("Data loss exceeded the RPO target")
     
     print("✓ test_rto_compliance passed")
 

@@ -7,7 +7,7 @@ import argparse
 import json
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import unicodedata
 import urllib.parse
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASES_PATH = REPO_ROOT / "tests" / "security" / "fixtures" / "detection-replay" / "replay_cases.json"
 SIGMA_REGEX_MODIFIERS = {"re", "regex", "match"}
+GROUP_OPEN_TOKEN = "("  # nosec B105
 HIGH_RISK_YARA_PATTERNS = (
     re.compile(r"\(\.\*\)\+"),
     re.compile(r"\(\.\+\)\+"),
@@ -186,7 +187,7 @@ class ConditionParser:
         token = self._peek()
         if token is None:
             raise ValueError("Unexpected end of condition")
-        if token == "(":
+        if token == GROUP_OPEN_TOKEN:  # nosec B105
             self.index += 1
             result = self.parse_or()
             if self._peek() != ")":
@@ -244,7 +245,7 @@ def evaluate_yara_case(case: dict[str, Any], yara_command: str | None, require_y
 
     rule_path = REPO_ROOT / case["rule"]
     fixture_path = REPO_ROOT / case["fixture"]
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603
         [yara_command, str(rule_path), str(fixture_path)],
         capture_output=True,
         text=True,

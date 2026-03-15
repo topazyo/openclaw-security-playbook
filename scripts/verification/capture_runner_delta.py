@@ -7,7 +7,7 @@ import argparse
 import json
 import platform
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,7 +34,7 @@ INTERESTING_ENV_VARS = (
 
 
 def run_command(command: list[str]) -> dict[str, object]:
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, capture_output=True, text=True, check=False)  # nosec B603
     return {
         "command": command,
         "returncode": result.returncode,

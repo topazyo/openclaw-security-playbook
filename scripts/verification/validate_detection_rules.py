@@ -8,7 +8,7 @@ rule set using `yarac` when available.
 from __future__ import annotations
 
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 from pathlib import Path
@@ -21,7 +21,7 @@ YARA_RULE = REPO_ROOT / "detections" / "ioc" / "ioc-openclaw.yar"
 
 def _run(command: list[str], description: str) -> None:
     print(f"[*] {description}")
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True)  # nosec B603
     if result.stdout:
         print(result.stdout.rstrip())
     if result.stderr:

@@ -5,7 +5,7 @@ Run from repo root:
     python tools/certificate-manager.py --help
 """
 
-import subprocess
+import subprocess  # nosec B404
 import argparse
 import json
 from datetime import datetime, timedelta
@@ -29,7 +29,7 @@ class CertificateManager:
     
     def check_expiry(self, cert_path):
         """Check certificate expiration date."""
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["openssl", "x509", "-in", cert_path, "-noout", "-enddate"],
             capture_output=True,
             text=True,
@@ -50,7 +50,7 @@ class CertificateManager:
     
     def renew_certificate(self, domain):
         """Renew certificate using certbot."""
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["certbot", "renew", "--domain", domain, "--non-interactive"],
             capture_output=True,
             text=True,
