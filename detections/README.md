@@ -9,13 +9,9 @@ Coverage maps to the three-tier detection model in
 | Path | Contents |
 |------|----------|
 | `ioc/` | Indicators of compromise: domains, ports, file paths, process names, YARA rules |
-| `edr/crowdstrike/` | CrowdStrike Falcon queries (Falcon LogScale / Humio SPL) |
 | `edr/mde/` | Microsoft Defender for Endpoint KQL queries |
-| `edr/cortex/` | Palo Alto Cortex XDR XQL queries |
-| `edr/sentinelone/` | SentinelOne Deep Visibility queries |
-| `siem/sentinel/` | Microsoft Sentinel KQL queries (requires openclaw-telemetry CEF forwarding) |
 | `siem/splunk/` | Splunk SPL queries |
-| `sigma/` | Platform-agnostic Sigma rules (convert to your platform with sigmac or pySigma) |
+| `sigma/` | Platform-agnostic Sigma rules (convert to your platform with `sigma-cli` and a supported backend) |
 
 ## Detection Tiers
 
@@ -45,7 +41,7 @@ See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
 
 - Tier 1 queries: EDR agent deployed on target endpoints, no additional tooling required
 - Tier 2/3 queries: openclaw-telemetry installed and configured with SIEM CEF/syslog forwarding
-- Sigma rules: sigmac or pySigma installed for conversion to your target platform
+- Sigma rules: `sigma-cli` plus the backend package for your target platform
 
 ## Validation
 
@@ -57,7 +53,7 @@ python scripts/verification/validate_detection_rules.py
 
 Requirements:
 
-- `sigma` in `PATH` for Sigma rule validation
+- `sigma` in `PATH` from `sigma-cli` for Sigma rule validation
 - `yarac` in `PATH` for YARA compilation
 
 The GitHub Actions lint workflow installs both toolchains on Ubuntu runners and executes this validation automatically.

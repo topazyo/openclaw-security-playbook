@@ -73,13 +73,13 @@ pip install -e .
 #### Layer 3: Runtime Sandboxing
 - **Purpose**: Contain AI agent processes
 - **Implementation**: Docker with hardening (read-only, no-new-privileges, seccomp)
-- **Configuration**: `configs/examples/production-k8s.yml`
-- **Verification**: `docker inspect` for security settings
+- **Configuration**: `configs/examples/docker-compose-full-stack.yml`
+- **Verification**: `docker inspect clawdbot-production` for security settings
 
 #### Layer 4: Runtime Enforcement
 - **Purpose**: Block malicious AI agent actions in real-time
 - **Implementation**: openclaw-shield (prompt injection guards, PII redaction, tool allowlisting)
-- **Configuration**: `docs/guides/07-community-tools-integration.md`
+- **Configuration**: `docs/guides/08-community-tools-integration.md`
 
 #### Layer 5: Supply Chain Security
 - **Purpose**: Prevent malicious skills
@@ -189,7 +189,7 @@ python scripts/incident-response/notification-manager.py --incident INC-2026-001
 **Eradication Phase**
 ```bash
 # Generate incident timeline
-python scripts/incident-response/timeline-generator.py --incident INC-2026-001 --output timeline.md
+./scripts/forensics/build_timeline.sh --incident-dir ~/openclaw-incident-TIMESTAMP
 
 # Calculate blast radius
 python scripts/incident-response/impact-analyzer.py --incident INC-2026-001 --resource i-0abc123 --data-types PII,Credentials
@@ -389,7 +389,7 @@ Standalone tool scripts under `tools/` remain available for debugging, but opera
 
 3. Review incident timeline:
    ```bash
-   python scripts/incident-response/timeline-generator.py --incident INC-2026-001 --output timeline.md
+   ./scripts/forensics/build_timeline.sh --incident-dir ~/openclaw-incident-TIMESTAMP
    ```
 
 ### Lab 3: Generate Compliance Report
@@ -416,7 +416,7 @@ openclaw-cli scan compliance --policy SEC-005
 - **Documentation**: [docs/guides/](../docs/guides/)
 - **Runbooks**: [examples/incident-response/](../examples/incident-response/)
 - **Troubleshooting**: [docs/troubleshooting/](../docs/troubleshooting/)
-- **Community Tools**: [docs/guides/07-community-tools-integration.md](../docs/guides/07-community-tools-integration.md)
+- **Community Tools**: [docs/guides/08-community-tools-integration.md](../docs/guides/08-community-tools-integration.md)
 
 ---
 

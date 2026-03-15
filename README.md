@@ -7,9 +7,9 @@
 [![Documentation](https://img.shields.io/badge/docs-complete-brightgreen.svg)](docs/guides/)
 [![Security: Hardened](https://img.shields.io/badge/security-hardened-blue.svg)](docs/guides/01-quick-start.md)
 [![Platform: Multi](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](docs/guides/)
-[![SOC 2 Type II](https://img.shields.io/badge/SOC%202-100%25%20compliant-green.svg)](configs/organization-policies/soc2-compliance-mapping.json)
-[![ISO 27001:2022](https://img.shields.io/badge/ISO%2027001-100%25%20compliant-green.svg)](configs/organization-policies/iso27001-compliance-mapping.json)
-[![GDPR](https://img.shields.io/badge/GDPR-compliant-green.svg)](docs/policies/data-classification-policy.md)
+[![SOC 2 Type II](https://img.shields.io/badge/SOC%202-17%20mapped%20controls-green.svg)](configs/organization-policies/soc2-compliance-mapping.json)
+[![ISO 27001:2022](https://img.shields.io/badge/ISO%2027001-19%20mapped%20controls-green.svg)](configs/organization-policies/iso27001-compliance-mapping.json)
+[![GDPR](https://img.shields.io/badge/GDPR-policy%20mapped-green.svg)](docs/policies/data-classification.md)
 [![Tests](https://img.shields.io/badge/tests-9%20suites%20passing-brightgreen.svg)](tests/)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue.svg)](.github/workflows/)
 
@@ -63,7 +63,7 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 
 ## 📦 What's Included
 
-  This playbook provides a **comprehensive, production-ready security framework** for AI agents, with 110+ files and full scenario-to-detection coverage:
+  This playbook provides a **production-focused security documentation and validation framework** for AI agents, with 110+ files of guidance, validation content, and reference configurations:
 
   ### 📚 Documentation & Threat Modeling
   - **Guides & Checklists:** Complete implementation guides, onboarding, security review, and production checklists (see `docs/guides/`, `docs/checklists/`)
@@ -84,7 +84,7 @@ This playbook provides **7-layer defense-in-depth** security architecture:
   - **Replay Validation:** Detection replay and regression workflows for hosted and local runners (`.github/workflows/detection-replay-validation.yml`)
 
   ### 🤖 Automation Scripts & Tools
-  - **Discovery & Verification:** OS vulnerability scanning, dependency checking, IoC scanning, security posture assessment (`scripts/discovery/`, `scripts/verification/`)
+  - **Verification:** Security posture checks and detection validation (`scripts/verification/`)
   - **Incident Response:** Auto-containment, forensics collection, notification, ticketing, timeline generation (`scripts/incident-response/`, `scripts/forensics/`)
   - **Supply Chain:** Skill integrity monitoring, manifest validation (`scripts/supply-chain/`)
   - **Operational Tools:** CLI, policy validator, incident simulator, compliance reporter, certificate manager, config migrator (`tools/`)
@@ -112,7 +112,7 @@ This playbook provides **7-layer defense-in-depth** security architecture:
   - **Runtime Regression:** Hosted runner validation and artifact archiving (`.github/workflows/runtime-security-regression.yml`)
   - **Detection Replay:** Adversarial replay and evasion validation (`.github/workflows/detection-replay-validation.yml`)
 
-  **Total: 110+ files providing enterprise-grade, scenario-complete AI agent security**
+  **Total: 110+ files providing reference security guidance, validation content, and operational tooling**
 
 ---
 
@@ -123,7 +123,7 @@ Get the playbook tooling installed and validate the reference security configura
 ```bash
 # 1. Clone repository
 git clone https://github.com/openclaw/openclaw-security-playbook.git
-cd clawdbot-security-playbook
+cd openclaw-security-playbook
 
 # 2. Create a virtual environment and install the package
 python -m venv .venv
@@ -202,7 +202,7 @@ Fresh-clone note: the verifier can return warnings until a compatible OpenClaw/C
 1. [Supply Chain Security](docs/guides/05-supply-chain-security.md) - Malicious skills
 2. [Network Segmentation](docs/guides/03-network-segmentation.md) - Authentication bypass
 3. [Credential Isolation](docs/guides/02-credential-isolation.md) - Backup file persistence
-4. [Community Tools](docs/guides/07-community-tools-integration.md) - Detection techniques
+4. [Community Tools](docs/guides/08-community-tools-integration.md) - Optional third-party integrations
 5. [Detection & Hunting](docs/guides/07-detection-and-hunting.md) - 3-tier detection, kill chain queries
 6. [ATLAS Threat Mapping](docs/threat-model/ATLAS-mapping.md) - MITRE ATLAS kill chains
 
@@ -346,11 +346,11 @@ External Request
 - **Automated Monitoring:** Daily integrity checks with alerting
 - **Allowlist Enforcement:** Only approved skills can be installed
 
-### ✅ Runtime Protection
-- **Prompt Injection Guards:** Pattern matching and sanitization (openclaw-shield)
-- **PII Redaction:** Automatic removal of sensitive data from outputs
-- **Tool Allowlisting:** Restrict which tools can be executed
-- **Behavioral Monitoring:** Anomaly detection for unusual agent behavior (openclaw-telemetry)
+### ✅ Runtime Protection Guidance
+- **Prompt Injection Guards:** Reference integration guidance for external enforcement tooling
+- **PII Redaction:** Documented control patterns for sensitive output handling
+- **Tool Allowlisting:** Reference policy and configuration patterns for allowed tools
+- **Behavioral Monitoring:** Repo-native detection validation plus optional external telemetry integrations
 
 ### ✅ Detection & Hunting
 - **3-Tier Detection Model:** Discovery → Behavioral Hunting → Kill Chain Detection
@@ -464,13 +464,13 @@ pytest --cov=scripts --cov=examples --cov-report=html
 | **Supply Chain Integrity** | None (auto-install) | High (signatures, manifests) | ✅ **100%** |
 | **Incident Response Time** | Unknown | < 15 min (documented playbooks) | ✅ **Defined** |
 | **Vulnerability Patching** | Manual | Automated (CRITICAL <7d, HIGH <30d) | ✅ **Automated** |
-| **Compliance Coverage** | 0% | 100% (SOC 2, ISO 27001, GDPR) | ✅ **100%** |
+| **Compliance Coverage** | 0% | Repo-backed mapped controls and policy documentation | ✅ **Documented** |
 
 ### Compliance Mappings
 
-This playbook provides complete compliance coverage:
+This playbook provides repo-backed compliance mappings and policy references:
 
-#### SOC 2 Type II (36 Controls - 100% Implemented)
+#### SOC 2 Type II (17 Mapped Controls in Repo)
 - **CC6.1:** Logical and physical access controls (MFA required)
 - **CC7.1:** Threat identification procedures (vulnerability scanning)
 - **CC7.2:** Continuous monitoring (Prometheus/Grafana/Alertmanager)
@@ -479,10 +479,10 @@ This playbook provides complete compliance coverage:
 - **CC8.1:** Change management procedures (developer-guide.md)
 
 **Evidence Available:**
-- `configs/organization-policies/soc2-compliance-mapping.json` (36 controls)
+- `configs/organization-policies/soc2-compliance-mapping.json` (17 mapped controls)
 - `openclaw-cli report compliance --framework SOC2` (automated reporting)
 
-#### ISO 27001:2022 (93 Controls - 100% Implemented)
+#### ISO 27001:2022 (19 Mapped Controls in Repo)
 - **A.9.2.1:** User registration and de-registration (access review)
 - **A.10.1.1:** Cryptographic key management (90-day rotation)
 - **A.12.6.1:** Technical vulnerability management (auto-remediate.sh)
@@ -491,18 +491,18 @@ This playbook provides complete compliance coverage:
 - **A.18.1.3:** Protection of records (7-year audit log retention)
 
 **Evidence Available:**
-- `configs/organization-policies/iso27001-compliance-mapping.json` (93 controls)
+- `configs/organization-policies/iso27001-compliance-mapping.json` (19 mapped controls)
 - `openclaw-cli report compliance --framework ISO27001` (automated reporting)
 
-#### GDPR (Article 32 - Compliant)
-- **Encryption:** AES-256-GCM for personal data (data-classification-policy.md)
+#### GDPR (Policy and Control Mapping)
+- **Encryption:** AES-256-GCM for personal data (data-classification.md)
 - **Access Control:** MFA + RBAC (authentication.yml)
 - **Breach Notification:** Automated 72-hour notification (notification-manager.py)
 - **Data Minimization:** PII detection and redaction (input-validation.py)
 - **Right to be Forgotten:** Documented deletion procedures
 
 **Evidence Available:**
-- `docs/policies/data-classification-policy.md` (GDPR requirements)
+- `docs/policies/data-classification.md` (GDPR requirements)
 - `openclaw-cli scan compliance --policy SEC-002` (encryption validation)
 
 ---
@@ -781,6 +781,6 @@ If this playbook helped secure your AI agents, please star the repository to hel
 
 Made with 🔒 for AI Agent Security
 
-**Version 3.0.0** | **Last Updated:** February 2026 | **110+ Files** | **100% SOC 2/ISO 27001 Compliant**
+**Version 3.0.0** | **Last Updated:** February 2026 | **110+ Files** | **17 SOC 2 / 19 ISO 27001 mapped controls documented**
 
 </div>

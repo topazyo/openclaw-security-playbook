@@ -109,7 +109,7 @@ tls:
   enabled: false
 
   # TLS version constraints
-  min_version: "1.2"  # Minimum: TLS 1.2
+  min_version: "1.3"  # Minimum: TLS 1.3
   max_version: "1.3"  # Maximum: TLS 1.3
 
   # Certificate configuration
@@ -133,18 +133,10 @@ tls:
 
   # Cipher suites (prioritized order)
   cipher_suites:
-    # TLS 1.3 (preferred)
+    # TLS 1.3
     - "TLS_AES_128_GCM_SHA256"
     - "TLS_AES_256_GCM_SHA384"
     - "TLS_CHACHA20_POLY1305_SHA256"
-
-    # TLS 1.2 (fallback)
-    - "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-    - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-    - "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-    - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-    - "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
-    - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
 
   # Prefer server cipher order
   prefer_server_ciphers: false  # Let client choose for TLS 1.3

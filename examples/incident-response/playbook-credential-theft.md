@@ -489,7 +489,7 @@ EOF
    **Remediation**:
    - Update openclaw-shield rules with new injection patterns
    - Implement stricter output filtering for system commands
-   - Enable verbose logging for all prompt processing (see [07-community-tools-integration.md](../../docs/guides/07-community-tools-integration.md))
+   - Enable verbose logging for all prompt processing (see [08-community-tools-integration.md](../../docs/guides/08-community-tools-integration.md))
    
    ---
    

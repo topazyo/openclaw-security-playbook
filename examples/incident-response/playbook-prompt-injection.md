@@ -54,7 +54,7 @@ This playbook provides step-by-step procedures for responding to prompt injectio
 - **[Scenario 001: Indirect Prompt Injection Attack](../scenarios/scenario-001-indirect-prompt-injection-attack.md)** - Document/email-based attacks
 
 ### Technical References
-- **[Community Tools Integration - openclaw-shield](../../docs/guides/07-community-tools-integration.md#openclaw-shield)** - Runtime enforcement, prompt injection guards, PII redaction
+- **[Community Tools Integration - openclaw-shield](../../docs/guides/08-community-tools-integration.md#openclaw-shield)** - Runtime enforcement, prompt injection guards, PII redaction
 - **[Security Layers Guide](../../docs/architecture/security-layers.md)** - Layer 4: Runtime Enforcement
 - **[Anomaly Detector](../../scripts/monitoring/anomaly_detector.py)** - Automated behavioral detection tool
 

@@ -320,7 +320,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Information transfer rules, procedures, or agreements are in place for all types of transfer facilities.
 
 **Implementation**:
-- **Network transfer**: TLS 1.2+ encryption (see [Network Segmentation](../guides/03-network-segmentation.md))
+- **Network transfer**: TLS 1.3 encryption (see [Network Segmentation](../guides/03-network-segmentation.md))
 - **Backup transfer**: Encrypted backups to S3 (AES-256 + GPG)
 - **Email**: Encrypted email for Restricted data (PGP or S/MIME)
 - **Third-party transfer**: Data Processing Agreements (DPA) required, secure file transfer (SFTP, S3 pre-signed URLs)
@@ -586,7 +586,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Implementation**:
 - Forensics procedures: Chain of custody maintained
 - Evidence sources: Audit logs (immutable), system snapshots (read-only), network captures
-- Forensic tools: [forensics-collector.py](../../scripts/incident-response/forensics-collector.py) automates evidence collection
+- Forensic tools: [collect_evidence.sh](../../scripts/forensics/collect_evidence.sh) automates evidence collection
 - Evidence preservation: Encrypted storage, 7-year retention
 
 **Evidence types**:
@@ -1506,7 +1506,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Security mechanisms, service levels, and service requirements of network services are identified, implemented, and monitored.
 
 **Implementation**:
-- Secure protocols: TLS 1.2+ (no SSLv3, TLS 1.0/1.1)
+- Secure protocols: TLS 1.3 only
 - Service SLA: 99.9% uptime, response time <500ms
 - Monitoring: Health checks every 30 seconds (Kubernetes probes)
 - Third-party services: Anthropic Claude API (SLA in contract)
@@ -1557,7 +1557,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Rules for effective use of cryptography are defined and implemented.
 
 **Implementation**:
-- Encryption standards: AES-256 (data at rest), TLS 1.2+ (data in transit)
+- Encryption standards: AES-256 (data at rest), TLS 1.3 (data in transit)
 - Key management: AWS KMS, Azure Key Vault (cloud providers)
 - Credential encryption: GPG for backup encryption
 - Cryptographic policy: Approved algorithms (AES, RSA 2048+, ECDSA P-256+)

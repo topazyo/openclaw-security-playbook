@@ -12,7 +12,7 @@
 # Maintenance: Community tools (shield, telemetry) + self (custom configs)
 #
 # For complete integration guide, see:
-# docs/guides/07-community-tools-integration.md
+# docs/guides/08-community-tools-integration.md
 #
 # =============================================================================
 
@@ -145,7 +145,7 @@ container:
 # LAYER 4: RUNTIME SECURITY ENFORCEMENT (openclaw-shield)
 # =============================================================================
 # Skill integration: https://github.com/knostic/openclaw-shield
-# See: docs/guides/07-community-tools-integration.md#openclaw-shield
+# See: docs/guides/08-community-tools-integration.md#openclaw-shield
 
 shield:
   enabled: true
@@ -472,7 +472,7 @@ skills:
 # LAYER 6: BEHAVIORAL MONITORING (openclaw-telemetry)
 # =============================================================================
 # Skill integration: https://github.com/knostic/openclaw-telemetry
-# See: docs/guides/07-community-tools-integration.md#openclaw-telemetry
+# See: docs/guides/08-community-tools-integration.md#openclaw-telemetry
 
 telemetry:
   enabled: true
@@ -599,7 +599,7 @@ telemetry:
 # LAYER 7: ORGANIZATIONAL CONTROLS
 # =============================================================================
 # Shadow AI discovery via openclaw-detect (deployed via MDM)
-# See: docs/guides/07-community-tools-integration.md#openclaw-detect
+# See: docs/guides/08-community-tools-integration.md#openclaw-detect
 
 organization:
   # Policy version for centralized enforcement
@@ -773,7 +773,7 @@ metadata:
 #    cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-shield
 # 3. Install openclaw-telemetry skill integration:
 #    cd ~/.openclaw/plugins && git clone https://github.com/knostic/openclaw-telemetry
-# 4. Deploy openclaw-detect via MDM (see docs/guides/07-community-tools-integration.md)
+# 4. Deploy openclaw-detect via MDM (see docs/guides/08-community-tools-integration.md)
 # 5. Test in staging environment before production
 # 6. Run verification: ./scripts/verification/verify_openclaw_security.sh
 # 7. Monitor logs for 24 hours before full rollout
@@ -785,7 +785,7 @@ metadata:
 # Week 4: Enable shield enforcement mode
 #
 # Related Documentation:
-# - Integration Guide: docs/guides/07-community-tools-integration.md
+# - Integration Guide: docs/guides/08-community-tools-integration.md
 # - Quick Start: docs/guides/01-quick-start.md
 # - Incident Response: docs/guides/06-incident-response.md
 # - Troubleshooting: docs/troubleshooting/common-issues.md

@@ -7,7 +7,9 @@ version: '3.8'
 services:
   # Main ClawdBot service
   clawdbot:
-    image: anthropic/clawdbot:latest
+    # Set CLAWDBOT_IMAGE to your registry and tag, e.g. yourregistry/clawdbot:2.0.0
+    # No official published image exists for this playbook; build or supply your own.
+    image: "${CLAWDBOT_IMAGE:?CLAWDBOT_IMAGE must be set to your registry/image:tag}"
     container_name: clawdbot-production
     user: "1000:1000"
     cap_drop:

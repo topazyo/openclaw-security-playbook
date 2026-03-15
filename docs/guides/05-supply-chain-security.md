@@ -86,7 +86,7 @@ Use the `skill_manifest.py` script:
 
 ```bash
 # Generate baseline manifest
-./scripts/supply-chain/skill_manifest.py \
+python scripts/supply-chain/skill_manifest.py \
   --skills-dir ~/.openclaw/skills \
   --output manifests/baseline-$(date +%Y%m%d).json
 ```
@@ -151,7 +151,7 @@ Expected output:
 
 ```bash
 # Compare against baseline
-./scripts/supply-chain/skill_manifest.py \
+python scripts/supply-chain/skill_manifest.py \
   --skills-dir ~/.openclaw/skills \
   --output manifests/daily-$(date +%Y%m%d).json \
   --compare manifests/baseline-20260214.json \
@@ -175,7 +175,7 @@ Expected output:
 crontab -e
 
 # Run daily at 3 AM
-0 3 * * * /path/to/scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --compare /path/to/baseline.json --alert-on-changes && echo "Skill integrity check passed" || echo "⚠️ ALERT: Skill modifications detected" | mail -s "OpenClaw Security Alert" security@company.com
+0 3 * * * python $(pwd)/scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --compare /path/to/baseline.json --alert-on-changes && echo "Skill integrity check passed" || echo "⚠️ ALERT: Skill modifications detected" | mail -s "OpenClaw Security Alert" security@company.com
 ```
 
 ---
@@ -392,7 +392,7 @@ sudo apt-get install fswatch  # Linux
 # Monitor skills directory
 fswatch -o ~/.openclaw/skills | while read change; do
   echo "⚠️ ALERT: Skill directory modified"
-  ./scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --compare baseline.json --alert-on-changes
+  python scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --compare baseline.json --alert-on-changes
   # Send alert
   curl -X POST https://alerts.company.com/webhook \
     -d '{"alert":"Skill modification detected","severity":"high"}'
@@ -421,7 +421,7 @@ The skill_manifest.py script scans for:
 **Example scan output:**
 
 ```bash
-./scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --output manifest.json
+python scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills --output manifest.json
 
 # Output:
 # ⚠ SECURITY WARNINGS:
@@ -505,7 +505,7 @@ skills:
 
 3. **Generate new manifest**
    ```bash
-   ./scripts/supply-chain/skill_manifest.py \
+   python scripts/supply-chain/skill_manifest.py \
      --skills-dir ~/.openclaw-staging/skills \
      --output manifests/staging-1.3.0.json
    ```
@@ -539,7 +539,7 @@ skills:
 2. **Identify compromised skills**
    ```bash
    # Compare against baseline
-   ./scripts/supply-chain/skill_manifest.py \
+   python scripts/supply-chain/skill_manifest.py \
      --skills-dir ~/.openclaw/skills \
      --compare manifests/baseline.json
    ```
@@ -564,7 +564,7 @@ skills:
    git checkout <known-good-commit>
 
    # Verify integrity
-   ./scripts/supply-chain/skill_manifest.py \
+   python scripts/supply-chain/skill_manifest.py \
      --skills-dir ~/.openclaw/skills \
      --compare manifests/baseline.json
    ```
@@ -587,7 +587,7 @@ gpg --verify file-reader.py.asc file-reader.py
 grep -E "requireSignature|autoUpdate|autoInstall" ~/.openclaw/config/skills.yml
 
 # Verify baseline integrity comparison
-./scripts/supply-chain/skill_manifest.py \
+python scripts/supply-chain/skill_manifest.py \
   --skills-dir ~/.openclaw/skills \
   --compare manifests/baseline-20260214.json
 ```
@@ -632,7 +632,7 @@ No unexpected skill additions or hash mismatches
 
 - **Runtime Sandboxing:** [04-runtime-sandboxing.md](04-runtime-sandboxing.md)
 - **Incident Response:** [06-incident-response.md](06-incident-response.md)
-- **Community Tools:** [07-community-tools-integration.md](07-community-tools-integration.md)
+- **Community Tools:** [08-community-tools-integration.md](08-community-tools-integration.md)
 
 ---
 

@@ -200,7 +200,7 @@ tail /var/log/openclaw/audit.log
 - [ ] **Security monitoring** (openclaw-telemetry or SIEM alerts)
 - [ ] **Anomaly detection** (behavioral baseline established)
 
-**Reference**: [Community Tools Integration](../guides/07-community-tools-integration.md)
+**Reference**: [Community Tools Integration](../guides/08-community-tools-integration.md)
 
 ---
 

@@ -65,48 +65,33 @@ Even with credential isolation and network segmentation, assume breach:
 ### Production-Ready Docker Run Command
 
 ```bash
+# No network access:
 docker run -d \
   --name clawdbot-production \
-  \
-  # Capabilities (DROP ALL, add only necessary)
   --cap-drop ALL \
   --cap-add NET_BIND_SERVICE \
-  \
-  # Filesystem (read-only root, tmpfs for temp files)
   --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=100m \
   --tmpfs /var/run:rw,noexec,nosuid,nodev,size=10m \
-  \
-  # Volume mounts (minimum required, read-only where possible)
   -v ~/.openclaw/config:/app/config:ro \
   -v ~/.openclaw/skills:/app/skills:ro \
   -v ~/.openclaw/logs:/app/logs:rw \
-  \
-  # Network (localhost only)
-  --network=none \  # No network access
-  # OR for localhost access:
-  # -p 127.0.0.1:18789:18789 \
-  \
-  # Security options
+  --network=none \
   --security-opt no-new-privileges:true \
-  --security-opt seccomp=openclaw-seccomp.json \
-  --security-opt apparmor=openclaw-apparmor \
-  \
-  # Resource limits
+  --security-opt seccomp=./scripts/hardening/docker/seccomp-profiles/clawdbot.json \
   --memory=2g \
   --memory-swap=2g \
   --cpus=2.0 \
   --pids-limit=100 \
-  \
-  # User (non-root)
   --user 1000:1000 \
-  \
-  # Other security
   --log-driver=json-file \
   --log-opt max-size=10m \
   --log-opt max-file=3 \
   \
-  anthropic/clawdbot:latest
+  "${CLAWDBOT_IMAGE}"   # Set CLAWDBOT_IMAGE to your registry/image:tag
+
+# For localhost-only access instead of --network=none, replace that flag with:
+# -p 127.0.0.1:18789:18789
 ```
 
 **Each option explained below...**
@@ -246,9 +231,10 @@ docker exec clawdbot-production sh -c 'echo "#!/bin/sh\necho pwned" > /tmp/explo
 
 ```bash
 # Limit memory to 2GB
+# --memory-swap set equal to --memory disables swap entirely
 --memory=2g \
---memory-swap=2g \       # Same as memory = no swap
---memory-reservation=1g    # Soft limit
+--memory-swap=2g \
+--memory-reservation=1g    # soft limit
 ```
 
 **Test memory limit:**
@@ -301,7 +287,7 @@ Secure Computing Mode filters system calls at kernel level.
 **Create custom seccomp profile:**
 
 ```json
-// openclaw-seccomp.json
+// scripts/hardening/docker/seccomp-profiles/clawdbot.json
 {
   "defaultAction": "SCMP_ACT_ERRNO",
   "architectures": ["SCMP_ARCH_X86_64"],
@@ -343,11 +329,14 @@ Secure Computing Mode filters system calls at kernel level.
 **Apply seccomp profile:**
 ```bash
 docker run \
-  --security-opt seccomp=openclaw-seccomp.json \
+  --security-opt seccomp=./scripts/hardening/docker/seccomp-profiles/clawdbot.json \
   ...
 ```
 
 ### AppArmor Profile
+
+This repository does not ship an AppArmor profile. If your environment uses AppArmor,
+create and maintain a local profile explicitly before adding the `apparmor=` security option.
 
 **Create AppArmor profile:**
 
@@ -540,7 +529,7 @@ version: '3.8'
 
 services:
   clawdbot:
-    image: anthropic/clawdbot:latest
+    image: "${CLAWDBOT_IMAGE}"   # Replace with your registry/image:tag
     container_name: clawdbot-production
 
     # User
@@ -555,8 +544,7 @@ services:
     # Security options
     security_opt:
       - no-new-privileges:true
-      - seccomp:./openclaw-seccomp.json
-      - apparmor:openclaw-profile
+      - seccomp:./scripts/hardening/docker/seccomp-profiles/clawdbot.json
 
     # Filesystem
     read_only: true
@@ -636,7 +624,7 @@ services:
 - **Quick Start:** [01-quick-start.md](01-quick-start.md)
 - **Network Segmentation:** [03-network-segmentation.md](03-network-segmentation.md)
 - **Supply Chain Security:** [05-supply-chain-security.md](05-supply-chain-security.md)
-- **Community Tools (openclaw-shield):** [07-community-tools-integration.md](07-community-tools-integration.md)
+- **Community Tools (openclaw-shield):** [08-community-tools-integration.md](08-community-tools-integration.md)
 
 ---
 

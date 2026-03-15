@@ -224,8 +224,8 @@ This policy ensures:
 **Actions**:
 1. **Collect Evidence**:
    ```bash
-   # Forensic data collection
-   ./scripts/incident-response/forensics-collector.py --incident-id INC-2026-001
+   # Preserve evidence before containment changes the host state
+   ./scripts/forensics/collect_evidence.sh
    ```
    
 2. **Review Logs**:
@@ -472,7 +472,7 @@ Sincerely,
 
 **OpenClaw Implementation**:
 - Automated detection via openclaw-telemetry (real-time alerts)
-- Evidence collection preserved (see [forensics-collector.py](../../scripts/incident-response/forensics-collector.py))
+- Evidence collection preserved (see [collect_evidence.sh](../../scripts/forensics/collect_evidence.sh))
 - Notification draft generated from [reporting-template.md](../../examples/incident-response/reporting-template.md)
 - Legal reviews before submission
 
@@ -527,7 +527,8 @@ Sincerely,
 
 ### Automation Scripts
 - [Auto-Containment](../../scripts/incident-response/auto-containment.py)
-- [Forensics Collector](../../scripts/incident-response/forensics-collector.py)
+- [Evidence Collection](../../scripts/forensics/collect_evidence.sh)
+- [Timeline Builder](../../scripts/forensics/build_timeline.sh)
 - [Notification Manager](../../scripts/incident-response/notification-manager.py)
 
 ### External Resources

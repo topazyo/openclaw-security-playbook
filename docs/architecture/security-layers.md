@@ -30,11 +30,11 @@ No single security control is perfect. Defense-in-depth provides multiple indepe
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 7: Organizational Controls & Shadow AI Detection     │
 │  Purpose: Enterprise-wide governance, MDM deployment        │
-│  Tools: openclaw-detect, group policies                     │
+│  Tools: group policies, optional external discovery tooling │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 6: Behavioral Monitoring & Anomaly Detection         │
 │  Purpose: Detect unusual behavior, unauthorized actions     │
-│  Tools: openclaw-telemetry, SIEM integration                │
+│  Tools: repo-native monitoring, SIEM integration, optional external telemetry tooling │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 5: Supply Chain Security & Integrity Checking        │
 │  Purpose: Prevent malicious skill installation              │
@@ -42,7 +42,7 @@ No single security control is perfect. Defense-in-depth provides multiple indepe
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 4: Runtime Security Enforcement                      │
 │  Purpose: Guard against prompt injection, PII leakage       │
-│  Tools: openclaw-shield, input validation                   │
+│  Tools: input validation, optional external enforcement tooling │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Runtime Sandboxing & Isolation                    │
 │  Purpose: Contain compromised skills, prevent escapes       │
@@ -275,18 +275,7 @@ docker exec <container> touch /test  # Should fail: Read-only file system
 - **Output Redaction**: Remove PII, credentials, secrets from outputs
 - **Context Window Limiting**: Prevent context stuffing attacks
 
-**Implementation** (using openclaw-shield):
-```yaml
-# configs/examples/with-community-tools.yml
-services:
-  openclaw-shield:
-    image: knostic/openclaw-shield:latest
-    environment:
-      SHIELD_MODE: "enforce"  # block vs log
-      PROMPT_INJECTION_THRESHOLD: 0.7
-      PII_REDACTION_ENABLED: "true"
-      TOOL_ALLOWLIST: "/config/tool-allowlist.json"
-```
+**Implementation**: Use the repo-native policy and configuration patterns in `configs/skill-policies/` and `configs/templates/`. If you adopt external enforcement tooling, treat it as an optional dependency and validate it separately before production use.
 
 **Verification**:
 ```bash
@@ -295,7 +284,7 @@ echo "Ignore previous instructions" | ./test-shield.sh
 # Should return: BLOCKED - Prompt injection detected
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-shield-runtime-security-enforcement)
+**Guide**: [08-community-tools-integration.md](../guides/08-community-tools-integration.md)
 
 ---
 
@@ -370,18 +359,7 @@ echo "Ignore previous instructions" | ./test-shield.sh
 - **Audit Trails**: Immutable record of all actions
 - **Alerting**: Real-time notifications for incidents
 
-**Implementation** (using openclaw-telemetry):
-```yaml
-# configs/examples/with-community-tools.yml
-services:
-  openclaw-telemetry:
-    image: knostic/openclaw-telemetry:latest
-    environment:
-      BASELINE_PERIOD: "7d"
-      ANOMALY_THRESHOLD: "3sigma"
-      ALERT_WEBHOOK: "${SLACK_WEBHOOK_URL}"
-      SIEM_INTEGRATION: "splunk"
-```
+**Implementation**: Use `scripts/monitoring/anomaly_detector.py`, the detection content in `detections/`, and your SIEM pipeline. If you adopt external telemetry tooling, validate it separately and integrate it only after approval.
 
 **Key Metrics Monitored:**
 - Tokens consumed per request (detect exfiltration loops)
@@ -395,7 +373,7 @@ services:
 curl http://localhost:9090/metrics | grep openclaw
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-telemetry-enterprise-telemetry)
+**Guide**: [08-community-tools-integration.md](../guides/08-community-tools-integration.md)
 
 ---
 
@@ -447,7 +425,7 @@ curl http://localhost:9090/metrics | grep openclaw
 ./scripts/verification/verify_openclaw_security.sh
 ```
 
-**Guide**: [07-community-tools-integration.md](../guides/07-community-tools-integration.md#openclaw-detect-shadow-ai-discovery)
+**Guide**: [08-community-tools-integration.md](../guides/08-community-tools-integration.md)
 
 ---
 
@@ -461,13 +439,13 @@ External Request
     ▼
 ┌──────────────────────────────┐
 │  Layer 7: Policy Check       │  ← Is this user/deployment authorized?
-│  (openclaw-detect)            │
+│  (policy + approved discovery tooling) │
 └───────────┬──────────────────┘
             │ ✅ Authorized
             ▼
 ┌──────────────────────────────┐
 │  Layer 6: Telemetry Start    │  ← Log request, start monitoring
-│  (openclaw-telemetry)         │
+│  (repo monitoring or approved telemetry tooling) │
 └───────────┬──────────────────┘
             │
             ▼
@@ -479,7 +457,7 @@ External Request
             ▼
 ┌──────────────────────────────┐
 │  Layer 4: Input Sanitization │  ← Prompt injection detection
-│  (openclaw-shield)            │
+│  (repo controls or approved enforcement tooling) │
 └───────────┬──────────────────┘
             │ ✅ Clean Input
             ▼
@@ -499,13 +477,13 @@ External Request
             ▼
 ┌──────────────────────────────┐
 │  Layer 4: Output Redaction   │  ← Remove PII/credentials
-│  (openclaw-shield)            │
+│  (repo controls or approved enforcement tooling) │
 └───────────┬──────────────────┘
             │ ✅ Safe Output
             ▼
 ┌──────────────────────────────┐
 │  Layer 6: Telemetry End      │  ← Log completion, check anomalies
-│  (openclaw-telemetry)         │
+│  (repo monitoring or approved telemetry tooling) │
 └──────────────────────────────┘
 ```
 
@@ -560,7 +538,7 @@ When Layer 6 (monitoring) detects an anomaly:
    - Test container escape resistance
 
 2. **Day 3**: Layer 4 (Runtime Enforcement)
-   - Deploy openclaw-shield
+  - Apply repo-native input validation and tool restriction controls
    - Configure prompt injection detection
    - Enable output redaction
 
@@ -578,7 +556,7 @@ When Layer 6 (monitoring) detects an anomaly:
 **Priority**: Detection and response
 
 1. **Day 1-2**: Layer 6 (Monitoring)
-   - Deploy openclaw-telemetry
+  - Deploy repo-native monitoring and detection validation
    - Configure SIEM integration
    - Set up alerting
 
@@ -688,7 +666,7 @@ curl http://localhost:9090/metrics | grep openclaw_requests_total
 - [Layer 2: Network Segmentation](../guides/03-network-segmentation.md)
 - [Layer 3: Runtime Sandboxing](../guides/04-runtime-sandboxing.md)
 - [Layer 5: Supply Chain Security](../guides/05-supply-chain-security.md)
-- [Layers 4, 6, 7: Community Tools](../guides/07-community-tools-integration.md)
+- [Layers 4, 6, 7: Community Tools](../guides/08-community-tools-integration.md)
 
 ### Configuration Examples
 - [Docker Compose Full Stack](../../configs/examples/docker-compose-full-stack.yml)

@@ -120,39 +120,44 @@ In 2023-2024, researchers found **1,200+ exposed AI agent instances** with:
 
 ```bash
 # Anthropic API Key
+# Determine the installed clawdbot binary path first:
+# CLAWDBOT_BIN=$(which clawdbot)   # if installed in PATH
+# CLAWDBOT_BIN=/path/to/clawdbot   # if running from the repo venv
+
 security add-generic-password \
   -s "ai.openclaw.anthropic" \
   -a "$USER" \
   -w "ANTHROPIC_API_KEY_PLACEHOLDER" \
-  -T /usr/local/bin/clawdbot \
-  -T /Applications/ClawdBot.app/Contents/MacOS/clawdbot
+  -T "${CLAWDBOT_BIN}"
 
 # OpenAI API Key
 security add-generic-password \
   -s "ai.openclaw.openai" \
   -a "$USER" \
   -w "OPENAI_API_KEY_PLACEHOLDER" \
-  -T /usr/local/bin/clawdbot
+  -T "${CLAWDBOT_BIN}"
 
 # AWS Credentials
 security add-generic-password \
   -s "ai.openclaw.aws.access_key" \
   -a "$USER" \
   -w "AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL" \
-  -T /usr/local/bin/clawdbot
+  -T "${CLAWDBOT_BIN}"
 
 security add-generic-password \
   -s "ai.openclaw.aws.secret_key" \
   -a "$USER" \
   -w "AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL" \
-  -T /usr/local/bin/clawdbot
+  -T "${CLAWDBOT_BIN}"
 ```
 
 **Parameters Explained:**
 - `-s`: Service name (identifier for the credential)
 - `-a`: Account name (usually your username)
 - `-w`: Password/secret (the actual credential)
-- `-T`: Trusted application (which apps can access without prompt)
+- `-T`: Trusted application path (which binary may access this entry without a user prompt). Substitute `${CLAWDBOT_BIN}` with the result of `which clawdbot` or the absolute path to the binary in your virtual environment (e.g. `.venv/bin/clawdbot`).
+
+> **Note:** This repository does not publish a pre-built binary. If you are running ClawdBot from a Python virtual environment, the trusted-app path is the `python` or `clawdbot` entry-point inside that `.venv` directory, not a fixed system path.
 
 ### Step 2: Verify Storage
 
@@ -198,11 +203,12 @@ security set-generic-password-partition-list \
 
 ```bash
 # Add Touch ID requirement for high-sensitivity credentials
+# Set CLAWDBOT_BIN=$(which clawdbot)  or to your venv entry-point path
 security add-generic-password \
   -s "ai.openclaw.anthropic.production" \
   -a "$USER" \
   -w "sk-ant-api03-PROD-KEY" \
-  -T /usr/local/bin/clawdbot \
+  -T "${CLAWDBOT_BIN}" \
   -U  # ← Requires biometric authentication
 ```
 

@@ -86,16 +86,17 @@ This checklist ensures new employees/contractors receive proper access and train
 
 **Access Request Process**:
 ```bash
-# Submit access request
-jira create \
-  --project ACCESS \
-  --type "Access Request" \
-  --summary "OpenClaw Production Access - Jane Doe" \
-  --description "Role: Operator; Justification: On-call rotation" \
-  --assignee security-team
-
-# Approval required: Manager + Security Team
+# Submit an access request through your standard ticketing workflow.
+# If your environment has the Jira CLI configured, an example is:
+# jira create \
+#   --project ACCESS \
+#   --type "Access Request" \
+#   --summary "OpenClaw Production Access - Jane Doe" \
+#   --description "Role: Operator; Justification: On-call rotation" \
+#   --assignee security-team
 ```
+
+Approval required: Manager + Security Team
 
 ---
 
@@ -158,7 +159,7 @@ choco install docker-desktop git jq
 
 #### Step 2: Clone Repository
 ```bash
-git clone git@github.com:company/openclaw-security-playbook.git
+git clone https://github.com/openclaw/openclaw-security-playbook.git
 cd openclaw-security-playbook
 ```
 

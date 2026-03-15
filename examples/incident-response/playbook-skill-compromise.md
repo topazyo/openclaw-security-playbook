@@ -57,7 +57,7 @@ This playbook provides step-by-step procedures for responding to supply chain at
 - **[Supply Chain Security Guide](../../docs/guides/05-supply-chain-security.md)** - Layer 5: Skill integrity, manifest validation, SBOM generation
 - **[Skill Manifest Tool](../../scripts/supply-chain/skill_manifest.py)** - Integrity verification and dangerous pattern detection
 - **[Skill Integrity Monitor](../../scripts/supply-chain/skill_integrity_monitor.sh)** - Continuous monitoring for skill changes
-- **[Community Tools - openclaw-detect](../../docs/guides/07-community-tools-integration.md#openclaw-detect)** - Shadow AI detection, unapproved skill discovery
+- **[Community Tools - openclaw-detect](../../docs/guides/08-community-tools-integration.md#openclaw-detect)** - Shadow AI detection, unapproved skill discovery
 
 ---
 
