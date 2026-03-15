@@ -72,8 +72,6 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Secret Service configuration
-SECRET_SERVICE="org.freedesktop.secrets"
-SECRET_COLLECTION="default"
 SECRET_LABEL_PREFIX="ClawdBot"
 
 # Search locations
@@ -118,7 +116,6 @@ BACKEND="auto"  # auto, gnome, kde
 
 # Detected backend
 DETECTED_BACKEND=""
-SECRET_TOOL_CMD=""
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -206,10 +203,42 @@ trap cleanup EXIT
 detect_keyring_backend() {
     info "Detecting keyring backend..."
 
+    case "$BACKEND" in
+        auto)
+            ;;
+        gnome)
+            if ! command -v secret-tool &> /dev/null; then
+                error "Requested GNOME backend but secret-tool not found"
+                info "Install with: sudo apt-get install libsecret-tools (Debian/Ubuntu)"
+                info "            : sudo dnf install libsecret (Fedora/RHEL)"
+                exit 1
+            fi
+
+            DETECTED_BACKEND="gnome"
+            success "Using GNOME Keyring"
+            return 0
+            ;;
+        kde)
+            if ! command -v kwalletcli &> /dev/null; then
+                error "Requested KDE backend but kwalletcli not found"
+                info "Install with: sudo apt-get install kwalletcli (Debian/Ubuntu)"
+                exit 1
+            fi
+
+            DETECTED_BACKEND="kde"
+            success "Using KWallet"
+            return 0
+            ;;
+        *)
+            error "Unsupported backend: $BACKEND"
+            info "Supported backends: auto, gnome, kde"
+            exit 1
+            ;;
+    esac
+
     # Check for secret-tool (libsecret)
     if command -v secret-tool &> /dev/null; then
         DETECTED_BACKEND="libsecret"
-        SECRET_TOOL_CMD="secret-tool"
         success "Using libsecret (secret-tool)"
         return 0
     fi
@@ -226,7 +255,6 @@ detect_keyring_backend() {
             exit 1
         fi
 
-        SECRET_TOOL_CMD="secret-tool"
         success "Using GNOME Keyring"
         return 0
     fi
@@ -237,7 +265,6 @@ detect_keyring_backend() {
 
         # Check for kwalletcli
         if command -v kwalletcli &> /dev/null; then
-            SECRET_TOOL_CMD="kwalletcli"
             success "Using KWallet"
             return 0
         else
@@ -375,7 +402,8 @@ detect_credentials_in_env() {
 
         for pattern in "${env_patterns[@]}"; do
             if grep -q "export $pattern=" "$env_file" 2>/dev/null; then
-                local value=$(grep "export $pattern=" "$env_file" | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+                local value
+                value=$(grep "export $pattern=" "$env_file" | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
                 echo "ENV|$env_file|$pattern|$value" >> "$CREDENTIALS_FOUND"
                 ((found_count++))
                 warning "Found $pattern in: $env_file"
@@ -508,7 +536,7 @@ migrate_credential_to_keyring() {
         service "$service" \
         account "$account"
 
-    if [ $? -eq 0 ]; then
+    if secret-tool lookup service "$service" account "$account" &> /dev/null; then
         success "Migrated: $service"
         echo "SUCCESS|$service|$source" >> "$MIGRATION_REPORT"
         record_migration_state "SUCCESS" "$service" "$source" "$account"
@@ -539,8 +567,10 @@ process_credentials() {
         case "$type" in
             FILE)
                 # Extract credential from file
-                local cred_value=$(echo "$value" | grep -oE 'sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}')
-                local service="ai.openclaw.$(basename "$location" | sed 's/\.[^.]*$//')"
+                local cred_value
+                local service
+                cred_value=$(echo "$value" | grep -oE 'sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}')
+                service="ai.openclaw.$(basename "$location" | sed 's/\.[^.]*$//')"
 
                 if migrate_credential_to_keyring "$service" "$USER" "$cred_value" "$location"; then
                     ((success_count++))
@@ -551,7 +581,8 @@ process_credentials() {
 
             ENV)
                 # Migrate from environment file
-                local service="ai.openclaw.$(echo "$key" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
+                local service
+                service="ai.openclaw.$(echo "$key" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
 
                 if migrate_credential_to_keyring "$service" "$USER" "$value" "$location"; then
                     ((success_count++))
@@ -562,7 +593,8 @@ process_credentials() {
 
             RUNENV)
                 # Migrate from running environment
-                local service="ai.openclaw.$(echo "$location" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
+                local service
+                service="ai.openclaw.$(echo "$location" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
 
                 if migrate_credential_to_keyring "$service" "$USER" "$key" "environment"; then
                     ((success_count++))
@@ -674,7 +706,8 @@ rollback_migration() {
     info "Rolling back migration..."
 
     # Find most recent backup
-    local latest_backup=$(ls -t "$BACKUP_DIR" 2>/dev/null | head -1)
+    local latest_backup
+    latest_backup=$(ls -t "$BACKUP_DIR" 2>/dev/null | head -1)
 
     if [ -z "$latest_backup" ]; then
         error "No backup found for rollback"
@@ -696,7 +729,8 @@ rollback_migration() {
     info "Restoring configuration files..."
 
     for config_dir in "${CONFIG_DIRS[@]}"; do
-        local backup_path="$BACKUP_DIR/$latest_backup/$(basename "$config_dir")"
+        local backup_path
+        backup_path="$BACKUP_DIR/$latest_backup/$(basename "$config_dir")"
         if [ -d "$backup_path" ]; then
             cp -r "$backup_path/"* "$config_dir/" 2>/dev/null || true
             verbose "Restored: $config_dir"
@@ -705,7 +739,8 @@ rollback_migration() {
 
     # Restore environment files
     for env_file in "${ENV_FILES[@]}"; do
-        local backup_file="$BACKUP_DIR/$latest_backup/$(basename "$env_file")"
+        local backup_file
+        backup_file="$BACKUP_DIR/$latest_backup/$(basename "$env_file")"
         if [ -f "$backup_file" ]; then
             cp "$backup_file" "$env_file"
             verbose "Restored: $env_file"
@@ -964,7 +999,8 @@ main() {
     fi
 
     # Show summary
-    local cred_count=$(wc -l < "$CREDENTIALS_FOUND" | tr -d ' ')
+    local cred_count
+    cred_count=$(wc -l < "$CREDENTIALS_FOUND" | tr -d ' ')
     info "Found $cred_count credential(s) to migrate"
 
     # Create backup

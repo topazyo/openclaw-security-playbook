@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck yara
-          shellcheck scripts/**/*.sh
+          find scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning -x
       - name: Validate Detection Rules
         run: |
           python scripts/verification/validate_detection_rules.py
