@@ -118,28 +118,32 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 
 ## 🚀 Quick Start (15 Minutes)
 
-Get a hardened AI agent running in 15 minutes:
+Get the playbook tooling installed and validate the reference security configuration in about 15 minutes:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/YOUR-ORG/clawdbot-security-playbook.git
+git clone https://github.com/openclaw/openclaw-security-playbook.git
 cd clawdbot-security-playbook
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Create a virtual environment and install the package
+python -m venv .venv
+source .venv/bin/activate  # Windows (PowerShell): .venv\Scripts\Activate.ps1
+pip install -e .
 
-# 3. Run security verification (pre-flight check)
+# 3. Run baseline security verification
 ./scripts/verification/verify_openclaw_security.sh
 
-# 4. Validate configuration
+# 4. Validate the reference agent configuration
 openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 
-# 5. Scan for vulnerabilities
+# 5. Run a repo-native vulnerability scan
 openclaw-cli scan vulnerability --target production
 
-# 6. Deploy with Docker (hardened)
-docker run -d \
+# 6. Review the canonical hardened runtime definition
+docker compose -f configs/examples/docker-compose-full-stack.yml config
 ```
+
+Fresh-clone note: the verifier can return warnings until a compatible OpenClaw/ClawdBot runtime and TLS endpoint are running. Use [docs/guides/01-quick-start.md](docs/guides/01-quick-start.md) and [training/developer-guide.md](training/developer-guide.md) to align runtime settings with the verifier.
 
 ---
 
@@ -151,8 +155,8 @@ docker run -d \
 
 1. **Start here:** [Quick Start Guide](docs/guides/01-quick-start.md) (15 min)
 2. **Learn:** [Credential Isolation](docs/guides/02-credential-isolation.md) (30 min)
-3. **Practice:** Deploy with `docker-compose-full-stack.yml`
-4. **Verify:** Run `verify_openclaw_security.sh`
+3. **Practice:** Review and adapt `configs/examples/docker-compose-full-stack.yml`
+4. **Verify:** Run `./scripts/verification/verify_openclaw_security.sh`
 
 **Time Investment:** 2 hours → Secure deployment
 
@@ -371,17 +375,17 @@ External Request
 
 | Script | Purpose | Example Command |
 |--------|---------|-------|
-| **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./verify_openclaw_security.sh` |
-| **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python skill_manifest.py --skills-dir ~/.openclaw/skills` |
-| **[backup-restore.sh](configs/examples/backup-restore.sh)** | Backup and restore | `./backup-restore.sh backup` |
-| **[collect_evidence.sh](scripts/forensics/collect_evidence.sh)** | Incident evidence preservation | `./collect_evidence.sh [--containment]` |
-| **[build_timeline.sh](scripts/forensics/build_timeline.sh)** | Attack timeline reconstruction | `./build_timeline.sh --incident-dir ~/openclaw-incident-*` |
-| **[check_credential_scope.sh](scripts/forensics/check_credential_scope.sh)** | Credential exposure assessment | `./check_credential_scope.sh [YYYY-MM-DD]` |
-| **[verify_hash_chain.py](scripts/forensics/verify_hash_chain.py)** | Telemetry tamper detection | `python verify_hash_chain.py --input telemetry.jsonl` |
+| **[verify_openclaw_security.sh](scripts/verification/verify_openclaw_security.sh)** | Security posture verification | `./scripts/verification/verify_openclaw_security.sh` |
+| **[skill_manifest.py](scripts/supply-chain/skill_manifest.py)** | Skill integrity checking | `python scripts/supply-chain/skill_manifest.py --skills-dir ~/.openclaw/skills` |
+| **[backup-restore.sh](configs/examples/backup-restore.sh)** | Backup and restore | `./configs/examples/backup-restore.sh backup` |
+| **[collect_evidence.sh](scripts/forensics/collect_evidence.sh)** | Incident evidence preservation | `./scripts/forensics/collect_evidence.sh [--containment]` |
+| **[build_timeline.sh](scripts/forensics/build_timeline.sh)** | Attack timeline reconstruction | `./scripts/forensics/build_timeline.sh --incident-dir ~/openclaw-incident-*` |
+| **[check_credential_scope.sh](scripts/forensics/check_credential_scope.sh)** | Credential exposure assessment | `./scripts/forensics/check_credential_scope.sh [YYYY-MM-DD]` |
+| **[verify_hash_chain.py](scripts/forensics/verify_hash_chain.py)** | Telemetry tamper detection | `python scripts/forensics/verify_hash_chain.py --input telemetry.jsonl` |
 
-### openclaw-cli Command-Line Tool
+### openclaw-cli Commands
 
-The framework includes a comprehensive CLI for daily security operations:
+The framework includes a comprehensive CLI for daily security operations. Install the package with `pip install -e .` from repo root to make the command available in your virtual environment:
 
 ```bash
 # Vulnerability scanning
@@ -399,8 +403,8 @@ openclaw-cli report weekly --start 2024-01-15 --end 2024-01-22
 openclaw-cli report compliance --framework SOC2 --output report.json
 
 # Configuration management
-openclaw-cli config validate openclaw-agent.yml
-openclaw-cli config migrate --from-version 1.0 --to-version 2.0
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
+openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
 ```
 
 ### Python Security Tools
@@ -773,7 +777,7 @@ If this playbook helped secure your AI agents, please star the repository to hel
 
 <div align="center">
 
-**[Get Started →](docs/guides/01-quick-start.md)** | **[Report Issue](https://github.com/YOUR-ORG/clawdbot-security-playbook/issues)** | **[Contribute](CONTRIBUTING.md)**
+**[Get Started →](docs/guides/01-quick-start.md)** | **[Report Issue](https://github.com/openclaw/openclaw-security-playbook/issues)** | **[Contribute](CONTRIBUTING.md)**
 
 Made with 🔒 for AI Agent Security
 
