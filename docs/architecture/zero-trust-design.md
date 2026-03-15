@@ -745,7 +745,7 @@ docker exec clawdbot ping 10.0.0.1
 
 1. **Deploy openclaw-telemetry**:
    ```bash
-   docker-compose -f configs/examples/with-community-tools.yml up -d openclaw-telemetry
+   docker compose -f configs/examples/with-community-tools.yml up -d openclaw-telemetry
    ```
 
 2. **Configure alerts**:

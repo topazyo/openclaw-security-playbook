@@ -275,7 +275,7 @@ diff /opt/openclaw/configs/clawdbot.secure.yml \
 
 ```bash
 # Stop ClawdBot service
-docker-compose -f configs/examples/docker-compose-full-stack.yml down
+docker compose -f configs/examples/docker-compose-full-stack.yml down
 
 # Or Kubernetes
 kubectl delete deployment clawdbot -n openclaw
@@ -318,7 +318,7 @@ kubectl delete deployment clawdbot -n openclaw
 
 ```bash
 # Restart ClawdBot
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Wait for health check
 ./scripts/verification/wait-for-healthy.sh --timeout 300

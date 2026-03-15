@@ -35,6 +35,11 @@ This checklist ensures new employees/contractors receive proper access and train
 ## Day 1: Initial Setup
 
 ### Welcome Package
+
+> **⚠️ FILL IN BEFORE DISTRIBUTING** — the contact details below are placeholder examples.
+> Replace `it@company.com`, `security@company.com`, and `user@company.com`
+> with your organisation's real contacts before sending this to new hires.
+
 - [ ] **Welcome email sent** with:
   - IT Helpdesk contact: it@company.com
   - Security Team contact: security@company.com
@@ -146,11 +151,11 @@ Approval required: Manager + Security Team
 
 #### Step 1: Install Prerequisites
 ```bash
-# macOS
-brew install docker docker-compose git jq
+# macOS (Docker Compose V2 is bundled with Docker Desktop; standalone V1 package not needed)
+brew install docker git jq
 
 # Linux
-sudo apt update && sudo apt install -y docker.io docker-compose git jq
+sudo apt update && sudo apt install -y docker.io git jq docker-compose-plugin
 sudo usermod -aG docker $USER  # Add user to docker group
 
 # Windows (PowerShell as Admin)
@@ -181,10 +186,10 @@ secret-tool lookup service "ai.openclaw.anthropic"         # Linux
 #### Step 4: Deploy Development Instance
 ```bash
 # Use hardened Docker Compose configuration
-docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Wait for health check
-docker-compose -f configs/examples/docker-compose-full-stack.yml ps
+docker compose -f configs/examples/docker-compose-full-stack.yml ps
 
 # Verify deployment
 ./scripts/verification/verify_openclaw_security.sh

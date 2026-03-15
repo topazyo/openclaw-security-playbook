@@ -1,8 +1,7 @@
 # Detection Rules and Hunting Queries
 
 This directory contains all detection content for OpenClaw, Moltbot, and Clawdbot deployments.
-Coverage maps to the three-tier detection model in
-[Part 3: Detecting OpenClaw Compromise](https://cloudsecops.hashnode.dev/openclaw-detecting-compromise).
+Coverage follows the three-tier model described in [`docs/guides/07-detection-and-hunting.md`](../docs/guides/07-detection-and-hunting.md).
 
 ## Directory Structure
 
@@ -19,7 +18,8 @@ Coverage maps to the three-tier detection model in
 Deploy these as scheduled rules regardless of whether you suspect compromise.
 
 **Tier 2 — Behavioral Hunting:** Detect anomalous agent behavior indicating compromise in progress.
-Requires openclaw-telemetry (Part 2, Layer 6) to be deployed and forwarding to SIEM.
+Requires `openclaw-telemetry` deployed and forwarding to SIEM.
+Setup: see [`docs/guides/08-community-tools-integration.md`](../docs/guides/08-community-tools-integration.md).
 
 **Tier 3 — Kill Chain Detection:** Map observed activity to specific MITRE ATLAS attack chains.
 See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
@@ -36,6 +36,10 @@ See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
 | `openclaw-runtime-hardening-drift.yml` | Container launch missing required hardening flags | Tier 1 |
 | `openclaw-tls-downgrade.yml` | TLS version below 1.3 on OpenClaw control ports | Tier 1 |
 | `openclaw-gateway-config-drift.yml` | Gateway config file modifications (pre-exposure drift signal) | Tier 1 |
+| `openclaw-mcp-path-traversal.yml` | MCP path traversal attempt via request path or query string (scenario 003) | Tier 2 |
+| `openclaw-agent-impersonation-webhook.yml` | Agent impersonation via skill webhook toward non-allowlisted URLs (scenario 004) | Tier 2 |
+| `openclaw-rag-poisoning-upload.yml` | RAG knowledge-base upload with poisoning indicators (scenario 005) | Tier 2 |
+| `openclaw-expensive-trial-abuse.yml` | Trial-tier resource exhaustion / unusually expensive prompt patterns (scenario 007) | Tier 2 |
 
 ## Prerequisites
 
@@ -81,3 +85,18 @@ Event types: `tool_executed`, `message_received`, `session_start`, `session_end`
 
 If you write a detection rule that catches something not covered here, please open a PR.
 Include: platform, query, tested telemetry version, and a brief description of what it catches.
+
+## Rolling Back or Tuning Rules
+
+If a rule produces excessive false positives:
+
+1. Check the [Tuning Notes](../docs/guides/07-detection-and-hunting.md#tuning-notes) in
+   `docs/guides/07-detection-and-hunting.md` for threshold guidance.
+2. For Sigma rules: edit the relevant file in `sigma/`, re-convert with `sigma-cli`, and
+   re-import into your SIEM.
+3. For platform-specific rules (KQL / SPL): disable the scheduled rule in your platform,
+   edit the query, and re-enable.
+4. After any change, re-run replay validation to confirm true-positive detection is preserved:
+   ```bash
+   python scripts/verification/validate_detection_replay.py --skip-yara
+   ```

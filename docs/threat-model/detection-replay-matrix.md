@@ -24,8 +24,8 @@ This matrix maps replay fixtures to the scenario themes, telemetry fields, and e
 | `soul-md-positive` | [examples/scenarios/scenario-002-malicious-skill-deployment.md](../../examples/scenarios/scenario-002-malicious-skill-deployment.md) persistence stage | Sigma event fixture | `Image`, `CommandLine`, `TargetFilename`, `EventType` | `openclaw-soul-md-modification.yml` matches |
 | `supply-chain-drift-positive` | [examples/scenarios/scenario-002-malicious-skill-deployment.md](../../examples/scenarios/scenario-002-malicious-skill-deployment.md) | Sigma event fixture | `TargetFilename`, `EventType` | `openclaw-supply-chain-drift.yml` matches |
 | `gateway-config-drift-positive` | Synthetic pre-exposure config tampering | Sigma event fixture | `TargetFilename`, `EventType` | `openclaw-gateway-config-drift.yml` matches |
-| `yara-malicious-skill-positive` | [scenario-002-malicious-skill-deployment.md](scenario-002-malicious-skill-deployment.md) | YARA file fixture | Skill file contents | `OpenClaw_Skill_Dangerous_Patterns` matches |
-| `yara-soul-injection-positive` | Memory poisoning / persistence from [ATLAS-mapping.md](ATLAS-mapping.md) | YARA file fixture | `SOUL.md` contents | `OpenClaw_SOUL_Injection_Persistence` matches |
+| `yara-malicious-skill-positive` | [examples/scenarios/scenario-002-malicious-skill-deployment.md](../../examples/scenarios/scenario-002-malicious-skill-deployment.md) | YARA file fixture | Skill file contents | `OpenClaw_Skill_Dangerous_Patterns` matches |
+| `yara-soul-injection-positive` | Memory poisoning / persistence from [docs/threat-model/ATLAS-mapping.md](ATLAS-mapping.md) | YARA file fixture | `SOUL.md` contents | `OpenClaw_SOUL_Injection_Persistence` matches |
 | `yara-gateway-config-positive` | Synthetic gateway bind drift | YARA config fixture | Gateway config contents | `OpenClaw_Gateway_Exposed_Config` matches |
 
 ## Adversarial Variants

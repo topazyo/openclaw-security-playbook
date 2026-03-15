@@ -103,7 +103,9 @@ pip install -e .
 ### Morning Routine
 
 1. **Check Grafana Dashboards**
-   - Open [dashboard-system-health.json](https://grafana.openclaw.ai/d/system-health)
+   - Import `examples/monitoring/dashboard-system-health.json` into your locally deployed Grafana instance
+     (see `configs/monitoring-config/grafana-dashboards.yml` for provisioning config).
+   - Open the **System Health** dashboard in your browser (typically http://localhost:3000).
    - Review Panel 10 (vulnerability metrics) for new CVEs
    - Check CPU/memory/disk usage trends
 
@@ -117,9 +119,18 @@ pip install -e .
    openclaw-cli scan compliance --policy SEC-003
    ```
 
-4. **Generate Daily Security Summary**
+4. **Generate Rolling 24-Hour Security Report**
    ```bash
-   openclaw-cli report weekly --start $(date -d '1 day ago' +%Y-%m-%d) --end $(date +%Y-%m-%d)
+   # Provide explicit dates; the report subcommand is 'weekly' and accepts any date range
+   # Linux (GNU date):
+   openclaw-cli report weekly \
+     --start $(date -d '1 day ago' +%Y-%m-%d) \
+     --end $(date +%Y-%m-%d)
+
+   # macOS (BSD date):
+   openclaw-cli report weekly \
+     --start $(date -v-1d +%Y-%m-%d) \
+     --end $(date +%Y-%m-%d)
    ```
 
 ### Weekly Tasks
@@ -223,7 +234,9 @@ openclaw-cli simulate incident --type credential-theft --severity P1
 
 ### Grafana Dashboards
 
-Access dashboards at [https://grafana.openclaw.ai](https://grafana.openclaw.ai):
+Access dashboards in your locally deployed Grafana (typically http://localhost:3000).
+Import dashboard JSON files from `examples/monitoring/` using Grafana → Dashboards → Import.
+Provisioning can be automated via `configs/monitoring-config/grafana-dashboards.yml`.
 
 1. **System Health Dashboard**
    - Panel 1: CPU/Memory usage

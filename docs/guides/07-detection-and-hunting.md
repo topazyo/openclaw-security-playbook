@@ -10,8 +10,11 @@ difficulty: Intermediate
 This guide covers deploying and operating the detection content in `detections/` for
 OpenClaw, Moltbot, and Clawdbot deployments.
 
-It is the companion reference to
-[Part 3: Detecting OpenClaw Compromise](https://cloudsecops.hashnode.dev/openclaw-detecting-compromise).
+Cross-reference material:
+- Platform-agnostic rule inventory: [`detections/README.md`](../../detections/README.md)
+- Threat scenario coverage: [`docs/threat-model/ATLAS-mapping.md`](../threat-model/ATLAS-mapping.md)
+- Detection-to-scenario replay matrix: [`docs/threat-model/detection-replay-matrix.md`](../threat-model/detection-replay-matrix.md)
+- Monitoring stack configuration: [`configs/monitoring-config/`](../../configs/monitoring-config/)
 
 ## Platform Notes
 
@@ -29,7 +32,9 @@ Run shell-centric commands through WSL2 or PowerShell equivalents.
 **For Tier 1 (Discovery):** EDR agent deployed on target endpoints. No additional tooling required.
 
 **For Tier 2/3 (Behavioral Hunting and Kill Chain Detection):**
-- openclaw-telemetry installed and running (see Part 2, Layer 6)
+- `openclaw-telemetry` installed and running on agent hosts, forwarding JSONL events to your SIEM.
+  See [`docs/guides/08-community-tools-integration.md`](08-community-tools-integration.md) for
+  setup guidance. The telemetry schema is documented in [`detections/README.md`](../../detections/README.md).
 - SIEM receiving CEF/syslog events from openclaw-telemetry
 - For KQL queries: Microsoft Sentinel with CommonSecurityLog table populated
 
@@ -140,3 +145,43 @@ python3 scripts/forensics/verify_hash_chain.py \
 ```
 
 See `docs/guides/06-incident-response.md` for the complete IR playbook.
+
+---
+
+## Rolling Back Detection Rules
+
+When a rule produces an unacceptable false-positive rate in production:
+
+### Disable a Sigma-Converted Rule
+
+```bash
+# In Splunk: disable the saved search
+curl -k -u admin:$SPLUNK_PASSWORD \
+  -X POST https://localhost:8089/servicesNS/admin/search/saved/searches/<rule-name>/disable
+
+# In Sentinel: disable the scheduled query rule via the Azure portal or CLI
+az sentinel alert-rule update \
+  --resource-group <rg> --workspace-name <ws> \
+  --rule-id <id> --enabled false
+```
+
+### Modify a Sigma Rule and Re-Deploy
+
+```bash
+# Edit the relevant rule in detections/sigma/
+# Then re-convert and re-deploy:
+sigma convert -t splunk detections/sigma/openclaw-<rule>.yml \
+    -o detections/siem/splunk/openclaw-<rule>.spl
+# Re-import the generated SPL in your SIEM
+```
+
+### Validate After Rollback
+
+```bash
+# Confirm the replay test still detects the true-positive fixture
+python scripts/verification/validate_detection_replay.py --skip-yara
+# Expected: positive fixtures match, negative fixtures do not
+```
+
+For guidance on tuning thresholds before disabling a rule entirely, see the
+[Tuning Notes](#tuning-notes) section above.

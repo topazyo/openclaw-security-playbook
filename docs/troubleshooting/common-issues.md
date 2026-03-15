@@ -1330,9 +1330,9 @@ tail -100 ~/.openclaw/logs/clawdbot.log
 ```
 
 ### Support Channels
-- **GitHub Issues:** https://github.com/YOUR-ORG/clawdbot-security-playbook/issues
+- **GitHub Issues:** https://github.com/openclaw/openclaw-security-playbook/issues
 - **Documentation:** `docs/guides/01-quick-start.md`
-- **Security Issues:** security@company.com
+- **Security Issues:** See [SECURITY.md](../../SECURITY.md)
 
 ---
 

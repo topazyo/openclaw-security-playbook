@@ -1,12 +1,20 @@
 # GDPR Compliance Guide
 
-**Document Type**: Compliance Guide  
+> **⚠️ TEMPLATE — MUST BE CUSTOMISED BEFORE USE**
+> This file is a **compliance implementation template**, not a finished legal artifact.
+> All `[FILL IN: ...]` fields must be populated by your organisation's Legal and DPO team
+> before this document is used as a compliance record, shared with a Data Protection
+> Authority, or published as a privacy notice. Distributing this with placeholder values
+> constitutes an incomplete and potentially invalid GDPR record.
+
+**Document Type**: Compliance Template (requires organisational customisation)  
 **Version**: 1.0.0  
 **Last Updated**: 2026-02-14  
 **Owner**: Data Protection Officer (DPO) + Legal + Security Team  
 **Regulation**: EU General Data Protection Regulation (GDPR) 2016/679
 
-This document details ClawdBot/OpenClaw compliance with the EU General Data Protection Regulation (GDPR).
+This document provides a GDPR compliance framework and implementation guide for
+ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publishing.
 
 ---
 
@@ -29,9 +37,9 @@ This document details ClawdBot/OpenClaw compliance with the EU General Data Prot
 
 ### GDPR Scope
 
-**Controller**: [Company Name]  
-**Data Protection Officer (DPO)**: [Name], dpo@company.com, [Phone]  
-**EU Representative** (if non-EU company): [Name], [Address], eu-rep@company.com
+**Controller**: [FILL IN: Legal Entity Name]  
+**Data Protection Officer (DPO)**: [FILL IN: Full Name], [FILL IN: dpo@your-org.com], [FILL IN: Phone]  
+**EU Representative** (if non-EU company): [FILL IN: Name], [FILL IN: Address], [FILL IN: eu-rep@your-org.com]
 
 **Processing Activities**:
 - AI agent conversation history (user interactions with ClawdBot/OpenClaw)
@@ -54,7 +62,7 @@ This document details ClawdBot/OpenClaw compliance with the EU General Data Prot
 | **Access Credentials** | User setup | Authentication | Contractual necessity | Duration of account |
 | **Audit Logs** | System-generated | Security, compliance, fraud detection | Legitimate interest + legal obligation | 7 years (compliance requirement) |
 | **Employee Data** | HR onboarding | Employment, access control | Contractual necessity | Employment + 7 years (legal requirement) |
-| **PII in Prompts** | User input | [REDACTED by openclaw-shield] | N/A - not stored | Immediately redacted |
+| **PII in Prompts** | User input | Redacted at ingestion when `openclaw-shield` is deployed and configured (see `docs/guides/08-community-tools-integration.md`); if `openclaw-shield` is not deployed, PII reaches the model and is governed by the relevant conversation-history retention policy | Conditional on deployment | See retention policy; not stored if redaction is active |
 
 ---
 

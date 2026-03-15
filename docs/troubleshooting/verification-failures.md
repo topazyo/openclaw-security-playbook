@@ -36,17 +36,19 @@ bash: ./scripts/verification/verify_openclaw_security.sh: No such file or direct
 **Solution:**
 ```bash
 # Ensure you're in the repository root
-cd ~/clawdbot-security-playbook
+cd ~/openclaw-security-playbook
 
 # Verify script exists
 ls -la scripts/verification/verify_openclaw_security.sh
 
-# If missing, download from repository
-curl -O https://raw.githubusercontent.com/YOUR-ORG/clawdbot-security-playbook/main/scripts/verification/verify_openclaw_security.sh
+# If the file is genuinely missing from a complete clone, re-clone the repo:
+# git clone https://github.com/openclaw/openclaw-security-playbook.git
 
-# Make executable
+# Make executable (if present but not executable)
 chmod +x scripts/verification/verify_openclaw_security.sh
 ```
+
+**Note on exit codes:** The script exits `0` (all checks pass), `1` (one or more critical issues), or `2` (warnings only — no critical issues, or an unknown argument). A fresh clone without a running deployment will produce warnings and exit `2`; this is expected and does not require re-downloading the script.
 
 ---
 
@@ -86,7 +88,7 @@ ERROR: Unsupported platform: MINGW64_NT
 # Option 1: Use WSL2 (Windows Subsystem for Linux)
 wsl --install
 wsl
-cd /mnt/c/Users/YourName/clawdbot-security-playbook
+cd /mnt/c/Users/YourName/openclaw-security-playbook
 ./scripts/verification/verify_openclaw_security.sh
 
 # Option 2: Use PowerShell (limited support)
@@ -1291,9 +1293,9 @@ cat diagnostic_report.txt
 ```
 
 #### 4. **Community Support**
-- **GitHub Issues:** https://github.com/YOUR-ORG/clawdbot-security-playbook/issues
-- **Discussions:** https://github.com/YOUR-ORG/clawdbot-security-playbook/discussions
-- **Security Contact:** security@company.com (for security vulnerabilities)
+- **GitHub Issues:** https://github.com/openclaw/openclaw-security-playbook/issues
+- **Discussions:** https://github.com/openclaw/openclaw-security-playbook/discussions
+- **Security Contact:** See [SECURITY.md](../../SECURITY.md) for vulnerability disclosures
 
 #### 5. **Professional Support**
 For enterprise deployments requiring professional support:

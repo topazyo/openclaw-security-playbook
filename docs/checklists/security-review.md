@@ -61,17 +61,27 @@ sudo iptables -L | grep 18789
 ---
 
 ### 2.2 TLS Configuration
-- [ ] **TLS 1.2+ enforced** (no SSLv3, TLS 1.0, TLS 1.1)
-- [ ] **Strong ciphers only** (ECDHE-RSA-AES256-GCM-SHA384 or better)
+- [ ] **TLS 1.3 only enforced** (no SSLv3, TLS 1.0, TLS 1.1, or TLS 1.2)
+- [ ] **Strong ciphers only** (AES-256-GCM; per the playbook immutable baseline: TLS 1.3 / AES-256-GCM)
 - [ ] **Valid certificates** (not self-signed for production, expiry >30 days)
 - [ ] **HSTS enabled** (Strict-Transport-Security header)
 
 **Verification**:
 ```bash
-# Test TLS configuration
-nmap --script ssl-enum-ciphers -p 18789 localhost
-# Expected: Grade A or A+
+# Confirm TLS 1.2 is rejected (must fail)
+openssl s_client -connect 127.0.0.1:8443 -tls1_2 </dev/null 2>&1 | grep -E "handshake failure|no protocols"
+# Expected: handshake failure or protocol version error
+
+# Confirm TLS 1.3 is accepted
+openssl s_client -connect 127.0.0.1:8443 -tls1_3 </dev/null 2>&1 | grep -E "TLSv1\.3"
+# Expected: TLSv1.3 in the protocol line
+
+# Inspect certificate expiry
+openclaw-cli scan certificates
+# Expected: all certificates show Days Until Expiry > 30
 ```
+
+**Reference**: [Certificate Manager](../../tools/certificate-manager.py) for renewal automation.
 
 ---
 

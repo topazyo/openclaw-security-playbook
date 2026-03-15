@@ -46,10 +46,14 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 
 ### Audit Period
 
-**Current Audit Period**: January 1, 2026 - December 31, 2026  
-**Audit Firm**: [Audit Firm Name]  
-**Last Audit**: Q4 2025 (Report dated January 15, 2026)  
-**Audit Opinion**: Unqualified (clean opinion)
+> **\u26a0\ufe0f TEMPLATE SECTION \u2014 requires organisational input before use as a compliance artifact.**
+
+**Current Audit Period**: [FILL IN: e.g. January 1, 2026 - December 31, 2026]  
+**Audit Firm**: [FILL IN: name of independent audit firm]  
+**Last Audit**: [FILL IN: quarter and year, e.g. Q4 2025]  
+**Audit Opinion**: [FILL IN: opinion from the auditor's report, e.g. Unqualified]
+
+> The control-mapping dashboard below reflects the 17 SOC 2 criteria explicitly modelled\n> in this repo and is source-backed. The audit-period fields above are organisation-specific\n> and must be completed before sharing this document as external evidence.
 
 ---
 
@@ -739,15 +743,17 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 
 ### Auditor Access
 
-**Audit Firm**: [Audit Firm Name]  
-**Lead Auditor**: [Name], [Email]  
-**Audit Fieldwork**: October 1-31, 2026  
-**Evidence Request Portal**: [URL]
+> **\u26a0\ufe0f TEMPLATE SECTION \u2014 fill in before sharing with auditors.**
+
+**Audit Firm**: [FILL IN: name of independent audit firm]  
+**Lead Auditor**: [FILL IN: Full Name], [FILL IN: email]  
+**Audit Fieldwork**: [FILL IN: dates]  
+**Evidence Request Portal**: [FILL IN: URL]
 
 **Point of Contact**:
-- Compliance Officer: compliance@company.com
-- CISO: ciso@company.com
-- Audit Liaison: [Name], [Email]
+- Compliance Officer: [FILL IN: compliance@your-org.com]
+- CISO: [FILL IN: ciso@your-org.com]
+- Audit Liaison: [FILL IN: Name], [FILL IN: email]
 
 ---
 
