@@ -167,8 +167,10 @@ check_requirements() {
     info "Checking requirements..."
 
     # Check macOS version
-    local macos_version=$(sw_vers -productVersion)
-    local major_version=$(echo "$macos_version" | cut -d. -f1)
+    local macos_version
+    local major_version
+    macos_version=$(sw_vers -productVersion)
+    major_version=$(echo "$macos_version" | cut -d. -f1)
 
     if [ "$major_version" -lt 10 ]; then
         error "This script requires macOS 10.14 (Mojave) or later"
@@ -278,7 +280,8 @@ detect_credentials_in_env() {
 
         for pattern in "${env_patterns[@]}"; do
             if grep -q "export $pattern=" "$env_file" 2>/dev/null; then
-                local value=$(grep "export $pattern=" "$env_file" | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+                local value
+                value=$(grep "export $pattern=" "$env_file" | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
                 echo "ENV|$env_file|$pattern|$value" >> "$CREDENTIALS_FOUND"
                 ((found_count++))
                 warning "Found $pattern in: $env_file"
@@ -407,7 +410,7 @@ migrate_credential_to_keychain() {
         -T "$(command -v clawdbot 2>/dev/null || echo /usr/local/bin/clawdbot)" \
         -A  # Allow access by all applications
 
-    if [ $? -eq 0 ]; then
+    if security find-generic-password -s "$service" -a "$account" -w &> /dev/null; then
         local stored_value=""
         stored_value=$(security find-generic-password -s "$service" -a "$account" -w 2>/dev/null || true)
 
@@ -445,8 +448,10 @@ process_credentials() {
         case "$type" in
             FILE)
                 # Extract credential from file
-                local cred_value=$(echo "$value" | grep -oE 'sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}')
-                local service="$KEYCHAIN_SERVICE_PREFIX.$(basename "$location" | sed 's/\.[^.]*$//')"
+                local cred_value
+                local service
+                cred_value=$(echo "$value" | grep -oE 'sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}')
+                service="$KEYCHAIN_SERVICE_PREFIX.$(basename "$location" | sed 's/\.[^.]*$//')"
 
                 if migrate_credential_to_keychain "$service" "$KEYCHAIN_ACCOUNT" "$cred_value" "$location"; then
                     ((success++))
@@ -457,7 +462,8 @@ process_credentials() {
 
             ENV)
                 # Migrate from environment file
-                local service="$KEYCHAIN_SERVICE_PREFIX.$(echo "$key" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
+                local service
+                service="$KEYCHAIN_SERVICE_PREFIX.$(echo "$key" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
 
                 if migrate_credential_to_keychain "$service" "$KEYCHAIN_ACCOUNT" "$value" "$location"; then
                     ((success++))
@@ -468,7 +474,8 @@ process_credentials() {
 
             RUNENV)
                 # Migrate from running environment
-                local service="$KEYCHAIN_SERVICE_PREFIX.$(echo "$location" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
+                local service
+                service="$KEYCHAIN_SERVICE_PREFIX.$(echo "$location" | tr '[:upper:]' '[:lower:]' | sed 's/_/./g')"
 
                 if migrate_credential_to_keychain "$service" "$KEYCHAIN_ACCOUNT" "$key" "environment"; then
                     ((success++))
@@ -584,7 +591,8 @@ rollback_migration() {
     info "Rolling back migration..."
 
     # Find most recent backup
-    local latest_backup=$(ls -t "$BACKUP_DIR" | head -1)
+    local latest_backup
+    latest_backup=$(ls -t "$BACKUP_DIR" | head -1)
 
     if [ -z "$latest_backup" ]; then
         error "No backup found for rollback"
@@ -606,7 +614,8 @@ rollback_migration() {
     info "Restoring configuration files..."
 
     for config_dir in "${CONFIG_DIRS[@]}"; do
-        local backup_path="$BACKUP_DIR/$latest_backup/$(basename "$config_dir")"
+        local backup_path
+        backup_path="$BACKUP_DIR/$latest_backup/$(basename "$config_dir")"
         if [ -d "$backup_path" ]; then
             cp -r "$backup_path/"* "$config_dir/" 2>/dev/null || true
             verbose "Restored: $config_dir"
@@ -615,7 +624,8 @@ rollback_migration() {
 
     # Restore environment files
     for env_file in "${ENV_FILES[@]}"; do
-        local backup_file="$BACKUP_DIR/$latest_backup/$(basename "$env_file")"
+        local backup_file
+        backup_file="$BACKUP_DIR/$latest_backup/$(basename "$env_file")"
         if [ -f "$backup_file" ]; then
             cp "$backup_file" "$env_file"
             verbose "Restored: $env_file"
@@ -849,7 +859,8 @@ main() {
     fi
 
     # Show summary
-    local cred_count=$(wc -l < "$CREDENTIALS_FOUND" | tr -d ' ')
+    local cred_count
+    cred_count=$(wc -l < "$CREDENTIALS_FOUND" | tr -d ' ')
     info "Found $cred_count credential(s) to migrate"
 
     # Create backup

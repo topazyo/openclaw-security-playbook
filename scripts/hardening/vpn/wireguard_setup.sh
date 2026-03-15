@@ -88,8 +88,6 @@ WG_MODE=""  # server or client
 CONFIG_DIR="/etc/wireguard"
 KEYS_DIR="$CONFIG_DIR/keys"
 PEERS_DIR="$CONFIG_DIR/peers"
-LOG_DIR="/var/log/wireguard"
-LOG_FILE="$LOG_DIR/setup_$(date +%Y%m%d_%H%M%S).log"
 
 # Runtime paths (user-specific)
 USER_CONFIG_DIR="$HOME/.openclaw/wireguard"
@@ -146,7 +144,7 @@ log() {
 require_root() {
     if [ "$EUID" -ne 0 ]; then
         error "This operation requires root privileges"
-        info "Run with: sudo $SCRIPT_NAME $*"
+        info "Run with: sudo $SCRIPT_NAME"
         exit 1
     fi
 }
@@ -243,7 +241,8 @@ install_wireguard() {
         return 0
     fi
 
-    local os=$(detect_os)
+    local os
+    os=$(detect_os)
 
     case "$os" in
         macos)
@@ -338,7 +337,8 @@ get_server_public_ip() {
 
 allocate_ip_address() {
     # Allocate next available IP in the VPN network
-    local network_prefix=$(echo "$WG_NETWORK" | cut -d'/' -f1 | cut -d'.' -f1-3)
+    local network_prefix
+    network_prefix=$(echo "$WG_NETWORK" | cut -d'/' -f1 | cut -d'.' -f1-3)
     local existing_ips
     existing_ips=$(wg show "$WG_INTERFACE" allowed-ips 2>/dev/null | awk '{print $2}' | cut -d'/' -f1 | cut -d'.' -f4 || true)
 
@@ -372,8 +372,10 @@ configure_server() {
     info "Configuring WireGuard server..."
 
     # Get or create server keys
-    local server_private_key_file=$(get_or_create_keys "server")
-    local server_private_key=$(cat "$server_private_key_file")
+    local server_private_key_file
+    local server_private_key
+    server_private_key_file=$(get_or_create_keys "server")
+    server_private_key=$(cat "$server_private_key_file")
 
     # Get server public IP
     if [ -z "$WG_SERVER_IP" ]; then
@@ -381,7 +383,8 @@ configure_server() {
     fi
 
     # Server IP in VPN network
-    local server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
+    local server_vpn_ip
+    server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
 
     # Create server configuration
     info "Creating server configuration: $CONFIG_DIR/${WG_INTERFACE}.conf"
@@ -492,13 +495,18 @@ configure_client() {
     fi
 
     # Get or create client keys
-    local client_name="client-$(hostname)"
-    local client_private_key_file=$(get_or_create_keys "$client_name")
-    local client_private_key=$(cat "$client_private_key_file")
-    local client_public_key=$(cat "$KEYS_DIR/${client_name}_public.key")
+    local client_name
+    local client_private_key_file
+    local client_private_key
+    local client_public_key
+    client_name="client-$(hostname)"
+    client_private_key_file=$(get_or_create_keys "$client_name")
+    client_private_key=$(cat "$client_private_key_file")
+    client_public_key=$(cat "$KEYS_DIR/${client_name}_public.key")
 
     # Client IP in VPN network
-    local client_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|2/32|')
+    local client_vpn_ip
+    client_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|2/32|')
 
     info "Requesting server public key..."
     warning "You need the server's public key to configure the client"
@@ -577,12 +585,16 @@ add_peer() {
     info "Adding peer: $PEER_NAME"
 
     # Generate keys for peer
-    local peer_private_key_file=$(get_or_create_keys "$PEER_NAME")
-    local peer_private_key=$(cat "$peer_private_key_file")
-    local peer_public_key=$(cat "$KEYS_DIR/${PEER_NAME}_public.key")
+    local peer_private_key_file
+    local peer_private_key
+    local peer_public_key
+    peer_private_key_file=$(get_or_create_keys "$PEER_NAME")
+    peer_private_key=$(cat "$peer_private_key_file")
+    peer_public_key=$(cat "$KEYS_DIR/${PEER_NAME}_public.key")
 
     # Allocate IP for peer
-    local peer_ip=$(allocate_ip_address)
+    local peer_ip
+    peer_ip=$(allocate_ip_address)
     local peer_ip_cidr="${peer_ip}/32"
 
     info "Peer IP: $peer_ip"
@@ -603,8 +615,10 @@ EOF
     local peer_config="$PEERS_DIR/${PEER_NAME}.conf"
 
     # Get server info
-    local server_public_key=$(cat "$KEYS_DIR/server_public.key")
-    local server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
+    local server_public_key
+    local server_vpn_ip
+    server_public_key=$(cat "$KEYS_DIR/server_public.key")
+    server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
 
     cat > "$peer_config" << EOF
 # WireGuard Client Configuration
@@ -770,7 +784,8 @@ verify_connectivity() {
     wg show "$WG_INTERFACE"
 
     # Get peers
-    local peers=$(wg show "$WG_INTERFACE" peers 2>/dev/null || true)
+    local peers
+    peers=$(wg show "$WG_INTERFACE" peers 2>/dev/null || true)
 
     if [ -z "$peers" ]; then
         warning "No peers configured"
@@ -823,7 +838,8 @@ troubleshoot_connection() {
     fi
 
     # Check IP forwarding (server)
-    local ip_forward=$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo "0")
+    local ip_forward
+    ip_forward=$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo "0")
     if [ "$ip_forward" = "1" ]; then
         success "IP forwarding enabled"
     else
@@ -835,7 +851,8 @@ troubleshoot_connection() {
     info "Checking firewall..."
 
     if command -v iptables &>/dev/null; then
-        local fw_rules=$(sudo iptables -L -n | grep -i wireguard || true)
+        local fw_rules
+        fw_rules=$(sudo iptables -L -n | grep -i wireguard || true)
         if [ -n "$fw_rules" ]; then
             success "WireGuard firewall rules present"
         else
@@ -897,7 +914,8 @@ uninstall_wireguard() {
 
     # Backup configuration
     if [ -f "$CONFIG_DIR/${WG_INTERFACE}.conf" ]; then
-        local backup_dir="$HOME/.openclaw/wireguard_backup_$(date +%Y%m%d_%H%M%S)"
+        local backup_dir
+        backup_dir="$HOME/.openclaw/wireguard_backup_$(date +%Y%m%d_%H%M%S)"
         mkdir -p "$backup_dir"
         cp -r "$CONFIG_DIR" "$backup_dir/"
         info "Configuration backed up to: $backup_dir"

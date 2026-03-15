@@ -194,9 +194,12 @@ install_tailscale_macos() {
 install_tailscale_ubuntu() {
     info "Installing Tailscale on Ubuntu/Debian..."
 
+    local distro_codename
+    distro_codename="$(lsb_release -cs)"
+
     # Add Tailscale repository
-    curl -fsSL --connect-timeout 10 --max-time 30 https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).gpg | sudo apt-key add -
-    curl -fsSL --connect-timeout 10 --max-time 30 https://pkgs.tailscale.com/stable/ubuntu/$(lsb_release -cs).list | sudo tee /etc/apt/sources.list.d/tailscale.list
+    curl -fsSL --connect-timeout 10 --max-time 30 "https://pkgs.tailscale.com/stable/ubuntu/${distro_codename}.gpg" | sudo apt-key add -
+    curl -fsSL --connect-timeout 10 --max-time 30 "https://pkgs.tailscale.com/stable/ubuntu/${distro_codename}.list" | sudo tee /etc/apt/sources.list.d/tailscale.list
 
     # Update and install
     sudo apt-get update
@@ -506,8 +509,10 @@ verify_installation() {
     fi
 
     # Check authentication status
-    local status=$(get_tailscale_status_json)
-    local backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
+    local status
+    local backend_state
+    status=$(get_tailscale_status_json)
+    backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
 
     if [ "$backend_state" = "Running" ]; then
         success "Authenticated and connected"
@@ -517,7 +522,8 @@ verify_installation() {
     fi
 
     # Check IP address
-    local ip=$(tailscale ip -4 2>/dev/null)
+    local ip
+    ip=$(tailscale ip -4 2>/dev/null)
     if [ -n "$ip" ]; then
         success "Tailscale IP: $ip"
     else
@@ -527,7 +533,8 @@ verify_installation() {
 
     # Check DNS
     if echo "$status" | jq -e '.MagicDNSSuffix' &>/dev/null; then
-        local dns_suffix=$(echo "$status" | jq -r '.MagicDNSSuffix')
+        local dns_suffix
+        dns_suffix=$(echo "$status" | jq -r '.MagicDNSSuffix')
         success "MagicDNS enabled: $dns_suffix"
     else
         info "MagicDNS not configured"
@@ -545,8 +552,10 @@ verify_connectivity() {
     fi
 
     # Get list of peers
-    local status=$(get_tailscale_status_json)
-    local peer_entries=$(echo "$status" | jq -r '.Peer | to_entries[]? | [.key, (.value.HostName // "unknown"), (.value.TailscaleIPs[0] // "")] | @tsv' 2>/dev/null)
+    local status
+    local peer_entries
+    status=$(get_tailscale_status_json)
+    peer_entries=$(echo "$status" | jq -r '.Peer | to_entries[]? | [.key, (.value.HostName // "unknown"), (.value.TailscaleIPs[0] // "")] | @tsv' 2>/dev/null)
 
     if [ -z "$peer_entries" ]; then
         warning "No peers found. This may be the first device."
@@ -560,7 +569,7 @@ verify_connectivity() {
     local -a ping_names=()
     local -a ping_ips=()
 
-    while IFS=$'\t' read -r peer_key peer_name peer_ip; do
+    while IFS=$'\t' read -r _peer_key peer_name peer_ip; do
         if [ -n "$peer_ip" ]; then
             ping -c 1 -W 2 "$peer_ip" &>/dev/null &
             ping_pids+=("$!")
@@ -588,8 +597,10 @@ verify_acl_compliance() {
     info "3. Review access rules for tag:$TAILSCALE_TAG"
 
     # Check device tags
-    local status=$(get_tailscale_status_json)
-    local tags=$(echo "$status" | jq -r '.Self.Tags[]?' 2>/dev/null)
+    local status
+    local tags
+    status=$(get_tailscale_status_json)
+    tags=$(echo "$status" | jq -r '.Self.Tags[]?' 2>/dev/null)
 
     if [ -n "$tags" ]; then
         success "Device tags:"
@@ -673,8 +684,10 @@ troubleshoot_auth() {
     info "Troubleshooting authentication..."
 
     # Check authentication status
-    local status=$(get_tailscale_status_json)
-    local backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
+    local status
+    local backend_state
+    status=$(get_tailscale_status_json)
+    backend_state=$(echo "$status" | jq -r '.BackendState // "unknown"')
 
     info "Backend state: $backend_state"
 

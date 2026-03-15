@@ -64,8 +64,6 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Paths
@@ -135,14 +133,16 @@ error() {
 audit() {
     local level=$1
     shift
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "[$timestamp] [$level] $*" >> "$AUDIT_LOG"
 }
 
 log() {
     local level=$1
     shift
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "[$timestamp] [$level] $*" >> "$LOG_FILE"
 }
 
@@ -271,14 +271,16 @@ validate_manifest() {
     fi
 
     # Check version format
-    local version=$(jq -r '.version' "$manifest_file")
+    local version
+    version=$(jq -r '.version' "$manifest_file")
     if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         warning "Invalid version format: $version (expected semver)"
     fi
 
     # Validate source repository
     if jq -e '.repository' "$manifest_file" &>/dev/null; then
-        local repo=$(jq -r '.repository' "$manifest_file")
+        local repo
+        repo=$(jq -r '.repository' "$manifest_file")
         if ! validate_source "$repo"; then
             warning "Untrusted source repository: $repo"
         fi
@@ -297,7 +299,8 @@ validate_source() {
     fi
 
     # Check if source matches trusted patterns
-    local trusted_sources=$(jq -r '.sources.trusted[]' "$ALLOWLIST_FILE" 2>/dev/null || echo "")
+    local trusted_sources
+    trusted_sources=$(jq -r '.sources.trusted[]' "$ALLOWLIST_FILE" 2>/dev/null || echo "")
 
     for trusted in $trusted_sources; do
         if [[ "$source" == "$trusted"* ]]; then
@@ -306,7 +309,8 @@ validate_source() {
     done
 
     # Check approved sources
-    local approved_sources=$(jq -r '.sources.approved[]' "$ALLOWLIST_FILE" 2>/dev/null || echo "")
+    local approved_sources
+    approved_sources=$(jq -r '.sources.approved[]' "$ALLOWLIST_FILE" 2>/dev/null || echo "")
 
     for approved in $approved_sources; do
         if [ "$source" = "$approved" ]; then
@@ -328,11 +332,14 @@ check_integrity() {
         return 0
     fi
 
-    local expected_hash=$(jq -r '.integrity.hash' "$manifest_file")
-    local hash_algo=$(jq -r '.integrity.algorithm // "sha256"' "$manifest_file")
+    local expected_hash
+    local hash_algo
+    expected_hash=$(jq -r '.integrity.hash' "$manifest_file")
+    hash_algo=$(jq -r '.integrity.algorithm // "sha256"' "$manifest_file")
 
     # Get skill directory
-    local skill_dir=$(dirname "$manifest_file")
+    local skill_dir
+    skill_dir=$(dirname "$manifest_file")
 
     # Calculate actual hash
     local actual_hash=""
@@ -398,8 +405,10 @@ verify_signature() {
         return 1
     fi
 
-    local signature_value=$(jq -r '.signature.value // empty' "$manifest_file")
-    local public_key=$(jq -r '.signature.public_key // empty' "$manifest_file")
+    local signature_value
+    local public_key
+    signature_value=$(jq -r '.signature.value // empty' "$manifest_file")
+    public_key=$(jq -r '.signature.public_key // empty' "$manifest_file")
     local trusted_keys
     trusted_keys=$(jq -r '.validation.signature.trusted_keys[]?' "$POLICY_FILE" 2>/dev/null || true)
 
@@ -494,8 +503,10 @@ scan_dangerous_patterns() {
 
     info "Scanning for dangerous patterns..."
 
-    local patterns=$(jq -r '.patterns[].pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
-    local exceptions=$(jq -r '.exceptions[]? // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    local patterns
+    local exceptions
+    patterns=$(jq -r '.patterns[].pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    exceptions=$(jq -r '.exceptions[]? // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
     local found_issues=0
 
     while IFS= read -r pattern; do
@@ -547,7 +558,8 @@ check_permissions() {
         return 0
     fi
 
-    local permissions=$(jq -r '.permissions[]' "$manifest_file")
+    local permissions
+    permissions=$(jq -r '.permissions[]' "$manifest_file")
     local dangerous_perms=("filesystem:write" "network:unrestricted" "process:exec" "secrets:read")
 
     while IFS= read -r perm; do
@@ -573,8 +585,10 @@ quarantine_skill() {
     warning "Quarantining skill: $skill_path"
     audit "QUARANTINE" "Skill: $skill_path | Reason: $reason"
 
-    local skill_name=$(basename "$skill_path")
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local skill_name
+    local timestamp
+    skill_name=$(basename "$skill_path")
+    timestamp=$(date +%Y%m%d_%H%M%S)
     local quarantine_path="${QUARANTINE_DIR}/${skill_name}_${timestamp}"
 
     # Move skill to quarantine
@@ -616,7 +630,8 @@ restore_skill() {
     info "Restoring skill: $quarantine_id"
 
     # Read original path
-    local original_path=$(grep "Original Path:" "${quarantine_path}/QUARANTINE_INFO.txt" | cut -d' ' -f3)
+    local original_path
+    original_path=$(grep "Original Path:" "${quarantine_path}/QUARANTINE_INFO.txt" | cut -d' ' -f3)
 
     if [ -z "$original_path" ]; then
         error "Could not determine original path"
@@ -647,7 +662,8 @@ scan_all_skills() {
     fi
 
     # Find all skill manifests
-    local manifests=$(find "$SKILLS_DIR" -name "skill-manifest.json" 2>/dev/null)
+    local manifests
+    manifests=$(find "$SKILLS_DIR" -name "skill-manifest.json" 2>/dev/null)
 
     if [ -z "$manifests" ]; then
         warning "No skill manifests found"
@@ -684,7 +700,8 @@ scan_all_skills() {
         fi
 
         # Scan for dangerous patterns
-        local skill_dir=$(dirname "$manifest")
+        local skill_dir
+        skill_dir=$(dirname "$manifest")
         if ! scan_dangerous_patterns "$skill_dir"; then
             ((issues++))
         fi
@@ -738,7 +755,8 @@ start_monitoring() {
 
     # Start monitor in background
     (monitor_loop) &
-    local pid=$!
+    local pid
+    pid=$!
 
     echo $pid > "$PIDFILE"
 
@@ -755,7 +773,8 @@ stop_monitoring() {
         return 1
     fi
 
-    local pid=$(cat "$PIDFILE")
+    local pid
+    pid=$(cat "$PIDFILE")
 
     info "Stopping monitor (PID: $pid)..."
 
@@ -772,7 +791,8 @@ stop_monitoring() {
 
 is_running() {
     if [ -f "$PIDFILE" ]; then
-        local pid=$(cat "$PIDFILE")
+        local pid
+        pid=$(cat "$PIDFILE")
         if kill -0 "$pid" 2>/dev/null; then
             return 0
         else
@@ -862,7 +882,8 @@ cleanup() {
 
 rotate_logs() {
     if [ -f "$LOG_FILE" ]; then
-        local size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+        local size
+        size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
 
         if [ "$size" -gt "$MAX_LOG_SIZE" ]; then
             info "Rotating log file (size: $size bytes)"
@@ -872,17 +893,18 @@ rotate_logs() {
     fi
 
     # Delete old logs
-    find "$LOG_DIR" -name "*.log.*.gz" -mtime +$LOG_RETENTION_DAYS -delete 2>/dev/null || true
+    find "$LOG_DIR" -name "*.log.*.gz" -mtime +"$LOG_RETENTION_DAYS" -delete 2>/dev/null || true
 }
 
 clean_quarantine() {
     info "Cleaning up old quarantine..."
 
-    local count=$(find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +$QUARANTINE_RETENTION_DAYS 2>/dev/null | wc -l)
+    local count
+    count=$(find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +"$QUARANTINE_RETENTION_DAYS" 2>/dev/null | wc -l)
 
-    if [ $count -gt 0 ]; then
+    if [ "$count" -gt 0 ]; then
         info "Removing $count old quarantined skill(s)"
-        find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +$QUARANTINE_RETENTION_DAYS -exec rm -rf {} \; 2>/dev/null || true
+        find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +"$QUARANTINE_RETENTION_DAYS" -exec rm -rf {} \; 2>/dev/null || true
     fi
 }
 
@@ -958,7 +980,8 @@ show_status() {
     echo ""
 
     if is_running; then
-        local pid=$(cat "$PIDFILE")
+        local pid
+        pid=$(cat "$PIDFILE")
         print_color "$GREEN" "Status: RUNNING (PID: $pid)"
     else
         print_color "$YELLOW" "Status: STOPPED"
@@ -972,8 +995,10 @@ show_status() {
     echo "  Log File:      $LOG_FILE"
     echo ""
 
-    local skill_count=$(find "$SKILLS_DIR" -name "skill-manifest.json" 2>/dev/null | wc -l)
-    local quarantine_count=$(find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    local skill_count
+    local quarantine_count
+    skill_count=$(find "$SKILLS_DIR" -name "skill-manifest.json" 2>/dev/null | wc -l)
+    quarantine_count=$(find "$QUARANTINE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
 
     echo "Statistics:"
     echo "  Total Skills:     $skill_count"
