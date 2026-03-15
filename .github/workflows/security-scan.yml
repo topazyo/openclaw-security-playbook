@@ -153,25 +153,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ hashFiles('package.json') != '' }}
         uses: actions/checkout@v4
 
+      - name: Detect npm project
+        id: npm-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package.json && -f package-lock.json ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Node.js
+        if: steps.npm-project.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
       - name: Install dependencies
+        if: steps.npm-project.outputs.present == 'true'
         run: npm ci
 
       - name: Run npm audit
+        if: steps.npm-project.outputs.present == 'true'
         run: |
           npm audit --json > npm-audit.json || true
           npm audit --audit-level=moderate
 
+      - name: Skip npm audit when no Node project exists
+        if: steps.npm-project.outputs.present != 'true'
+        shell: bash
+        run: |
+          echo "Skipping npm audit: no package.json/package-lock.json pair exists in this repository."
+
       - name: Upload npm audit results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.npm-project.outputs.present == 'true'
         with:
           name: npm-audit-results
           path: npm-audit.json
