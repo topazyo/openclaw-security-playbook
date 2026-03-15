@@ -11,6 +11,15 @@ from typing import Any
 def _json_handler(component: str, status_payload: dict[str, Any]):
     class _Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/metrics":
+                body = _render_metrics(component, status_payload).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/plain; version=0.0.4")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             if self.path not in {"/health", "/healthz", "/ready"}:
                 self.send_response(HTTPStatus.NOT_FOUND)
                 self.end_headers()
@@ -33,6 +42,26 @@ def _json_handler(component: str, status_payload: dict[str, Any]):
             return
 
     return _Handler
+
+
+def _render_metrics(component: str, status_payload: dict[str, Any]) -> str:
+    lines = [
+        "# HELP clawdbot_runtime_up Whether the ClawdBot runtime is healthy.",
+        "# TYPE clawdbot_runtime_up gauge",
+        f'clawdbot_runtime_up{{component="{component}"}} 1',
+    ]
+
+    for key, value in status_payload.items():
+        if isinstance(value, bool):
+            metric_name = f"clawdbot_{key}"
+            lines.append(f"# TYPE {metric_name} gauge")
+            lines.append(f'{metric_name}{{component="{component}"}} {1 if value else 0}')
+        elif isinstance(value, int):
+            metric_name = f"clawdbot_{key}"
+            lines.append(f"# TYPE {metric_name} gauge")
+            lines.append(f'{metric_name}{{component="{component}"}} {value}')
+
+    return "\n".join(lines) + "\n"
 
 
 def serve(component: str, host: str, port: int, status_payload: dict[str, Any]) -> None:

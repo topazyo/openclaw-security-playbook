@@ -306,10 +306,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-    user: "70:70"  # Postgres user
-
-    read_only: true
-
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=100m
       - /run/postgresql:rw,noexec,nosuid,nodev,size=10m
@@ -317,6 +313,7 @@ services:
     environment:
       - POSTGRES_DB=clawdbot
       - POSTGRES_USER=clawdbot
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - PGDATA=/var/lib/postgresql/data/pgdata
 
     secrets:
@@ -336,7 +333,7 @@ services:
           memory: 256M
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clawdbot"]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$(cat /run/secrets/postgres_password)\" pg_isready -U clawdbot -d clawdbot"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -439,7 +436,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-grafana-dev-password-change-me}
       - GF_INSTALL_PLUGINS=
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=https://grafana.clawdbot.internal
+      - GF_SERVER_ROOT_URL=http://127.0.0.1:3000
       - GF_AUTH_ANONYMOUS_ENABLED=false
 
     ports:
@@ -471,6 +468,14 @@ services:
       - type: bind
         source: ../../../configs/monitoring-config/grafana-datasources.yml
         target: /etc/grafana/provisioning/datasources/datasources.yml
+        read_only: true
+      - type: bind
+        source: ../../../configs/monitoring-config/grafana-dashboards.yml
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+        read_only: true
+      - type: bind
+        source: ../../../examples/monitoring
+        target: /var/lib/grafana/dashboards
         read_only: true
 
     logging:
