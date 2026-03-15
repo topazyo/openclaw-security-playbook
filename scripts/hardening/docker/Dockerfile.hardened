@@ -19,6 +19,7 @@
 #   - scanner: Security scanning stage
 #   - gateway: Production gateway image
 #   - agent: Production agent image
+#   - playbook: CI/runtime image for repository verification tooling
 #
 # Usage:
 #   # Build gateway
@@ -26,6 +27,9 @@
 #   
 #   # Build agent
 #   docker build --target agent -t clawdbot/agent:latest -f Dockerfile.hardened .
+#   
+#   # Build playbook verification image
+#   docker build --target playbook -t openclaw-playbook:latest -f Dockerfile.hardened .
 #   
 #   # Build with security scanning
 #   docker build --target scanner -t clawdbot/gateway:scan -f Dockerfile.hardened .
@@ -116,6 +120,9 @@ FROM dependency-builder AS app-builder
 COPY --chown=1000:1000 src/ /build/src/
 COPY --chown=1000:1000 setup.py pyproject.toml README.md /build/
 
+# Give the non-root build user ownership of the build workspace and venv.
+RUN chown -R clawdbot:clawdbot /build /opt/venv
+
 # Switch to non-root user for build
 USER clawdbot
 
@@ -156,6 +163,7 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     tini \
+    netcat-openbsd \
     curl \
     && update-ca-certificates
 
@@ -190,6 +198,10 @@ USER clawdbot
 
 FROM runtime-base AS gateway
 
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
 # Metadata labels (OCI standard)
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.authors="ClawdBot Security Team" \
@@ -205,8 +217,8 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       com.clawdbot.security.hardened="true"
 
 # Copy gateway-specific files
-COPY --chown=clawdbot:clawdbot config/gateway.yml /app/config/
-COPY --chown=clawdbot:clawdbot scripts/entrypoint-gateway.sh /app/entrypoint.sh
+COPY --chown=clawdbot:clawdbot configs/templates/gateway.hardened.yml /app/config/gateway.yml
+COPY --chown=clawdbot:clawdbot scripts/hardening/docker/entrypoint-gateway.sh /app/entrypoint.sh
 
 # Make entrypoint executable
 USER root
@@ -218,7 +230,7 @@ EXPOSE 8443/tcp 9090/tcp
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f https://localhost:8443/health || exit 1
+    CMD curl -f http://localhost:8443/health || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/sbin/tini", "--"]
@@ -231,6 +243,10 @@ CMD ["/app/entrypoint.sh"]
 # ============================================================================
 
 FROM runtime-base AS agent
+
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
 
 # Metadata labels
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
@@ -245,8 +261,8 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       com.clawdbot.security.hardened="true"
 
 # Copy agent-specific files
-COPY --chown=clawdbot:clawdbot config/agent.yml /app/config/
-COPY --chown=clawdbot:clawdbot scripts/entrypoint-agent.sh /app/entrypoint.sh
+COPY --chown=clawdbot:clawdbot configs/agent-config/openclaw-agent.yml /app/config/agent.yml
+COPY --chown=clawdbot:clawdbot scripts/hardening/docker/entrypoint-agent.sh /app/entrypoint.sh
 
 # Make entrypoint executable
 USER root
@@ -267,7 +283,41 @@ ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/app/entrypoint.sh"]
 
 # ============================================================================
-# STAGE 8: Development Image (Optional)
+# STAGE 8: Playbook Verification Image
+# ============================================================================
+
+FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS playbook
+
+# Install only what the playbook tooling needs at runtime.
+RUN apk add --no-cache \
+    ca-certificates \
+    tini \
+    && update-ca-certificates
+
+# Create non-root user and workspace
+RUN addgroup -g 1000 -S clawdbot && \
+    adduser -u 1000 -S clawdbot -G clawdbot -h /workspace
+
+WORKDIR /workspace/openclaw-security-playbook
+
+# Copy the executable playbook assets that CI validates and scans.
+COPY --chown=1000:1000 README.md ./
+COPY --chown=1000:1000 configs/ ./configs/
+COPY --chown=1000:1000 detections/ ./detections/
+COPY --chown=1000:1000 examples/ ./examples/
+COPY --chown=1000:1000 scripts/ ./scripts/
+COPY --chown=1000:1000 tools/ ./tools/
+
+USER clawdbot
+
+# Prove the image can execute a representative verification command at build time.
+RUN python scripts/verification/capture_runner_delta.py --help > /tmp/capture-runner-delta-help.txt
+
+ENTRYPOINT ["/sbin/tini", "--", "python"]
+CMD ["tools/policy-validator.py", "--help"]
+
+# ============================================================================
+# STAGE 9: Development Image (Optional)
 # ============================================================================
 
 FROM runtime-base AS development
