@@ -4,6 +4,8 @@
 
 This directory contains hardened Docker configurations for deploying ClawdBot with security best practices, including multi-stage builds, network isolation, resource limits, and security scanning.
 
+Repository CI uses the `playbook` target from `Dockerfile.hardened` for Trivy image scanning. That target packages the verification tooling and hardened configuration that actually live in this repository. The `agent` and `gateway` targets remain documented here for the separate application layout they were originally designed to build.
+
 ---
 
 ## Contents
@@ -222,7 +224,7 @@ healthcheck:
 
 ### Build Stages
 
-The `Dockerfile.hardened` uses 8 stages for maximum security and efficiency:
+The `Dockerfile.hardened` uses 9 stages for maximum security and efficiency:
 
 ```
 ┌─────────────────┐
@@ -250,7 +252,11 @@ The `Dockerfile.hardened` uses 8 stages for maximum security and efficiency:
 └──────────┘ └────────┘
     │
 ┌───▼──────────┐
-│8. development│  Dev image (optional)
+│8. playbook   │  Repo-native CI verification image
+└───┬──────────┘
+  │
+┌───▼──────────┐
+│9. development│  Dev image (optional)
 └──────────────┘
 ```
 
@@ -272,6 +278,13 @@ docker build \
 docker build \
   --target agent \
   --tag clawdbot/agent:1.0.0 \
+  --file Dockerfile.hardened \
+  .
+
+# Playbook verification build used by CI
+docker build \
+  --target playbook \
+  --tag openclaw-playbook:latest \
   --file Dockerfile.hardened \
   .
 

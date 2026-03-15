@@ -18,8 +18,6 @@
 #   docker-compose logs -f clawdbot
 #   docker-compose down
 
-version: '3.9'
-
 # ============================================================================
 # SERVICES
 # ============================================================================
@@ -31,13 +29,13 @@ services:
   clawdbot-gateway:
     image: clawdbot/gateway:${CLAWDBOT_VERSION:-latest}
     build:
-      context: .
-      dockerfile: Dockerfile.hardened
+      context: ../../..
+      dockerfile: scripts/hardening/docker/Dockerfile.hardened
       target: gateway
       args:
         - PYTHON_VERSION=3.11
-        - BUILD_DATE=${BUILD_DATE}
-        - VCS_REF=${VCS_REF}
+        - BUILD_DATE=${BUILD_DATE:-local-compose}
+        - VCS_REF=${VCS_REF:-workspace}
     container_name: clawdbot-gateway
     hostname: gateway
     restart: unless-stopped
@@ -109,7 +107,7 @@ services:
 
     # Health Check
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost:8443/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8443/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -118,13 +116,10 @@ services:
     # Volumes (read-only where possible)
     volumes:
       - type: bind
-        source: ./config
-        target: /app/config
+        source: ../../../configs/templates/gateway.hardened.yml
+        target: /app/config/gateway.yml
         read_only: true
-      - type: bind
-        source: ./logs
-        target: /app/logs
-        read_only: false
+      - gateway-logs:/app/logs
       - type: tmpfs
         target: /app/tmp
         tmpfs:
@@ -157,12 +152,13 @@ services:
   clawdbot-agent:
     image: clawdbot/agent:${CLAWDBOT_VERSION:-latest}
     build:
-      context: .
-      dockerfile: Dockerfile.hardened
+      context: ../../..
+      dockerfile: scripts/hardening/docker/Dockerfile.hardened
       target: agent
       args:
         - PYTHON_VERSION=3.11
-    container_name: clawdbot-agent
+        - BUILD_DATE=${BUILD_DATE:-local-compose}
+        - VCS_REF=${VCS_REF:-workspace}
     hostname: agent
     restart: unless-stopped
 
@@ -185,7 +181,7 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - GATEWAY_URL=https://clawdbot-gateway:8443
+      - GATEWAY_URL=http://clawdbot-gateway:8443
       - MAX_CONCURRENT_TASKS=5
       - TASK_TIMEOUT=300
 
@@ -209,7 +205,7 @@ services:
           memory: 256M
 
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -217,13 +213,16 @@ services:
 
     volumes:
       - type: bind
-        source: ./agent-config
-        target: /app/config
+        source: ../../../configs/agent-config/openclaw-agent.yml
+        target: /app/config/agent.yml
         read_only: true
       - type: volume
         source: agent-data
         target: /app/data
-      - agent-tmp:/app/tmp
+      - type: tmpfs
+        target: /app/tmp
+        tmpfs:
+          size: 104857600
 
     logging:
       driver: json-file
@@ -259,7 +258,7 @@ services:
 
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD}
+      --requirepass ${REDIS_PASSWORD:-redis-dev-password-change-me}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
@@ -345,10 +344,6 @@ services:
 
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - type: bind
-        source: ./db-init
-        target: /docker-entrypoint-initdb.d
-        read_only: true
 
     logging:
       driver: json-file
@@ -408,7 +403,7 @@ services:
 
     volumes:
       - type: bind
-        source: ./monitoring/prometheus.yml
+        source: ../../../configs/monitoring-config/prometheus.yml
         target: /etc/prometheus/prometheus.yml
         read_only: true
       - prometheus-data:/prometheus
@@ -441,7 +436,7 @@ services:
 
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-grafana-dev-password-change-me}
       - GF_INSTALL_PLUGINS=
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=https://grafana.clawdbot.internal
@@ -474,8 +469,8 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - type: bind
-        source: ./monitoring/grafana-dashboards
-        target: /etc/grafana/provisioning/dashboards
+        source: ../../../configs/monitoring-config/grafana-datasources.yml
+        target: /etc/grafana/provisioning/datasources/datasources.yml
         read_only: true
 
     logging:
@@ -543,7 +538,7 @@ networks:
       config:
         - subnet: 172.20.0.0/24
     driver_opts:
-      com.docker.network.bridge.name: clawdbot-frontend
+      com.docker.network.bridge.name: oc-front
       com.docker.network.bridge.enable_icc: "false"
       com.docker.network.bridge.enable_ip_masquerade: "true"
 
@@ -555,7 +550,7 @@ networks:
       config:
         - subnet: 172.21.0.0/24
     driver_opts:
-      com.docker.network.bridge.name: clawdbot-backend
+      com.docker.network.bridge.name: oc-back
       com.docker.network.bridge.enable_icc: "true"
 
   # Monitoring network - metrics collection
@@ -565,7 +560,7 @@ networks:
       config:
         - subnet: 172.22.0.0/24
     driver_opts:
-      com.docker.network.bridge.name: clawdbot-monitoring
+      com.docker.network.bridge.name: oc-mon
 
 # ============================================================================
 # VOLUMES
@@ -607,12 +602,8 @@ volumes:
   agent-data:
     driver: local
 
-  agent-tmp:
-    driver: tmpfs
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: size=100m,uid=1000,gid=1000
+  gateway-logs:
+    driver: local
 
 # ============================================================================
 # SECRETS

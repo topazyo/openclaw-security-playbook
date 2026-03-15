@@ -47,11 +47,75 @@ jobs:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy'
 
+      - name: Build playbook image for Trivy
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --target playbook \
+            --tag openclaw-playbook:latest \
+            --file scripts/hardening/docker/Dockerfile.hardened \
+            .
+
+      - name: Smoke run playbook image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm openclaw-playbook:latest
+
+      - name: Build gateway and agent images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --target gateway \
+            --tag clawdbot-gateway:ci \
+            --file scripts/hardening/docker/Dockerfile.hardened \
+            .
+          docker build \
+            --target agent \
+            --tag clawdbot-agent:ci \
+            --file scripts/hardening/docker/Dockerfile.hardened \
+            .
+
+      - name: Smoke run gateway and agent images
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker rm -f oc-gateway-ci oc-agent-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name oc-gateway-ci clawdbot-gateway:ci >/dev/null
+          sleep 3
+          docker exec oc-gateway-ci curl -sf http://127.0.0.1:8443/health >/dev/null
+
+          docker run -d --name oc-agent-ci clawdbot-agent:ci >/dev/null
+          sleep 3
+          docker exec oc-agent-ci curl -sf http://127.0.0.1:8000/health >/dev/null
+
       - name: Run Trivy for Docker images
         uses: aquasecurity/trivy-action@0.24.0
         with:
           scan-type: 'image'
-          image-ref: 'openclaw-agent:latest'
+          image-ref: 'openclaw-playbook:latest'
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+
+      - name: Run Trivy for gateway image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'image'
+          image-ref: 'clawdbot-gateway:ci'
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+
+      - name: Run Trivy for agent image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'image'
+          image-ref: 'clawdbot-agent:ci'
           severity: 'CRITICAL,HIGH'
           format: 'table'
 
