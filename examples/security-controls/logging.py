@@ -702,7 +702,7 @@ def example_sensitive_data_redaction():
     log_data = {
         "user_id": "user-123",
         "action": "update_credentials",
-        "password": "${DEMO_PASSWORD}",
+        "password": os.environ.get("DEMO_PASSWORD_PLACEHOLDER", "[demo-password-from-env]"),
         "credit_card": "${DEMO_CARD_TOKEN}",
         "email": "user@example.com",
         "api_key": "${OPENCLAW_API_KEY}"
@@ -773,24 +773,29 @@ def test_structured_logging():
     json_str = entry.to_json()
     parsed = json.loads(json_str)
     
-    assert parsed['user_id'] == "user-123"
-    assert parsed['event_type'] == "login_success"
+    if parsed['user_id'] != "user-123":
+        raise AssertionError("Structured logging should preserve the user_id field")
+    if parsed['event_type'] != "login_success":
+        raise AssertionError("Structured logging should preserve the event type")
     print("✓ test_structured_logging passed")
 
 
 def test_sensitive_data_redaction():
     """Test: Redact sensitive patterns."""
     data = {
-        "password": "secret123",
+        "password": os.environ.get("TEST_REDACTION_PASSWORD", "[redaction-test-secret]"),
         "credit_card": "1234567890123456",
         "normal_field": "public data"
     }
     
     redacted = SensitiveDataRedactor.redact_dict(data)
     
-    assert redacted['password'] == '[REDACTED]'
-    assert '****' in redacted['credit_card']
-    assert redacted['normal_field'] == 'public data'
+    if redacted['password'] != '[REDACTED]':
+        raise AssertionError("Passwords should be redacted")
+    if '****' not in redacted['credit_card']:
+        raise AssertionError("Credit card values should be masked")
+    if redacted['normal_field'] != 'public data':
+        raise AssertionError("Non-sensitive fields should remain unchanged")
     print("✓ test_sensitive_data_redaction passed")
 
 
@@ -811,7 +816,8 @@ def test_audit_log_integrity():
         
         # Verify valid
         is_valid, _ = audit_log.verify_integrity()
-        assert is_valid, "Valid log should pass verification"
+        if not is_valid:
+            raise AssertionError("Valid log should pass verification")
         
         # Tamper with log (change entry)
         with open(temp_file, 'r') as f:
@@ -828,7 +834,8 @@ def test_audit_log_integrity():
         # Verify tampered (should fail)
         audit_log2 = TamperEvidendAuditLog(temp_file)
         is_valid, invalid_seq = audit_log2.verify_integrity()
-        assert not is_valid, "Tampered log should fail verification"
+        if is_valid:
+            raise AssertionError("Tampered log should fail verification")
         
         print("✓ test_audit_log_integrity passed")
     

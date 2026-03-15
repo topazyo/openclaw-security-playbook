@@ -49,6 +49,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
+from cryptography.exceptions import InvalidTag
 
 
 # ============================================================================
@@ -780,7 +781,8 @@ def example_file_encryption():
     
     # Decrypt
     decrypted = encryptor.decrypt_data(encrypted)
-    assert decrypted == plaintext
+    if decrypted != plaintext:
+        raise AssertionError("Decrypted data does not match the original plaintext")
     print("✓ Decryption successful - data matches\n")
 
 
@@ -881,7 +883,8 @@ def test_encryption_round_trip():
     encrypted = encryptor.encrypt_data(plaintext)
     decrypted = encryptor.decrypt_data(encrypted)
     
-    assert decrypted == plaintext, "Decrypted data doesn't match plaintext"
+    if decrypted != plaintext:
+        raise AssertionError("Decrypted data doesn't match plaintext")
     print("✓ test_encryption_round_trip passed")
 
 
@@ -896,14 +899,15 @@ def test_encryption_with_aad():
     encrypted = encryptor.encrypt_data(plaintext, associated_data=aad)
     decrypted = encryptor.decrypt_data(encrypted, associated_data=aad)
     
-    assert decrypted == plaintext
+    if decrypted != plaintext:
+        raise AssertionError("Decrypted AAD payload does not match the original plaintext")
     
     # Wrong AAD should fail
     try:
         encryptor.decrypt_data(encrypted, associated_data=b"wrong-aad")
-        assert False, "Should have raised InvalidTag"
-    except Exception:
-        pass  # Expected - authentication failed
+        raise AssertionError("Should have raised InvalidTag")
+    except InvalidTag:
+        pass
     
     print("✓ test_encryption_with_aad passed")
 
@@ -915,15 +919,18 @@ def test_key_derivation():
     
     # Derive key
     key1 = derive_key_from_password(password, salt)
-    assert len(key1) == 32
+    if len(key1) != 32:
+        raise AssertionError("Derived key should be 32 bytes")
     
     # Same password + salt = same key
     key2 = derive_key_from_password(password, salt)
-    assert key1 == key2
+    if key1 != key2:
+        raise AssertionError("Same password and salt should derive the same key")
     
     # Different salt = different key
     key3 = derive_key_from_password(password, os.urandom(16))
-    assert key1 != key3
+    if key1 == key3:
+        raise AssertionError("Different salts should derive different keys")
     
     print("✓ test_key_derivation passed")
 

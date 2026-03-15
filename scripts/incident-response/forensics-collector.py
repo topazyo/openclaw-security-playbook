@@ -36,7 +36,7 @@ import logging
 import os
 import platform
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -127,7 +127,7 @@ class ForensicsCollector:
             if shutil.which("insmod") and Path("/lib/modules").exists():
                 try:
                     # Note: Requires LiME kernel module pre-compiled
-                    subprocess.run([
+                    subprocess.run([  # nosec B603 B607
                         "insmod", "lime.ko",
                         f"path={output_file}",
                         "format=raw"
@@ -298,7 +298,7 @@ class ForensicsCollector:
         if shutil.which("journalctl"):
             journal_file = logs_dir / "journalctl.log"
             try:
-                subprocess.run([
+                subprocess.run([  # nosec B603 B607
                     "journalctl",
                     "--since", "24 hours ago",
                     "--no-pager",
@@ -344,7 +344,7 @@ class ForensicsCollector:
         output_file = self.evidence_dir / "network-capture.pcap"
         
         try:
-            subprocess.run([
+            subprocess.run([  # nosec B603 B607
                 "tcpdump",
                 "-i", "any",
                 "-w", str(output_file),

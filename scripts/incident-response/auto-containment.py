@@ -294,7 +294,7 @@ class ContainmentManager:
             container = self.docker_client.containers.get(container_id)
             
             # Get current networks
-           networks = container.attrs['NetworkSettings']['Networks']
+            networks = container.attrs['NetworkSettings']['Networks']
             original_networks = list(networks.keys())
             
             logger.info(f"Container connected to networks: {original_networks}")
