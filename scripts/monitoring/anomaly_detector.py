@@ -32,7 +32,7 @@ use this script to read from openclaw-telemetry's structured output:
     telemetry_path = "~/.openclaw/logs/telemetry.jsonl"
     detect_custom_anomalies(telemetry_path)
 
-See: docs/guides/07-community-tools-integration.md#openclaw-telemetry
+See: docs/guides/08-community-tools-integration.md#openclaw-telemetry
 
 ================================================================================
 """

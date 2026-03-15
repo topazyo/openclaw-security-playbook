@@ -844,7 +844,7 @@ sudo wg show wg0 latest-handshakes
 - **WireGuard Mailing List:** https://lists.zx2c4.com/mailman/listinfo/wireguard
 
 ### Issues
-- **ClawdBot Issues:** https://github.com/YOUR-ORG/clawdbot-security-playbook/issues
+- **ClawdBot Issues:** https://github.com/openclaw/openclaw-security-playbook/issues
 - **Script Issues:** Include output from `--troubleshoot` flag
 
 ---

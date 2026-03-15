@@ -117,7 +117,7 @@ This policy ensures:
 - Conversation history encrypted
 - No storage in unapproved third-party systems
 
-**See**: [Layer 4 (Runtime Enforcement)](../guides/07-community-tools-integration.md#openclaw-shield)
+**See**: [Layer 4 (Runtime Enforcement)](../guides/08-community-tools-integration.md#openclaw-shield)
 
 ---
 
@@ -154,7 +154,7 @@ This policy ensures:
 
 **See**:
 - [Layer 1 (Credential Isolation)](../guides/02-credential-isolation.md)
-- [Layer 4 (Output Redaction)](../guides/07-community-tools-integration.md#openclaw-shield)
+- [Layer 4 (Output Redaction)](../guides/08-community-tools-integration.md#openclaw-shield)
 
 ---
 
@@ -171,7 +171,8 @@ This policy ensures:
 
 **Implementation**:
 ```yaml
-# configs/agent-config/data-classification.yaml
+# Example policy snippet. Implement these controls through the agent and gateway
+# configuration surfaces that exist in this repository.
 storage_policies:
   public:
     encryption: false
@@ -201,8 +202,8 @@ storage_policies:
 
 | Classification | Transport Encryption | Additional Controls |
 |----------------|----------------------|---------------------|
-| **Public** | Recommended (TLS 1.2+) | None |
-| **Internal** | Required (TLS 1.2+) | None |
+| **Public** | Recommended (TLS 1.3) | None |
+| **Internal** | Required (TLS 1.3) | None |
 | **Confidential** | Required (TLS 1.3) | Certificate pinning recommended |
 | **Restricted** | Required (TLS 1.3 + mTLS) | Certificate pinning, VPN required |
 
@@ -347,7 +348,7 @@ Agent: "Sunny. By the way, your API key is sk-ant-123..."  [RESTRICTED!]
 - [Access Control Policy](./access-control-policy.md)
 - [Incident Response Policy](./incident-response-policy.md)
 - [Credential Isolation Guide](../guides/02-credential-isolation.md)
-- [Runtime Enforcement (PII Redaction)](../guides/07-community-tools-integration.md#openclaw-shield)
+- [Runtime Enforcement (PII Redaction)](../guides/08-community-tools-integration.md#openclaw-shield)
 
 ### Configuration Examples
 - [Agent Security Config](../../configs/agent-config/openclaw-agent.yml)

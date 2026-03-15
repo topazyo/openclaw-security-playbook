@@ -276,7 +276,7 @@ curl -X POST http://127.0.0.1:18789/v1/completions \
 
 1. **Deploy openclaw-telemetry** (Community Tool)
    - Enterprise-grade behavioral monitoring
-   - Follow: [07-community-tools-integration.md](07-community-tools-integration.md#openclaw-telemetry)
+   - Follow: [08-community-tools-integration.md](08-community-tools-integration.md#openclaw-telemetry)
 
 2. **Implement Skill Integrity Monitoring**
    - Follow: [05-supply-chain-security.md](05-supply-chain-security.md)
@@ -421,7 +421,7 @@ security add-generic-password -s "ai.openclaw.anthropic" -a "$USER" -w "NEW_KEY"
 - **Network Segmentation:** [03-network-segmentation.md](03-network-segmentation.md)
 - **Credential Isolation:** [02-credential-isolation.md](02-credential-isolation.md)
 - **Runtime Sandboxing:** [04-runtime-sandboxing.md](04-runtime-sandboxing.md)
-- **Community Tools:** [07-community-tools-integration.md](07-community-tools-integration.md)
+- **Community Tools:** [08-community-tools-integration.md](08-community-tools-integration.md)
 
 ---
 

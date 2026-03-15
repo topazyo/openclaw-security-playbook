@@ -37,8 +37,8 @@ scripts/hardening/docker/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/YOUR-ORG/clawdbot-security-playbook
-cd clawdbot-security-playbook/scripts/hardening/docker
+git clone https://github.com/openclaw/openclaw-security-playbook.git
+cd openclaw-security-playbook/scripts/hardening/docker
 
 # 2. Create secrets directory (fail-secure permissions)
 (

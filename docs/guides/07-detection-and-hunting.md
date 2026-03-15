@@ -41,11 +41,11 @@ Start with Tier 1. These find every OpenClaw installation on your fleet before y
 about behavioral detection.
 
 ```bash
-# CrowdStrike: Import detections/edr/crowdstrike/openclaw-discovery-and-behavioral.spl
 # MDE: Create Custom Detection Rule from detections/edr/mde/openclaw-discovery.kql
-# Cortex: Import detections/edr/cortex/openclaw-discovery-and-behavioral.xql
-# SentinelOne: Create Storyline from detections/edr/sentinelone/openclaw-discovery.s1ql
+# Splunk: Import detections/siem/splunk/openclaw-discovery.spl if your telemetry is already landing in Splunk
 ```
+
+For other platforms, convert the shipped Sigma rules or add platform-specific content under `detections/`.
 
 Set the schedule to run hourly. Alert on any new result — every OpenClaw process or domain
 contact should be documented in your asset inventory.
@@ -56,14 +56,14 @@ Sigma rules in `detections/sigma/` are platform-agnostic and can be converted to
 target SIEM using [pySigma](https://github.com/SigmaHQ/pySigma):
 
 ```bash
-# Install pySigma with your backend
-pip install pysigma pysigma-backend-splunk
+# Install sigma-cli with your backend
+pip install sigma-cli pysigma pysigma-backend-splunk
 
 # Convert all OpenClaw rules to Splunk
 sigma convert -t splunk detections/sigma/openclaw-*.yml \
     -o detections/siem/splunk/openclaw-from-sigma.spl
 
-# Convert to Microsoft Sentinel KQL
+# Convert to Microsoft 365 Defender / MDE KQL
 pip install pysigma-backend-microsoft365defender
 sigma convert -t microsoft365defender detections/sigma/openclaw-*.yml
 ```
@@ -91,15 +91,14 @@ Run this validation checklist weekly:
 # Verify telemetry is flowing (should see recent events)
 tail -5 ~/.openclaw/logs/telemetry.jsonl | jq '.timestamp'
 
-# Verify hash chain is intact
-python3 scripts/forensics/verify_hash_chain.py \
-    --input ~/.openclaw/logs/telemetry.jsonl
+# Validate shipped detection content
+python scripts/verification/validate_detection_rules.py
 ```
 
 **Verify:** Expected output:
 ```text
 Recent telemetry timestamps are returned for the latest events.
-Hash chain verification reports integrity checks passed with no tampering detected.
+Detection rule validation completes without Sigma or YARA errors.
 ```
 
 ## Tuning Notes

@@ -351,10 +351,10 @@ This threat model maps to the [7-layer security architecture](./security-layers.
 | **Layer 1: Credential Isolation** | Credential exfiltration (P0), backup persistence | [02-credential-isolation.md](../guides/02-credential-isolation.md) |
 | **Layer 2: Network Segmentation** | Authentication bypass (P1), unauthorized access | [03-network-segmentation.md](../guides/03-network-segmentation.md) |
 | **Layer 3: Runtime Sandboxing** | Container escape (P1), host compromise | [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md) |
-| **Layer 4: Runtime Enforcement** | Prompt injection (P0), PII leakage | [07-community-tools-integration.md](../guides/07-community-tools-integration.md) |
+| **Layer 4: Runtime Enforcement** | Prompt injection (P0), PII leakage | [08-community-tools-integration.md](../guides/08-community-tools-integration.md) |
 | **Layer 5: Supply Chain Security** | Malicious skills (P0), tampering | [05-supply-chain-security.md](../guides/05-supply-chain-security.md) |
-| **Layer 6: Behavioral Monitoring** | Anomalous behavior, data exfiltration | [07-community-tools-integration.md](../guides/07-community-tools-integration.md) |
-| **Layer 7: Organizational Controls** | Shadow AI, policy violations | [07-community-tools-integration.md](../guides/07-community-tools-integration.md) |
+| **Layer 6: Behavioral Monitoring** | Anomalous behavior, data exfiltration | [08-community-tools-integration.md](../guides/08-community-tools-integration.md) |
+| **Layer 7: Organizational Controls** | Shadow AI, policy violations | [08-community-tools-integration.md](../guides/08-community-tools-integration.md) |
 
 ### Prioritization Matrix
 

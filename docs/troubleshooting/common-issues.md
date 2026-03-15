@@ -29,7 +29,7 @@ This guide covers common operational issues with ClawdBot, including installatio
 ```bash
 $ python --version
 Python 2.7.18
-$ pip install clawdbot
+$ pip install -e .
 ERROR: Package 'clawdbot' requires a different Python: 2.7.18 not in '>=3.9'
 ```
 
@@ -59,8 +59,8 @@ source clawdbot-env/bin/activate
 # Verify Python version
 python --version  # Should show 3.11.x
 
-# Install ClawdBot
-pip install clawdbot
+# Install the repo package from the repository root
+pip install -e .
 ```
 
 ---
@@ -69,7 +69,7 @@ pip install clawdbot
 
 **Symptom:**
 ```bash
-$ pip install clawdbot
+$ pip install -e .
 ERROR: Could not install packages due to an OSError: [Errno 13] Permission denied: '/usr/local/lib/python3.11/site-packages/'
 ```
 
@@ -80,13 +80,9 @@ ERROR: Could not install packages due to an OSError: [Errno 13] Permission denie
 # Option 1: Use virtual environment (RECOMMENDED)
 python3 -m venv clawdbot-env
 source clawdbot-env/bin/activate
-pip install clawdbot
+pip install -e .
 
-# Option 2: User installation
-pip install --user clawdbot
-
-# Option 3: System installation (not recommended)
-sudo pip install clawdbot
+# Install from the repository root instead of using a system-wide package install
 ```
 
 ---
@@ -95,7 +91,7 @@ sudo pip install clawdbot
 
 **Symptom:**
 ```bash
-$ pip install clawdbot
+$ pip install -e .
 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed.
   anthropic 0.25.0 requires httpx>=0.23.0, but you have httpx 0.22.0.
 ```
@@ -111,15 +107,15 @@ source clawdbot-env-clean/bin/activate
 # Upgrade pip
 pip install --upgrade pip
 
-# Install ClawdBot (will resolve dependencies)
-pip install clawdbot
+# Install from the repository root
+pip install -e .
 
 # If conflicts persist, install with constraints
-pip install clawdbot --constraint constraints.txt
+pip install -e . --constraint constraints.txt
 
 # Or upgrade conflicting package
 pip install --upgrade httpx
-pip install clawdbot
+pip install -e .
 ```
 
 ---
@@ -128,7 +124,7 @@ pip install clawdbot
 
 **Symptom:**
 ```bash
-$ pip install clawdbot
+$ pip install -e .
 SSL: CERTIFICATE_VERIFY_FAILED
 ```
 
@@ -145,10 +141,10 @@ sudo apt-get install ca-certificates
 sudo update-ca-certificates
 
 # Option 2: Use system certificates
-pip install --cert /etc/ssl/certs/ca-certificates.crt clawdbot
+pip install --cert /etc/ssl/certs/ca-certificates.crt -e .
 
 # Option 3: Temporary workaround (NOT RECOMMENDED for production)
-pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org clawdbot
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -e .
 ```
 
 ---

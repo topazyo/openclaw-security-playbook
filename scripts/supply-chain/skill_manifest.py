@@ -32,7 +32,7 @@ This script complements openclaw-shield (which blocks dangerous tools at
 runtime) by detecting when skills themselves are modified or compromised.
 
 See: docs/guides/05-supply-chain-security.md
-See: docs/guides/07-community-tools-integration.md
+See: docs/guides/08-community-tools-integration.md
 
 ================================================================================
 """
@@ -348,7 +348,7 @@ Examples:
 
 For runtime security enforcement, see:
 - openclaw-shield: https://github.com/knostic/openclaw-shield
-- docs/guides/07-community-tools-integration.md
+- docs/guides/08-community-tools-integration.md
         """
     )
 

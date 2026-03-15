@@ -103,8 +103,10 @@ Is this informational OR
 
 **Automated Detection**:
 ```bash
-# Check openclaw-telemetry alerts
-./scripts/monitoring/check-alerts.sh --last 24h --severity critical
+# Review recent anomalies from openclaw-telemetry logs
+python scripts/monitoring/anomaly_detector.py \
+  --logfile ~/.openclaw/logs/telemetry.jsonl \
+  --output-json
 
 # Review SIEM for security events
 # (Integration: see configs/examples/monitoring-stack.yml)
@@ -180,8 +182,10 @@ curl -X POST https://api.pagerduty.com/incidents \
 **P2/P3**: Slack notification + email
 ```bash
 # Slack notification
-./scripts/incident-response/notify.py \
-  --channel security-incidents \
+python scripts/incident-response/notification-manager.py \
+  --incident SEC-INC-2026-042 \
+  --severity MEDIUM \
+  --channel slack \
   --message "New P2 incident: Plaintext creds in config (SEC-INC-2026-042)"
 ```
 
@@ -225,10 +229,10 @@ curl -X POST https://api.pagerduty.com/incidents \
 
 | Incident Type | Containment Command |
 |---------------|---------------------|
-| **Credential Exfiltration** | `./scripts/incident-response/rotate-credentials.sh --key-id abc123 --emergency` |
-| **Malicious Skill** | `./scripts/incident-response/quarantine-skill.sh --skill-name evil-tool` |
+| **Credential Exfiltration** | `python scripts/incident-response/notification-manager.py --incident SEC-INC-2026-042 --severity CRITICAL --channel all --message "Rotate compromised provider keys immediately"` |
+| **Malicious Skill** | `docker stop clawdbot-production && mv ~/.openclaw/skills/evil-tool ~/.openclaw/quarantine/` |
 | **Container Escape** | `docker kill <container-id>; docker network disconnect <network> <container>` |
-| **DoS Attack** | `./scripts/incident-response/block-ip.sh --ip 203.0.113.45 --duration 24h` |
+| **DoS Attack** | `iptables -I INPUT -s 203.0.113.45 -j DROP` |
 | **MCP Server Compromise** | `systemctl stop openclaw-mcp-server; iptables -I INPUT -p tcp --dport 3000 -j DROP` |
 
 **Automated Containment** (if openclaw-shield is deployed):
@@ -249,9 +253,11 @@ shield:
 
 **Verification**:
 ```bash
-# Confirm attack has stopped
-./scripts/monitoring/check-alerts.sh --last 10m
-# Expected: No new alerts for this incident
+# Confirm attack has stopped by checking fresh telemetry
+python scripts/monitoring/anomaly_detector.py \
+  --logfile ~/.openclaw/logs/telemetry.jsonl \
+  --output-json
+# Expected: No new anomalies tied to this incident after containment
 ```
 
 #### Step 2.2: Damage Assessment
@@ -291,33 +297,29 @@ shield:
 **Actions**:
 1. **Rotate All Potentially Compromised Credentials**:
    ```bash
-   # Batch credential rotation
-   ./scripts/credential-migration/rotate-all-keys.sh \
-     --scope production \
-     --reason "SEC-INC-2026-042"
+  # Re-store rotated provider keys in the supported OS keychain flows
+  ./scripts/credential-migration/macos/migrate_credentials_macos.sh
+  # Or on Linux:
+  ./scripts/credential-migration/linux/migrate_credentials_linux.sh
    ```
 
 2. **Patch Exploited Vulnerabilities**:
    ```bash
-   # Emergency patching (skip change control for P0)
-   ./scripts/hardening/apply-security-patches.sh \
-     --cve CVE-2026-12345 \
-     --emergency
+  # Apply the relevant host or container patch using your standard package process,
+  # then rerun the security verifier before restoring service.
+  ./scripts/verification/verify_openclaw_security.sh
    ```
 
 3. **Update Firewall Rules**:
    ```bash
-   # Block attacker infrastructure
-   ./scripts/incident-response/block-iocs.sh \
-     --ioc-file attacker-infrastructure.txt
+  # Block attacker infrastructure
+  while read -r indicator; do iptables -I INPUT -s "$indicator" -j DROP; done < attacker-infrastructure.txt
    ```
 
 4. **Isolate Compromised Systems**:
    ```bash
-   # Move to quarantine VLAN
-   ./scripts/network/isolate-host.sh \
-     --host clawdbot-prod-01 \
-     --reason "SEC-INC-2026-042"
+  # Isolate the affected runtime from external networks
+  docker network disconnect bridge clawdbot-production
    ```
 
 **Verification**:
@@ -337,11 +339,9 @@ shield:
 
 ```bash
 # Automated eradication (P1/P2)
-./scripts/incident-response/eradicate.py \
-  --incident-id SEC-INC-2026-042 \
-  --remove-files /path/to/malicious-skill/ \
-  --kill-processes evil-miner \
-  --delete-users attacker-backdoor-account
+docker stop clawdbot-production
+rm -rf /path/to/malicious-skill/
+pkill -f evil-miner
 
 # Manual eradication (P0) - use forensics data to identify all artifacts
 ```
@@ -355,23 +355,19 @@ docker-compose -f configs/examples/docker-compose-full-stack.yml down
 docker system prune -a --volumes  # Remove all containers/images
 docker-compose -f configs/examples/docker-compose-full-stack.yml up -d
 
-# Verify integrity
-./scripts/supply-chain/verify-image-signatures.sh
+# Verify integrity of the deployed skill set
+./scripts/supply-chain/skill_integrity_monitor.sh --skills-dir ~/.openclaw/skills
 ```
 
 #### Step 3.3: Apply Hardening
 
 **Prevent recurrence**:
 ```bash
-# Apply additional security controls
-./scripts/hardening/harden-deployment.sh \
-  --profile maximum-security \
-  --apply-seccomp \
-  --enable-apparmor \
-  --restrict-network
+# Reapply the documented runtime hardening baseline and verify it
+./scripts/verification/verify_openclaw_security.sh
 
-# Enable openclaw-shield (if not already deployed)
-./scripts/community-tools/deploy-shield.sh --profile strict
+# If you use external runtime-enforcement tooling, re-enable it per
+# docs/guides/08-community-tools-integration.md after validation succeeds.
 ```
 
 **Reference**: [Security Hardening Guide](../guides/04-runtime-sandboxing.md)
@@ -429,10 +425,10 @@ kubectl rollout status deployment/clawdbot
 sed -i 's/LOG_LEVEL=INFO/LOG_LEVEL=DEBUG/' .env
 docker-compose restart
 
-# Lower anomaly detection thresholds
-./scripts/monitoring/set-alert-threshold.sh \
-  --metric api_usage \
-  --threshold 80  # Down from 95%
+# Run anomaly detection in follow mode during the recovery watch window
+python scripts/monitoring/anomaly_detector.py \
+  --logfile ~/.openclaw/logs/telemetry.jsonl \
+  --follow
 ```
 
 #### Step 4.4: Communicate Recovery
@@ -512,17 +508,17 @@ Status Page: Update to "All Systems Operational"
 
 **Runbooks**:
 ```bash
-# Add new playbook for this attack pattern
-cp examples/incident-response/playbook-template.md \
-   examples/incident-response/playbook-github-secret-leak.md
+# Copy the closest existing playbook and adapt it for the new pattern
+cp examples/incident-response/playbook-credential-theft.md \
+  examples/incident-response/playbook-github-secret-leak.md
 
-# Update with tested commands and timeline
+# Update the copied playbook with tested commands and the final incident timeline
 ```
 
 **Controls**:
 ```bash
-# Deploy recommended controls
-./scripts/hardening/apply-hardening.sh --profile post-inc-2026-042
+# Re-run the baseline verifier after applying the remediation controls
+./scripts/verification/verify_openclaw_security.sh
 ```
 
 **Policies**:
@@ -541,8 +537,8 @@ Incident-specific response procedures:
 | **Playbook 2** | Prompt Injection | P1 | [playbook-prompt-injection.md](../../examples/incident-response/playbook-prompt-injection.md) |
 | **Playbook 3** | Malicious Skill | P0/P1 | [playbook-skill-compromise.md](../../examples/incident-response/playbook-skill-compromise.md) |
 | **Playbook 4** | Data Breach | P0 | [playbook-data-breach.md](../../examples/incident-response/playbook-data-breach.md) |
-| **Playbook 5** | MCP Server Compromise | P1 | [scenario-003-mcp-server-compromise.md](../../examples/scenarios/scenario-003-mcp-server-compromise.md) |
-| **Playbook 6** | Container Escape | P0 | [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md) |
+| **Reference Scenario** | MCP Server Compromise | P1 | [scenario-003-mcp-server-compromise.md](../../examples/scenarios/scenario-003-mcp-server-compromise.md) |
+| **Reference Guide** | Container Escape Recovery Inputs | P0 | [04-runtime-sandboxing.md](../guides/04-runtime-sandboxing.md) |
 | **Playbook 7** | DoS Attack | P1/P2 | [playbook-denial-of-service.md](../../examples/incident-response/playbook-denial-of-service.md) |
 
 **See also**: [Real-World Scenarios](../../examples/scenarios/) for detailed attack demonstrations
@@ -554,40 +550,37 @@ Incident-specific response procedures:
 ### Detection
 
 ```bash
-# Check security alerts
-./scripts/monitoring/check-alerts.sh --last 24h
+# Review recent anomalies
+python scripts/monitoring/anomaly_detector.py --logfile ~/.openclaw/logs/telemetry.jsonl --output-json
 
 # Scan for indicators of compromise
-./scripts/incident-response/ioc-scanner.py --indicators-file iocs.txt
-
-# Review audit logs
-./scripts/monitoring/audit-log-analyzer.py --start "2026-02-14 00:00"
+python scripts/incident-response/ioc-scanner.py --file iocs.txt
 ```
 
 ### Analysis
 
 ```bash
 # Collect forensic evidence
-./scripts/incident-response/forensics-collector.py --incident-id SEC-INC-XXX
+python scripts/incident-response/forensics-collector.py --incident SEC-INC-XXX
 
 # Timeline generation
-./scripts/incident-response/timeline-generator.py --logs /var/log/openclaw/
+./scripts/forensics/build_timeline.sh --incident-dir ~/openclaw-incident-TIMESTAMP
 
 # Impact assessment
-./scripts/incident-response/impact-analyzer.py --incident-id SEC-INC-XXX
+python scripts/incident-response/impact-analyzer.py --incident SEC-INC-XXX
 ```
 
 ### Containment
 
 ```bash
-# Rotate credentials (emergency)
-./scripts/incident-response/rotate-credentials.sh --emergency
+# Trigger emergency communications for credential rotation
+python scripts/incident-response/notification-manager.py --incident SEC-INC-XXX --severity CRITICAL --channel all
 
 # Block IP addresses
-./scripts/incident-response/block-ip.sh --ip 203.0.113.45
+iptables -I INPUT -s 203.0.113.45 -j DROP
 
 # Quarantine skill
-./scripts/incident-response/quarantine-skill.sh --skill-name evil-tool
+mv ~/.openclaw/skills/evil-tool ~/.openclaw/quarantine/
 
 # Kill container
 docker kill <container-id>
@@ -596,8 +589,8 @@ docker kill <container-id>
 ### Eradication
 
 ```bash
-# Remove malicious components
-./scripts/incident-response/eradicate.py --incident-id SEC-INC-XXX
+# Remove malicious components manually using the forensics output
+rm -rf /path/to/malicious-components
 
 # Rebuild from clean images
 docker-compose down && docker system prune -a && docker-compose up -d
@@ -610,10 +603,7 @@ docker-compose down && docker system prune -a && docker-compose up -d
 
 ```bash
 # Send notifications
-./scripts/incident-response/notify.py --channel security-incidents --message "..."
-
-# Generate PIR report
-./scripts/incident-response/generate-pir.py --incident-id SEC-INC-XXX
+python scripts/incident-response/notification-manager.py --incident SEC-INC-XXX --message "..." --channel slack
 ```
 
 ---

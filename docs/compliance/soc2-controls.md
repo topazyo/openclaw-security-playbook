@@ -333,7 +333,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Implementation**:
 - **Authentication**: MFA required for all users
 - **Authorization**: RBAC with 3 roles (Admin, Developer, Operator)
-- **Encryption**: TLS 1.2+ for data in transit, AES-256 for data at rest
+- **Encryption**: TLS 1.3 for data in transit, AES-256 for data at rest
 - **Logging**: Immutable audit logs (tamper-evident)
 - **Backup**: 3-2-1 backup strategy (see [Backup and Recovery Procedure](../procedures/backup-recovery.md))
 
@@ -495,7 +495,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity restricts the transmission, movement, and removal of data.
 
 **Implementation**:
-- TLS 1.2+ for all network communication
+- TLS 1.3 for all network communication
 - VPN required for remote access (see [Network Segmentation](../guides/03-network-segmentation.md))
 - Data Loss Prevention (DLP): openclaw-shield blocks credential exfiltration
 - Backup encryption: AES-256 + GPG (see [Backup and Recovery](../procedures/backup-recovery.md))

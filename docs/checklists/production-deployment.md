@@ -68,7 +68,7 @@ This checklist MUST be completed and approved before ANY production deployment o
 - [ ] **Gateway binds to localhost** (`127.0.0.1:18789`, NOT `0.0.0.0`)
 - [ ] **VPN required for access** (Tailscale/WireGuard configured and tested)
 - [ ] **Firewall rules applied** (block public internet, allow VPN only)
-- [ ] **TLS 1.2+ enforced** (strong ciphers, valid certificates)
+- [ ] **TLS 1.3 enforced** (AES-256-GCM or equivalent approved TLS 1.3 ciphers, valid certificates)
 
 **Network Engineer Sign-Off**: ______________________________ Date: ______
 

@@ -627,7 +627,7 @@ See: [../../LICENSE](../../LICENSE)
 ## Support
 
 For issues or questions:
-- **GitHub Issues:** https://github.com/YOUR-ORG/clawdbot-security-playbook/issues
+- **GitHub Issues:** https://github.com/openclaw/openclaw-security-playbook/issues
 - **Documentation:** docs/guides/02-credential-isolation.md
 - **Troubleshooting:** docs/troubleshooting/verification-failures.md
 

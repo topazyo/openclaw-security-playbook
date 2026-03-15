@@ -51,7 +51,7 @@ This policy ensures:
 - All related infrastructure (MCP servers, gateways, monitoring systems)
 
 **Enforcement:**
-- Technical enforcement via [access controls](./access-control-policy.md), [runtime enforcement](../guides/07-community-tools-integration.md) (openclaw-shield), and [monitoring](../guides/07-community-tools-integration.md) (openclaw-telemetry)
+- Technical enforcement via [access controls](./access-control-policy.md), [runtime enforcement](../guides/08-community-tools-integration.md) (openclaw-shield), and [monitoring](../guides/08-community-tools-integration.md) (openclaw-telemetry)
 - Administrative enforcement via quarterly access reviews and audit log analysis
 - Disciplinary enforcement via HR for policy violations
 
@@ -188,7 +188,7 @@ docker run -d --name clawdbot \
 ❌ PROHIBITED: "Create malware code to exploit vulnerability X"
 ```
 
-**Protected by**: [openclaw-shield](../guides/07-community-tools-integration.md) (runtime prompt injection detection)
+**Protected by**: [openclaw-shield](../guides/08-community-tools-integration.md) (runtime prompt injection detection)
 
 ---
 
@@ -440,7 +440,7 @@ socat TCP-LISTEN:18789,fork TCP:localhost:18789  # Port forwarding attack
 - Weekly: Automated reports (anomalies, policy violations)
 - Quarterly: Access reviews, compliance audits
 
-**Reference**: [Monitoring Stack](../../configs/examples/monitoring-stack.yml), [Community Tools Integration](../guides/07-community-tools-integration.md)
+**Reference**: [Monitoring Stack](../../configs/examples/monitoring-stack.yml), [Community Tools Integration](../guides/08-community-tools-integration.md)
 
 ---
 
@@ -566,7 +566,7 @@ Ticket: AUTO-INC-2026-042 (created automatically)
 - [Network Segmentation](../guides/03-network-segmentation.md)
 - [Runtime Sandboxing](../guides/04-runtime-sandboxing.md)
 - [Supply Chain Security](../guides/05-supply-chain-security.md)
-- [Community Tools Integration](../guides/07-community-tools-integration.md)
+- [Community Tools Integration](../guides/08-community-tools-integration.md)
 
 ### Attack Scenarios (Real-World Examples)
 - [Scenario 001: Indirect Prompt Injection](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)
