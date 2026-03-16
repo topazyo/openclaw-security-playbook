@@ -34,12 +34,12 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 - Supply chain security (skills, MCP servers)
 - Monitoring and incident response systems
 
-**Certification Status**: ISO 27001:2022 Certified  
-**Certificate Number**: ISO27K-2026-001234  
-**Certification Body**: [Certification Body Name]  
-**Certification Date**: January 15, 2026  
-**Valid Until**: January 14, 2029 (3 years)  
-**Surveillance Audits**: Annually (January 2027, January 2028)
+**Certification Status**: ISO 27001:2022 Certified (template — replace with actual status)
+**Certificate Number**: [FILL IN: Certificate Number]
+**Certification Body**: [FILL IN: Certification Body Name]
+**Certification Date**: [FILL IN: Certification Date]
+**Valid Until**: [FILL IN: Expiry Date]
+**Surveillance Audits**: Annually
 
 ---
 
@@ -1795,23 +1795,27 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 
 ### Auditor Information
 
-**Certification Body**: [Certification Body Name]  
-**Lead Auditor**: [Name], [Email]  
-**Certificate Number**: ISO27K-2026-001234  
+> **⚠️ FILL IN before use as a live compliance record.**
+> The fields below are placeholder examples. Replace with verified values from
+> your certification body engagement before submitting or publishing this section.
+
+**Certification Body**: [FILL IN: Certification Body Name]
+**Lead Auditor**: [FILL IN: Name], [FILL IN: Email]
+**Certificate Number**: [FILL IN: Certificate Number]
 **Scope**: AI agent operations, credential management, runtime sandboxing, supply chain security, monitoring
 
-**Contact Points**:
-- **CISO**: ciso@company.com (primary contact)
-- **Compliance Officer**: compliance@company.com (evidence coordination)
-- **DPO**: dpo@company.com (privacy matters)
+**Contact Points** *(replace with verified organisational contacts)*:
+- **CISO**: [FILL IN: ciso@your-org.com] (primary contact)
+- **Compliance Officer**: [FILL IN: compliance@your-org.com] (evidence coordination)
+- **DPO**: [FILL IN: dpo@your-org.com] (privacy matters)
 
 ---
 
-**Document Owner**: Compliance Team + Security Team  
-**Last Updated**: 2026-02-14  
-**Next Review**: 2026-08-14 (semi-annual)  
-**Certificate Requests**: compliance@company.com  
-**Questions**: security@company.com
+**Document Owner**: Compliance Team + Security Team
+**Last Updated**: 2026-02-14
+**Next Review**: 2026-08-14 (semi-annual)
+**Certificate Requests**: [FILL IN: compliance@your-org.com]
+**Questions**: [FILL IN: security@your-org.com]
 
 **Related Documentation**:
 - [ISO 27001 Compliance Mapping JSON](../../configs/organization-policies/iso27001-compliance-mapping.json) - Machine-readable mapping

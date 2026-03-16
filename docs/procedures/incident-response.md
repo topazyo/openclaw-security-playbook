@@ -1,9 +1,15 @@
 # Incident Response Procedure
 
-**Document Type**: Operational Runbook  
-**Version**: 1.0.0  
-**Last Updated**: 2026-02-14  
-**Owner**: Security Team  
+> **\ud83d\uded1 TEMPLATE — NOT OPERATIONAL UNTIL CONTACTS ARE POPULATED**
+> All `@company.com` addresses, phone numbers, and named personnel in this document
+> are **placeholder examples**. This runbook must not be distributed to or used by
+> an incident response team until every contact section has been filled in with
+> verified organisational details. See the \"FILL IN\" warnings in each section.
+
+**Document Type**: Operational Runbook (Template — requires customisation)
+**Version**: 1.0.0
+**Last Updated**: 2026-02-14
+**Owner**: Security Team
 **Related Policy**: [Incident Response Policy](../policies/incident-response-policy.md)
 
 This runbook provides step-by-step procedures for responding to security incidents affecting ClawdBot/OpenClaw deployments.

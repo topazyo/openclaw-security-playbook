@@ -135,12 +135,18 @@ pip install -e .
 # 4. Validate the reference agent configuration
 openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 
-# 5. Run a repo-native vulnerability scan
-openclaw-cli scan vulnerability --target production
+# 5. List the shipped incident-response playbooks
+openclaw-cli playbook list
 
-# 6. Review the canonical hardened runtime definition
+# 6. Inspect the canonical hardened runtime definition (syntax check only)
+#    Requires env vars: CLAWDBOT_IMAGE, GATEWAY_TOKEN, ANTHROPIC_API_KEY, GRAFANA_PASSWORD
+#    See configs/examples/docker-compose-full-stack.yml header for details
 docker compose -f configs/examples/docker-compose-full-stack.yml config
 ```
+
+> **Shell support note:** scripts under `scripts/` assume bash or zsh. On Windows use WSL2 or Git Bash for shell workflows. The `openclaw-cli` command works natively on Windows via the installed Python entrypoint.
+>
+> **Runtime API note:** this repo ships health (`/health`, `/healthz`, `/ready`) and metrics (`/metrics`) endpoints only. It does not ship a runtime inference API. See [`docs/api/README.md`](docs/api/README.md).
 
 Fresh-clone note: the verifier can return warnings until a compatible OpenClaw/ClawdBot runtime and TLS endpoint are running. Use [docs/guides/01-quick-start.md](docs/guides/01-quick-start.md) and [training/developer-guide.md](training/developer-guide.md) to align runtime settings with the verifier.
 
@@ -387,23 +393,33 @@ External Request
 The framework includes a comprehensive CLI for daily security operations. Install the package with `pip install -e .` from repo root to make the command available in your virtual environment:
 
 ```bash
-# Vulnerability scanning
-openclaw-cli scan vulnerability --target production
-openclaw-cli scan compliance --policy SEC-003
-openclaw-cli scan access --days 90
-
-# Incident response
-openclaw-cli playbook list
-openclaw-cli playbook execute IRP-001 --severity P0
-openclaw-cli simulate incident --type credential-theft --severity P1
-
-# Compliance reporting
-openclaw-cli report weekly --start 2024-01-15 --end 2024-01-22
-openclaw-cli report compliance --framework SOC2 --output report.json
+# ── Repo-backed (work from a clean checkout) ─────────────────────────────────
 
 # Configuration management
 openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-version 1.0 --to-version 2.0
+
+# Policy and certificate scanning
+openclaw-cli scan compliance --policy SEC-003
+openclaw-cli scan certificates
+
+# Incident response playbooks
+openclaw-cli playbook list
+openclaw-cli playbook execute playbook-credential-theft --severity P0  # by filename stem
+openclaw-cli playbook execute IRP-001 --severity P0                    # same, by Playbook ID
+openclaw-cli simulate incident --type credential-theft --severity P1
+
+# Compliance reporting
+openclaw-cli report compliance --framework SOC2 --output report.json
+
+# ── Filesystem / dependency scanning (run directly; no CLI wrapper yet) ───────
+trivy fs .
+pip-audit --format json
+
+# ── Not yet implemented (placeholder modules; see scripts/README.md) ──────────
+# openclaw-cli scan vulnerability  (requires scripts.discovery  — Placeholder)
+# openclaw-cli scan access         (requires scripts.compliance — Placeholder)
+# openclaw-cli report weekly       (requires scripts.reporting  — Placeholder)
 ```
 
 ### Python Security Tools
@@ -427,23 +443,29 @@ python tools/config-migrator.py --config openclaw-agent.yml
 
 ### Testing Framework
 
-Comprehensive test suite with 9 test files:
+Test suite — 15 files across 3 directories:
 
 ```bash
-# Unit tests (4 files - security controls)
-pytest tests/unit/test_input_validation.py    # XSS/SQL/path traversal
-pytest tests/unit/test_rate_limiting.py        # Token bucket, Redis
-pytest tests/unit/test_authentication.py       # mTLS, OAuth2, MFA
-pytest tests/unit/test_encryption.py           # AES-256-GCM, key rotation
+# Unit tests (6 files)
+pytest tests/unit/test_input_validation.py        # XSS/SQL/path traversal
+pytest tests/unit/test_rate_limiting.py            # Token bucket, Redis
+pytest tests/unit/test_authentication.py           # mTLS, OAuth2, MFA
+pytest tests/unit/test_encryption.py               # AES-256-GCM, key rotation
+pytest tests/unit/test_clawdbot_runtime.py         # Runtime smoke tests
+pytest tests/unit/test_tools_help_smoke.py         # CLI help surface
 
-# Integration tests (3 files - workflows)
-pytest tests/integration/test_playbook_procedures.py  # IRP-001 execution
+# Integration tests (3 files)
+pytest tests/integration/test_playbook_procedures.py  # Playbook execution
 pytest tests/integration/test_backup_recovery.py      # RTO/RPO validation
 pytest tests/integration/test_access_review.py        # Quarterly reviews
 
-# Security tests (2 files - compliance)
-pytest tests/security/test_policy_compliance.py       # SEC-002/003/004/005
-pytest tests/security/test_vulnerability_scanning.py  # Trivy/npm/pip audits
+# Security tests (6 files)
+pytest tests/security/test_policy_compliance.py              # SEC-002/003/004/005
+pytest tests/security/test_vulnerability_scanning.py         # Trivy/npm/pip audits
+pytest tests/security/test_runtime_security_regression.py    # Runtime hardening regression
+pytest tests/security/test_detection_replay_validation.py    # Sigma/YARA replay
+pytest tests/security/test_malicious_skill_chain_exercise.py # Attack-chain exercise
+pytest tests/security/test_evidence_snapshot_cli.py          # Evidence capture
 
 # Run all tests with coverage
 pytest --cov=scripts --cov=examples --cov-report=html
@@ -473,7 +495,7 @@ This playbook provides repo-backed compliance mappings and policy references:
 - **CC6.1:** Logical and physical access controls (MFA required)
 - **CC7.1:** Threat identification procedures (vulnerability scanning)
 - **CC7.2:** Continuous monitoring (Prometheus/Grafana/Alertmanager)
-- **CC7.3:** Incident response (IRP-001 through IRP-006 playbooks)
+- **CC7.3:** Incident response (5 playbooks: IRP-001, IRP-002, IRP-003, IRP-004, IRP-007)
 - **CC7.4:** Security awareness training (security-training.md)
 - **CC8.1:** Change management procedures (developer-guide.md)
 
@@ -677,8 +699,7 @@ openclaw-security-playbook/
 │
 ├── LICENSE                            # Repository license
 ├── CONTRIBUTING.md                    # Contribution guidelines
-├── SECURITY.md                        # Security policy and disclosure
-└── CHANGELOG.md                       # Version history and updates
+└── SECURITY.md                        # Security policy and disclosure
 ```
 
 ---
@@ -690,7 +711,7 @@ openclaw-security-playbook/
 - **[Security Team Training](training/security-training.md)** - 4-hour security operations training
   - 7-layer defense architecture
   - Daily security operations (vulnerability scanning, compliance checks)
-  - Incident response procedures (IRP-001 execution)
+  - Incident response procedures (playbook execution and dry-run)
   - Monitoring and alerting (Grafana dashboards, Alertmanager routing)
   - Hands-on labs (vulnerability scan, incident simulation, compliance reporting)
 

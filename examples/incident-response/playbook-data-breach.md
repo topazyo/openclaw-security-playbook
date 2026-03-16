@@ -8,25 +8,27 @@
 
 ---
 
-## Table of Contents
+> **⚠️ DEPENDENCY NOTICE — Repo-native vs. External Steps**
+>
+> Steps in this playbook that `curl` to `*.openclaw.ai` endpoints or reference
+> `elk.openclaw.ai`, `monitoring.openclaw.ai`, `gateway.openclaw.ai`,
+> or `openclaw-shield` DLP features are **environment-specific**. They require
+> external hosted services or community tools that are **not vendored or provided
+> by this repository**.
+>
+> **Repo-native steps available from a clean checkout:**
+> - Evidence: `./scripts/forensics/collect_evidence.sh`
+> - Credential scope check: `./scripts/forensics/check_credential_scope.sh`
+> - Timeline: `./scripts/forensics/build_timeline.sh`
+> - Notification template: `examples/incident-response/reporting-template.md`
+> - Playbook dry-run: `openclaw-cli playbook execute playbook-data-breach --severity P0 --dry-run`
+>
+> For repo-native fallbacks for each community tool, see
+> [docs/guides/08-community-tools-integration.md](../../docs/guides/08-community-tools-integration.md).
+> All `dpo@openclaw.ai`, `security@openclaw.ai` addresses are placeholder examples —
+> replace with your organisation's real contacts before operational use.
 
-1. [Overview](#overview)
-2. [Related Documents](#related-documents)
-3. [Detection Indicators](#detection-indicators)
-4. [Triage & Assessment](#triage--assessment)
-5. [Containment](#containment)
-6. [Eradication](#eradication)
-7. [Recovery](#recovery)
-8. [Notification & Reporting](#notification--reporting)
-9. [Post-Incident Review](#post-incident-review)
-10. [Appendix](#appendix)
-
----
-
-## Overview
-
-### Purpose
-This playbook provides step-by-step procedures for responding to data breach incidents involving unauthorized access, theft, or exfiltration of OpenClaw/ClawdBot data, including conversation history, credentials, PII, and proprietary information.
+## Table of Contents involving unauthorized access, theft, or exfiltration of OpenClaw/ClawdBot data, including conversation history, credentials, PII, and proprietary information.
 
 ### Scope
 - **Data types**: Personal data (PII), credentials (API keys), conversation history, configuration data, proprietary algorithms, customer data

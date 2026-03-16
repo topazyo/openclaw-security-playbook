@@ -1,4 +1,4 @@
-# GDPR Compliance Guide
+﻿# GDPR Compliance Guide
 
 > **⚠️ TEMPLATE — MUST BE CUSTOMISED BEFORE USE**
 > This file is a **compliance implementation template**, not a finished legal artifact.
@@ -111,7 +111,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 
 ### Transparency (Articles 12-14)
 
-**Privacy Notice**: Published at [URL] and provided during onboarding
+**Privacy Notice**: Published at [FILL IN: URL] and provided during onboarding
 
 **Privacy Notice Contents** (Article 13 requirements):
 - Identity and contact details of controller and DPO
@@ -138,7 +138,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 **What**: Data subjects can request copy of their personal data
 
 **Implementation**:
-- Request form: [URL] or email dpo@company.com
+- Request form: [FILL IN: URL] or email dpo@company.com
 - Response SLA: 30 days (can extend by 2 months if complex, must notify)
 - Provided data: Conversation history (JSON export), account details, audit logs where user is subject
 
@@ -192,7 +192,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 - Legal claims (data needed for litigation)
 
 **Implementation**:
-- Request form: [URL] or email dpo@company.com
+- Request form: [FILL IN: URL] or email dpo@company.com
 - Response SLA: 30 days
 - **What we delete**: Conversation history, user profile, authentication credentials
 - **What we retain**: Audit logs (7 years legal requirement), anonymized analytics
@@ -245,7 +245,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 **Scope**: Only applies to data processed by automated means based on consent or contract (not audit logs under legal obligation)
 
 **Implementation**:
-- Request form: [URL] or email dpo@company.com
+- Request form: [FILL IN: URL] or email dpo@company.com
 - Response SLA: 30 days
 - **Format**: JSON (structured, machine-readable)
 - **Data included**: Conversation history, user profile, preferences
@@ -321,7 +321,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 ### Procedure for Exercising Rights
 
 **How to Submit Request**:
-1. **Online form**: [URL] (preferred, faster processing)
+1. **Online form**: [FILL IN: URL] (preferred, faster processing)
 2. **Email**: dpo@company.com (PGP key available for encrypted requests)
 3. **Postal mail**: [Company Address], Attn: Data Protection Officer
 
@@ -618,7 +618,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 ### DPIA for OpenClaw Conversation History Processing
 
 **DPIA Date**: January 2026  
-**DPO**: [Name], dpo@company.com  
+**DPO**: [FILL IN: Name], dpo@company.com  
 **Reviewed by**: Security Team, Legal, Executive Team
 
 #### 1. Description of Processing
@@ -795,8 +795,8 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 **OpenClaw Decision**: DPO appointed (proactive, even if not strictly mandatory)
 
 **DPO Details**:
-- **Name**: [Name]
-- **Contact**: dpo@company.com, [Phone]
+- **Name**: [FILL IN: Name]
+- **Contact**: dpo@company.com, [FILL IN: Phone]
 - **Position**: Reports to CISO and Executive Team
 - **Independence**: No conflict of interest (does not determine processing purposes)
 
@@ -921,7 +921,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 **Contact**:
 - **DPA**: [Name of DPA]
 - **Address**: [Address]
-- **Website**: [URL]
+- **Website**: [FILL IN: URL]
 - **Helpline**: [Phone/Email]
 
 **When to Contact DPA**:
@@ -985,8 +985,8 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 **Last Updated**: 2026-02-14  
 **Next Review**: 2027-02-14 (annual)  
 **DPO Contact**: dpo@company.com  
-**Data Subject Requests**: dpo@company.com or [URL]  
-**Privacy Notice**: [URL]
+**Data Subject Requests**: dpo@company.com or [FILL IN: URL]  
+**Privacy Notice**: [FILL IN: URL]
 
 **Related Documentation**:
 - [Data Classification Policy](../policies/data-classification.md) - PII handling requirements

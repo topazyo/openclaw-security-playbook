@@ -142,9 +142,18 @@ docker start clawdbot-production
 # Pause agent operations
 docker exec clawdbot-production touch /app/maintenance.lock
 
-# Capture active session
-curl http://127.0.0.1:18789/admin/debug/session > session.json
+# Capture available runtime evidence (repo-native)
+./scripts/forensics/collect_evidence.sh
+
+# Dump recent audit log entries for the affected agent
+jq 'select(.event=="tool_execution")' ~/.openclaw/logs/audit.jsonl \
+  | tail -50 > /tmp/recent-tool-executions.jsonl
 ```
+
+> **Note:** This repository does not ship an `/admin/debug/session` endpoint.
+> Use `collect_evidence.sh` and the audit log queries above as the initial
+> evidence capture step. If your runtime provides a session-dump API, add that
+> as an environment-specific extension step after the repo-native commands.
 
 ### Phase 2: Analysis (10-20 minutes)
 

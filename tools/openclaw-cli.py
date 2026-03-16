@@ -16,10 +16,16 @@ Subcommands:
 
 Usage:
   openclaw-cli scan --type vulnerability --target production
-  openclaw-cli playbook execute IRP-001 --severity P0
-  openclaw-cli report weekly --start 2024-01-15 --end 2024-01-22
+  openclaw-cli playbook list
+  openclaw-cli playbook execute playbook-credential-theft --severity P0
+  openclaw-cli playbook execute IRP-001 --severity P0          # same, by Playbook ID
+  openclaw-cli report compliance --framework SOC2
   openclaw-cli config validate openclaw-agent.yml
   openclaw-cli simulate incident --type credential-theft
+
+Not yet implemented (placeholder modules absent):
+  scan vulnerability, scan access, report weekly
+  See scripts/README.md for placeholder status.
 
 Installation:
   pip install click pyyaml boto3 requests tabulate
@@ -89,6 +95,37 @@ def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.Comple
     )
 
 
+def _resolve_playbook(playbook_id: str) -> "Path | None":
+    """Resolve a playbook reference to its Path.
+
+    Accepts either:
+    - A filename stem:   ``playbook-credential-theft``
+    - A Playbook ID:     ``IRP-001``
+
+    Returns the Path if found, otherwise None.
+    """
+    import re as _re
+    playbooks_dir = REPO_ROOT / "examples" / "incident-response"
+
+    # Direct filename match
+    direct = playbooks_dir / f"{playbook_id}.md"
+    if direct.exists():
+        return direct
+
+    # Search for a matching Playbook ID header inside the shipped files
+    _re_irp = _re.compile(r"\*\*Playbook ID\*\*:\s+" + _re.escape(playbook_id) + r"\b")
+    for p in sorted(playbooks_dir.glob("playbook-*.md")):
+        with open(p, encoding="utf-8") as f:
+            for line in f:
+                if _re_irp.search(line):
+                    return p
+                # Stop scanning past the front-matter block
+                if line.startswith("## "):
+                    break
+
+    return None
+
+
 # ============================================================================
 # CLI GROUP
 # ============================================================================
@@ -124,54 +161,22 @@ def scan():
 @click.option("--output", type=click.Path(), help="Output file path")
 @click.pass_context
 def vulnerability(ctx, target, output):
-    """Run vulnerability scan using Trivy and dependency checkers."""
-    click.echo(f"[*] Starting vulnerability scan on {target}...")
-    
-    # Import vulnerability scanner
-    from scripts.discovery import os_scan, dependency_scan
-    
-    # Scan OS packages
-    click.echo("[*] Scanning OS packages...")
-    os_vulns = os_scan.scan_os_packages(target=target)
-    
-    # Scan dependencies
-    click.echo("[*] Scanning dependencies...")
-    dep_vulns = dependency_scan.scan_npm_packages()
-    dep_vulns.extend(dependency_scan.scan_python_packages())
-    
-    all_vulns = os_vulns + dep_vulns
-    
-    # Display results
-    if all_vulns:
-        click.echo(f"\n[!] Found {len(all_vulns)} vulnerabilities:")
-        
-        # Group by severity
-        critical = [v for v in all_vulns if v.get("severity") == "CRITICAL"]
-        high = [v for v in all_vulns if v.get("severity") == "HIGH"]
-        medium = [v for v in all_vulns if v.get("severity") == "MEDIUM"]
-        low = [v for v in all_vulns if v.get("severity") == "LOW"]
-        
-        summary = [
-            ["CRITICAL", len(critical), "🔴"],
-            ["HIGH", len(high), "🟠"],
-            ["MEDIUM", len(medium), "🟡"],
-            ["LOW", len(low), "🟢"],
-        ]
-        
-        click.echo(tabulate(summary, headers=["Severity", "Count", "Status"]))
-        
-        # Save to file if specified
-        if output:
-            safe_output = _validate_output_path(output)
-            safe_output.parent.mkdir(parents=True, exist_ok=True)
-            with open(safe_output, "w", encoding="utf-8") as f:
-                json.dump(all_vulns, f, indent=2)
-            click.echo(f"\n[✓] Results saved to {safe_output}")
-    else:
-        click.echo("[✓] No vulnerabilities found!")
-    
-    if len(critical) != 0:
-        ctx.exit(1)
+    """Run vulnerability scan using Trivy and dependency checkers.
+
+    NOTE: The automated scan pipeline (scripts.discovery) is not yet
+    implemented in this repo.  Run the maintained CI tools directly:
+
+    \b
+      trivy fs .                                  # filesystem scan
+      pip-audit --format json                     # Python dependency audit
+      See .github/workflows/security-scan.yml for the full automated pipeline.
+    """
+    raise click.ClickException(
+        "scan vulnerability requires scripts.discovery modules that are not yet "
+        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
+        "Run 'trivy fs .' and 'pip-audit' directly, or trigger the "
+        ".github/workflows/security-scan.yml workflow for CI-backed scanning."
+    )
 
 
 @scan.command()
@@ -200,27 +205,20 @@ def compliance(ctx, policy):
 @click.option("--days", default=90, help="Flag accounts inactive for X days")
 @click.pass_context
 def access(ctx, days):
-    """Review user access and permissions."""
-    click.echo(f"[*] Reviewing access (flagging accounts inactive >{days} days)...")
-    
-    from scripts.compliance import access_review
-    
-    # Enumerate users
-    iam_users = access_review.enumerate_iam_users()
-    jira_users = access_review.enumerate_jira_users()
-    
-    # Find inactive accounts
-    inactive = access_review.find_inactive_accounts(days=days)
-    
-    click.echo(f"\n[*] User Summary:")
-    click.echo(f"  - IAM users: {len(iam_users)}")
-    click.echo(f"  - Jira users: {len(jira_users)}")
-    click.echo(f"  - Inactive (>{ days}d): {len(inactive)}")
-    
-    if inactive:
-        click.echo(f"\n[!] Inactive accounts:")
-        for user in inactive:
-            click.echo(f"  - {user['username']} (last active: {user['last_active']})")
+    """Review user access and permissions.
+
+    NOTE: The automated access-review pipeline (scripts.compliance) is not yet
+    implemented in this repo.  Follow the manual procedure instead:
+
+    \b
+      docs/procedures/access-review.md
+    """
+    raise click.ClickException(
+        "scan access requires scripts.compliance modules that are not yet "
+        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
+        "See docs/procedures/access-review.md for the manual quarterly "
+        "access-review procedure."
+    )
 
 
 @scan.command(name="certificates")
@@ -264,55 +262,73 @@ def playbook():
 @click.option("--dry-run", is_flag=True, help="Simulate without making changes")
 @click.pass_context
 def execute(ctx, playbook_id, severity, dry_run):
-    """Execute incident response playbook."""
-    click.echo(f"[*] Executing playbook {playbook_id} (severity: {severity})...")
-    
+    """Execute incident response playbook.
+
+    PLAYBOOK_ID may be a filename stem (playbook-credential-theft) or a
+    Playbook ID (IRP-001).  Run 'openclaw-cli playbook list' to see all
+    available playbooks and their identifiers.
+    """
+    playbook_path = _resolve_playbook(playbook_id)
+
+    if playbook_path is None:
+        click.secho(
+            f"[✗] Playbook not found for '{playbook_id}'.\n"
+            "    Run 'openclaw-cli playbook list' to see available playbooks.",
+            fg="red",
+        )
+        ctx.exit(1)
+        return
+
+    click.echo(f"[*] Executing playbook {playbook_path.stem} (severity: {severity})...")
+
     if dry_run:
         click.echo("[*] DRY RUN - No changes will be made")
-    
-    # Load playbook
-    playbook_path = Path(f"examples/incident-response/{playbook_id}.md")
-    
-    if not playbook_path.exists():
-        click.secho(f"[✗] Playbook not found: {playbook_path}", fg="red")
-        ctx.exit(1)
-    
-    # Execute phases
+
+    click.echo(f"[*] Playbook file: {playbook_path}")
+
+    # Walk the five standard IR phases
     phases = ["Detection", "Containment", "Eradication", "Recovery", "PIR"]
-    
     for phase in phases:
         click.echo(f"\n[*] Phase: {phase}")
-        
-        if not dry_run:
-            # Execute phase (implementation depends on playbook)
-            if phase == "Containment":
-                from scripts.incident_response import auto_containment
-                auto_containment.isolate_resources()
-            elif phase == "Detection":
-                from scripts.incident_response import forensics_collector
-                forensics_collector.collect()
-        else:
+        if dry_run:
             click.echo(f"    [DRY RUN] Would execute {phase} phase")
-    
-    click.secho(f"\n[✓] Playbook {playbook_id} executed successfully", fg="green")
+        else:
+            click.echo(
+                f"    Follow the '{phase}' section in {playbook_path.name}. "
+                "For automated helpers see scripts/incident-response/."
+            )
+
+    click.secho(f"\n[✓] Playbook {playbook_path.stem} ready for execution", fg="green")
 
 
 @playbook.command()
 @click.pass_context
 def list(ctx):
     """List available playbooks."""
-    playbooks_dir = Path("examples/incident-response")
-    
-    playbooks = list(playbooks_dir.glob("IRP-*.md"))
-    
-    click.echo(f"[*] Available playbooks ({len(playbooks)}):\n")
-    
-    for playbook in sorted(playbooks):
-        # Extract title from markdown
-        with open(playbook) as f:
-            title = f.readline().strip("# \n")
-        
-        click.echo(f"  - {playbook.stem}: {title}")
+    import re as _re
+    playbooks_dir = REPO_ROOT / "examples" / "incident-response"
+    _re_irp = _re.compile(r"\*\*Playbook ID\*\*:\s+(IRP-\S+)")
+
+    rows = []
+    for p in sorted(playbooks_dir.glob("playbook-*.md")):
+        title = ""
+        irp_id = ""
+        with open(p, encoding="utf-8") as f:
+            for line in f:
+                if not title and line.startswith("# "):
+                    title = line.strip("# \n")
+                m = _re_irp.match(line.strip())
+                if m:
+                    irp_id = m.group(1)
+                if title and irp_id:
+                    break
+        rows.append((p.stem, irp_id, title))
+
+    click.echo(f"[*] Available playbooks ({len(rows)}):\n")
+    click.echo(tabulate(rows, headers=["Filename stem", "ID", "Title"]))
+    click.echo(
+        "\n[i] Usage: openclaw-cli playbook execute <filename-stem-or-ID> --severity P0"
+    )
 
 
 # ============================================================================
@@ -331,27 +347,20 @@ def report():
 @click.option("--output", type=click.Path(), help="Output PDF path")
 @click.pass_context
 def weekly(ctx, start, end, output):
-    """Generate weekly security report."""
-    click.echo(f"[*] Generating weekly report ({start} to {end})...")
-    
-    from scripts.reporting import generate_weekly_report
-    
-    report_data = generate_weekly_report.generate(
-        start_date=start,
-        end_date=end,
+    """Generate weekly security report.
+
+    NOTE: The automated reporting pipeline (scripts.reporting) is not yet
+    implemented in this repo.  Use the compliance report command instead:
+
+    \b
+      openclaw-cli report compliance --framework SOC2
+    """
+    raise click.ClickException(
+        "report weekly requires scripts.reporting modules that are not yet "
+        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
+        "Use 'openclaw-cli report compliance --framework SOC2' for a "
+        "repo-backed compliance report."
     )
-    
-    # Display summary
-    click.echo(f"\n[*] Report Summary:")
-    click.echo(f"  - Vulnerabilities: {report_data['vulnerability_count']}")
-    click.echo(f"  - Incidents: {report_data['incident_count']}")
-    click.echo(f"  - Patching velocity: {report_data['patching_velocity']}%")
-    
-    if output:
-        safe_output = _validate_output_path(output)
-        safe_output.parent.mkdir(parents=True, exist_ok=True)
-        generate_weekly_report.export_pdf(report_data, str(safe_output))
-        click.echo(f"\n[✓] Report saved to {safe_output}")
 
 
 @report.command()
@@ -568,7 +577,7 @@ def incident(ctx, type, severity):
     click.echo(f"\n[*] Triggering incident response...")
     
     # Execute playbook
-    ctx.invoke(playbook.execute, playbook_id="IRP-001", severity=severity, dry_run=False)
+    ctx.invoke(playbook.execute, playbook_id="playbook-credential-theft", severity=severity, dry_run=False)
 
 
 # ============================================================================

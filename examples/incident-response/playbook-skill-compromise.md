@@ -8,24 +8,25 @@
 
 ---
 
-## Table of Contents
+> **⚠️ DEPENDENCY NOTICE — Repo-native vs. External Steps**
+>
+> Steps in this playbook that `curl` to `*.openclaw.ai` endpoints or reference
+> `openclaw-detect`, `openclaw-telemetry`, `elk.openclaw.ai`, `detect.openclaw.ai`,
+> or `gateway.openclaw.ai/skills` are **environment-specific**. They require external
+> hosted services or community tools that are **not vendored or provided by this repository**.
+>
+> **Repo-native steps available from a clean checkout:**
+> - Evidence: `./scripts/forensics/collect_evidence.sh`
+> - Skill integrity: `python scripts/supply-chain/skill_manifest.py --verify-signatures`
+> - Skill monitor: `./scripts/supply-chain/skill_integrity_monitor.sh`
+> - Playbook dry-run: `openclaw-cli playbook execute playbook-skill-compromise --severity P0 --dry-run`
+>
+> For repo-native fallbacks for each community tool, see
+> [docs/guides/08-community-tools-integration.md](../../docs/guides/08-community-tools-integration.md).
+> All `security@openclaw.ai` addresses are placeholder examples — replace with
+> your organisation's real contacts before operational use.
 
-1. [Overview](#overview)
-2. [Related Documents](#related-documents)
-3. [Detection Indicators](#detection-indicators)
-4. [Triage & Assessment](#triage--assessment)
-5. [Containment](#containment)
-6. [Eradication](#eradication)
-7. [Recovery](#recovery)
-8. [Post-Incident Review](#post-incident-review)
-9. [Appendix](#appendix)
-
----
-
-## Overview
-
-### Purpose
-This playbook provides step-by-step procedures for responding to supply chain attacks involving malicious or compromised OpenClaw/ClawdBot skills, including backdoored npm packages, typosquatting attacks, and dependency confusion.
+## Table of Contents involving malicious or compromised OpenClaw/ClawdBot skills, including backdoored npm packages, typosquatting attacks, and dependency confusion.
 
 ### Scope
 - **Attack types**: Malicious skill installation, skill compromise post-install, dependency confusion, typosquatting, backdoored npm packages
