@@ -33,13 +33,37 @@ Audience: Application developers, DevOps engineers
 
 ### Integrate with Your Application
 
+**Prerequisites — required before any `docker compose` or `kubectl` command:**
+
+| Variable | Purpose |
+|---|---|
+| `CLAWDBOT_IMAGE` | Your registry and image tag (e.g. `yourregistry/clawdbot:2.0.0`). No official published image exists for this playbook. |
+| `GATEWAY_TOKEN` | Gateway authentication secret (generate with `openssl rand -base64 32`). |
+| `ANTHROPIC_API_KEY` | Anthropic API key for the downstream runtime. |
+| `GRAFANA_PASSWORD` | Grafana admin password. |
+
+Set these in your shell or in a local `.env` file before proceeding:
+
+```bash
+export CLAWDBOT_IMAGE="yourregistry/clawdbot:2.0.0"
+export GATEWAY_TOKEN="$(openssl rand -base64 32)"
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GRAFANA_PASSWORD="$(openssl rand -base64 16)"
+```
+
 **Step 1: Deploy OpenClaw Agent**
 
 ```bash
-# Development environment
+# Development environment (syntax-check first, then bring up)
+docker compose -f configs/examples/docker-compose-full-stack.yml config   # validate
 docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 
 # Production environment (Kubernetes)
+# IMPORTANT: configs/examples/production-k8s.yml is a reference template.
+# You must substitute the CLAWDBOT_IMAGE, GATEWAY_TOKEN, and ANTHROPIC_API_KEY
+# placeholders before applying. The file uses shell-style placeholder syntax;
+# review it carefully and supply your organisation's image and secret management
+# path before running kubectl apply.
 kubectl apply -f configs/examples/production-k8s.yml
 ```
 
@@ -199,33 +223,43 @@ pytest tests/security/test_vulnerability_scanning.py -v
 
 ### GitHub Actions
 
-Add security scanning workflows:
+The repo ships a maintained security-scan workflow. Reference it directly rather than copying stale snippets:
+
+```
+.github/workflows/security-scan.yml
+```
+
+Key characteristics of the maintained workflow (as of this writing):
+
+- Uses `actions/checkout@v4`
+- Builds repo-native images (`openclaw-playbook:latest`, `clawdbot-gateway:ci`, `clawdbot-agent:ci`) via `scripts/hardening/docker/Dockerfile.hardened`
+- Scans filesystem and images with `aquasecurity/trivy-action@0.24.0` (pinned, not `@master`)
+- Uploads SARIF results to the GitHub Security tab
+
+To add scanning to a downstream repo, reference the workflow structure from `.github/workflows/security-scan.yml` and adapt image names and build targets to your context. Never copy the snippet below from older training docs — use the live workflow file as the single source of truth.
 
 ```yaml
-# .github/workflows/security-scan.yml
+# Minimal example — adapt from .github/workflows/security-scan.yml
 name: Security Scan
-
 on: [push, pull_request]
-
 jobs:
-  scan:
+  trivy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Run Trivy scan
-        run: |
-          ./scripts/vulnerability-scanning/os-scan.sh --image ${{ matrix.image }}
-      
-      - name: Run dependency scan
-        run: |
-          npm audit --json > npm-audit.json
-          pip-audit --format json > pip-audit.json
-      
-      - name: Create Jira tickets
-        if: failure()
-        run: |
-          python scripts/vulnerability-scanning/create-tickets.py --input scan-results.json --severity CRITICAL
+      - uses: actions/checkout@v4
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 ```
 
 ### Pre-commit Hooks

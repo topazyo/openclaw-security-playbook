@@ -1,8 +1,14 @@
 # Onboarding Checklist
 
-**Document Type**: New User Onboarding  
-**Version**: 1.0.1  
-**Last Updated**: 2026-02-21  
+> **\ud83d\uded1 TEMPLATE — DO NOT DISTRIBUTE UNTIL CONTACTS ARE POPULATED**
+> All `@company.com` addresses throughout this checklist are **placeholder examples**.
+> Replace every occurrence of `it@company.com`, `security@company.com`, `hr@company.com`,
+> and `user@company.com` with your organisation's verified contacts before sending
+> this document to new hires or posting it internally.
+
+**Document Type**: New User Onboarding (Template — requires customisation)
+**Version**: 1.0.1
+**Last Updated**: 2026-02-21
 **Owner**: Security Team + HR
 
 This checklist ensures new employees/contractors receive proper access and training for ClawdBot/OpenClaw systems.

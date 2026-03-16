@@ -225,23 +225,22 @@ cmdkey /list:openclaw_anthropic
 # Should list the stored credential target
 ```
 
-### Test 3: Send Test Request
+### Test 3: Verify Metrics Endpoint
+
+> **Note:** This repository does not ship a runtime inference API (`/v1/completions`).
+> The shipped server exposes `/health`, `/healthz`, `/ready`, and `/metrics` only.
+> See [`docs/api/README.md`](../api/README.md) for the complete endpoint surface.
+> Inference routes belong to the downstream OpenClaw/ClawdBot runtime, not to this playbook repo.
 
 ```bash
-# Generate auth token (if using gateway auth)
-AUTH_TOKEN=$GATEWAY_TOKEN
+# Confirm the metrics endpoint is reachable
+curl -s http://127.0.0.1:18789/metrics | grep clawdbot_runtime_up
 
-# Send test request
-curl -X POST http://127.0.0.1:18789/v1/completions \
-  -H "Authorization: Bearer $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "What is 2+2?",
-    "max_tokens": 50
-  }'
+# Confirm readiness endpoint
+curl -s http://127.0.0.1:18789/ready
 ```
 
-**Expected:** JSON response with completion
+**Expected:** Prometheus-format text (metrics) and a JSON `{"status":"ok"}` body (ready).
 
 ---
 

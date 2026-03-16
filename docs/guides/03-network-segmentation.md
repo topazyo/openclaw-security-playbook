@@ -35,15 +35,20 @@ This guide covers network-level isolation to prevent unauthorized access to AI a
 **Scenario:**
 ```
 Developer Machine (Laptop)
-├── ClawdBot: localhost:18789 (no auth required)
+├── ClawdBot gateway: localhost:18789 (no auth required)
 └── SSH Server: 0.0.0.0:22 (accessible)
 
 Attacker's Machine
 └── ssh user@dev-laptop.company.com -L 18789:localhost:18789
 
-# Now attacker can access ClawdBot:
-curl http://localhost:18789/v1/completions \
-  -d '{"prompt":"Exfiltrate all credentials"}'
+# Now attacker can poll the health and readiness surface:
+curl http://localhost:18789/health
+curl http://localhost:18789/metrics
+
+# And — if a downstream inference runtime is bound on the same host —
+# forward requests to it through the tunnelled connection.
+# The gateway's localhost-only binding provides no protection once
+# an SSH tunnel forwards port 18789 to the attacker's machine.
 ```
 
 **Impact:**

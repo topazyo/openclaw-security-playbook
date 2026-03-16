@@ -4,7 +4,11 @@ Security vulnerabilities and sensitive issues should be reported privately.
 
 ## Reporting a Vulnerability
 
-- Email: security@company.com
+> **⚠️ PLACEHOLDER — update before publishing**
+> The contact below is a template. Replace it with a verified disclosure channel
+> before distributing this repository to external parties.
+
+- Email: security@\<YOUR-ORG\>.com *(replace with your organisation's verified inbox)*
 - Include reproduction steps, affected paths, and impact assessment.
 - Do not open public issues for unpatched vulnerabilities.
 

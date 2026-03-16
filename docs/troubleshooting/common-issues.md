@@ -2,7 +2,16 @@
 
 > **Quick Reference:** General troubleshooting guide for ClawdBot operational issues
 
-This guide covers common operational issues with ClawdBot, including installation, configuration, runtime errors, and performance problems.
+> **⚠️ COMMAND SURFACE NOTE**
+> This repository does not ship a `clawdbot` console entrypoint.
+> - **Runtime management** (start/stop/restart): `docker compose -f configs/examples/docker-compose-full-stack.yml`  
+>   Requires `CLAWDBOT_IMAGE`, `GATEWAY_TOKEN`, `ANTHROPIC_API_KEY`, `GRAFANA_PASSWORD` — see compose file header.
+> - **Configuration validation**: `openclaw-cli config validate configs/agent-config/openclaw-agent.yml`
+> - **Playbook and reporting**: `openclaw-cli playbook list`, `openclaw-cli report compliance`
+> - **Minimal direct startup (gateway)**: `python -m clawdbot.gateway --config <path>`
+> - **Minimal direct startup (agent)**: `python -m clawdbot.agent --config <path>`
+>
+> Where this guide shows `clawdbot start`, substitute the docker compose or module command above.
 
 ---
 
@@ -110,10 +119,7 @@ pip install --upgrade pip
 # Install from the repository root
 pip install -e .
 
-# If conflicts persist, install with constraints
-pip install -e . --constraint constraints.txt
-
-# Or upgrade conflicting package
+# If conflicts persist, upgrade the conflicting package and retry
 pip install --upgrade httpx
 pip install -e .
 ```
@@ -170,14 +176,14 @@ ls -la ~/.config/openclaw/
 # Create configuration directory
 mkdir -p ~/.openclaw/config
 
-# Copy example configuration
-cp /path/to/clawdbot/examples/openclaw-agent.yml ~/.openclaw/config/
+# Copy the reference configuration from this repo
+cp configs/agent-config/openclaw-agent.yml ~/.openclaw/config/
 
-# Or specify custom config location
-clawdbot start --config /path/to/custom/config.yml
+# Validate configuration syntax (repo-native)
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 
-# Verify configuration loads
-clawdbot config validate
+# For runtime startup, use docker compose (set required env vars first):
+docker compose -f configs/examples/docker-compose-full-stack.yml up -d
 ```
 
 ---
@@ -328,34 +334,36 @@ Error: Failed to start server
 
 **Solution:**
 ```bash
-# Check detailed error logs
-clawdbot start --verbose
+# Stream Docker container logs for detailed error output
+docker compose -f configs/examples/docker-compose-full-stack.yml logs clawdbot
 
 # Common causes:
 
 # 1. Port already in use
-sudo lsof -i :8443
+sudo lsof -i :18789
 # Kill conflicting process
 kill -9 <PID>
 
-# 2. Permission denied (binding to port < 1024)
-# Use port >= 1024 or run with sudo
-clawdbot start --port 8443
+# 2. Missing required env vars — check compose prerequisite vars:
+#    CLAWDBOT_IMAGE, GATEWAY_TOKEN, ANTHROPIC_API_KEY, GRAFANA_PASSWORD
+docker compose -f configs/examples/docker-compose-full-stack.yml config
 
-# 3. Missing dependencies
-pip install -r requirements.txt
+# 3. Missing Python dependencies
+pip install -e .
 
-# 4. Corrupted installation
+# 4. Corrupted editable install
 pip uninstall clawdbot
-pip install --no-cache-dir clawdbot
+pip install -e .
 
 # 5. Check system resources
-df -h  # Disk space
-free -h  # Memory
-top  # CPU usage
+df -h          # Disk space
+free -h        # Memory (Linux)
 
-# Start in debug mode
-clawdbot start --debug --log-level DEBUG
+# 6. Start service with live output to watch for errors
+docker compose -f configs/examples/docker-compose-full-stack.yml up --no-deps clawdbot
+
+# Alternative: start the minimal gateway module directly
+python -m clawdbot.gateway --config configs/agent-config/openclaw-agent.yml
 ```
 
 ---
@@ -1263,43 +1271,49 @@ watch -n 1 'ps aux | grep clawdbot'
 
 ### System Health Check
 ```bash
-# Full diagnostic
-clawdbot doctor
+# Validate configuration
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
 
-# Check configuration
-clawdbot config validate
+# Check container status and recent logs
+docker compose -f configs/examples/docker-compose-full-stack.yml ps
+docker compose -f configs/examples/docker-compose-full-stack.yml logs --tail=100 clawdbot
 
-# Test API connectivity
-clawdbot test --all-providers
+# Health endpoint check (if runtime is running)
+curl -s http://127.0.0.1:18789/health
 
 # Check permissions
 ls -la ~/.openclaw/
 ls -la /etc/wireguard/  # If using VPN
 
-# View recent errors
-tail -100 ~/.openclaw/logs/clawdbot.log | grep ERROR
+# View recent log errors
+find ~/.openclaw/logs -name "*.log" -newer /tmp -exec grep ERROR {} \; 2>/dev/null
 
 # Check resource usage
-ps aux | grep clawdbot
+docker stats --no-stream
 df -h ~/.openclaw
 ```
 
 ### Debug Mode
 ```bash
-# Start with full debugging
-clawdbot start \
-  --debug \
-  --verbose \
-  --log-level DEBUG \
-  --no-daemon
+# Stream live container logs
+docker compose -f configs/examples/docker-compose-full-stack.yml logs -f clawdbot
 
-# Enable request logging
-cat >> ~/.openclaw/config/openclaw-agent.yml << 'EOF'
+# Enable debug logging in the agent configuration
+cat >> configs/agent-config/openclaw-agent.yml << 'EOF'
 debugging:
   log_requests: true
   log_responses: true
   log_headers: true
+logging:
+  level: DEBUG
 EOF
+
+# Restart service to apply config change
+docker compose -f configs/examples/docker-compose-full-stack.yml restart clawdbot
+
+# Alternative: direct gateway module startup with visible output
+PYTHONPATH=src python -m clawdbot.gateway \
+  --config configs/agent-config/openclaw-agent.yml
 ```
 
 ---

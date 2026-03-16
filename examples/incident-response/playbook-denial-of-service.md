@@ -8,24 +8,25 @@
 
 ---
 
-## Table of Contents
+> **⚠️ DEPENDENCY NOTICE — Repo-native vs. External Steps**
+>
+> Steps in this playbook that `curl` to `*.openclaw.ai` endpoints or reference
+> `openclaw-telemetry`, `gateway.openclaw.ai`, `monitoring.openclaw.ai`,
+> `telemetry.openclaw.ai`, or `status.openclaw.ai` are **environment-specific**.
+> They require external hosted services or community tools that are **not vendored
+> or provided by this repository**.
+>
+> **Repo-native steps available from a clean checkout:**
+> - Evidence: `./scripts/forensics/collect_evidence.sh`
+> - Resource monitoring: `docker stats` / `kubectl top pods`
+> - Rate-limit config: `configs/templates/gateway.hardened.yml`
+> - Auto-containment: `python scripts/incident-response/auto-containment.py`
+> - Playbook dry-run: `openclaw-cli playbook execute playbook-denial-of-service --severity P1 --dry-run`
+>
+> For repo-native fallbacks for each community tool, see
+> [docs/guides/08-community-tools-integration.md](../../docs/guides/08-community-tools-integration.md).
 
-1. [Overview](#overview)
-2. [Related Documents](#related-documents)
-3. [Detection Indicators](#detection-indicators)
-4. [Attack Classification](#attack-classification)
-5. [Containment & Mitigation](#containment--mitigation)
-6. [Eradication](#eradication)
-7. [Recovery](#recovery)
-8. [Post-Incident Review](#post-incident-review)
-9. [Appendix](#appendix)
-
----
-
-## Overview
-
-### Purpose
-This playbook provides step-by-step procedures for responding to Denial of Service (DoS) and Distributed Denial of Service (DDoS) attacks targeting OpenClaw/ClawdBot infrastructure, including resource exhaustion, API abuse, and conversation flooding.
+## Table of Contents (DoS) and Distributed Denial of Service (DDoS) attacks targeting OpenClaw/ClawdBot infrastructure, including resource exhaustion, API abuse, and conversation flooding.
 
 ### Scope
 - **Attack types**: Volumetric attacks (bandwidth saturation), protocol attacks (SYN floods), application-layer attacks (HTTP floods, API abuse)
