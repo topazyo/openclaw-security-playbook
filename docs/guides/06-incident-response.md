@@ -15,6 +15,11 @@ difficulty: Advanced
 
 This guide provides actionable incident response playbooks for AI agent security incidents, from detection through recovery.
 
+> **Document type — Learning Guide**  
+> This is the educational reference guide covering incident response concepts, classification, and example response patterns. It is intentionally self-contained for learning purposes.
+> - **Operational runbook** (emergency contacts, escalation matrix, SLAs, and playbook index): see [docs/procedures/incident-response.md](../procedures/incident-response.md).
+> - **Standalone executable playbooks** (IRP-001 – IRP-004, with full dependency notices): see [examples/incident-response/](../../examples/incident-response/).
+
 ## Platform Notes
 
 ### Linux

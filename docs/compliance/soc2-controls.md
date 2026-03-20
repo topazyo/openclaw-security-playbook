@@ -8,6 +8,10 @@
 
 This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Services Criteria.
 
+> ⚠️ **Template Boundary Notice**: This document contains two types of content:
+> - **Source-backed control mappings** (CC1–CC9, A1, C1, PI1 sections): derived from `configs/organization-policies/soc2-compliance-mapping.json` and validated tooling. Safe to use as a reference.
+> - **Organisation-specific placeholders** (marked `[FILL IN]`, and `@company.com` addresses appearing in implementation examples and the document footer): these values are illustrative examples. Replace every placeholder and every `@company.com` address with your organisation's verified details before sharing this document as an external audit artifact or submitting it to an auditor.
+
 ---
 
 ## Table of Contents
@@ -173,7 +177,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity obtains or generates and uses relevant, quality information to support internal control.
 
 **Implementation**:
-- Security incident notifications (Slack #security-incidents, email security@company.com)
+- Security incident notifications (Slack #security-incidents, email [FILL IN: your security notification email])
 - Monthly security newsletter (threat intelligence, policy updates)
 - Weekly vulnerability reports (to development and operations teams)
 - Quarterly security town halls (CISO presents to all employees)
@@ -198,7 +202,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 
 **Evidence**:
 - Breach notification records (timestamps, recipients)
-- Security advisories (published on security@company.com)
+- Security advisories (published on [FILL IN: your security advisory contact email])
 - SOC 2 report distribution log
 
 ---
@@ -760,8 +764,8 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Document Owner**: Compliance Team + Security Team  
 **Last Updated**: 2026-02-14  
 **Next Review**: 2026-08-14 (semi-annual)  
-**SOC 2 Report Requests**: compliance@company.com  
-**Questions**: security@company.com
+**SOC 2 Report Requests**: [FILL IN: compliance@your-org.com]  
+**Questions**: [FILL IN: security@your-org.com]
 
 **Related Documentation**:
 - [SOC 2 Compliance Mapping JSON](../../configs/organization-policies/soc2-compliance-mapping.json) - Machine-readable mapping

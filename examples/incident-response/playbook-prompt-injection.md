@@ -196,6 +196,7 @@
    
    ```bash
    # Check for multiple blocks from same user
+   # ⚠️ External service — see DEPENDENCY NOTICE at the top of this playbook
    curl -X POST "https://elk.openclaw.ai/security-events-*/_search" \
      -H "Content-Type: application/json" \
      -d '{
