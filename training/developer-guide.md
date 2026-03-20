@@ -306,9 +306,12 @@ Send logs to Elasticsearch:
 
 ```python
 import logging
+import os
 from elasticsearch import Elasticsearch
 
-es = Elasticsearch(["http://elk.openclaw.ai:9200"])
+# Set ELASTICSEARCH_URL in your environment to point to your Elasticsearch instance.
+# elk.openclaw.ai is a deployment-specific endpoint and is not provided by this repo.
+es = Elasticsearch([os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")])
 
 logger = logging.getLogger("openclaw")
 handler = logging.StreamHandler()
@@ -330,13 +333,23 @@ logger.info("Request processed", extra={
 
 **Issue: Rate limit exceeded during development**
 
-Solution: Use development environment overrides:
+Solution: Add a development override file and reference it from your agent config.
+There is no standalone `openclaw-agent` binary — the only CLI entrypoint shipped
+by this repo is `openclaw-cli` (installed by `pip install -e .`):
 
-```bash
-openclaw-agent --config openclaw-agent.yml --env development
+```yaml
+# environment-overrides.yml
+development:
+  security_controls:
+    rate_limiting:
+      requests_per_minute: 1000
 ```
 
-This sets `rate_limiting.requests_per_minute: 1000` (relaxed).
+Then validate the merged config:
+
+```bash
+openclaw-cli config validate configs/agent-config/openclaw-agent.yml
+```
 
 **Issue: MFA required but not configured**
 
@@ -365,11 +378,11 @@ development:
 
 ## Additional Resources
 
-- **API Documentation**: [docs/api/](../docs/api/) (if available)
+- **API Documentation**: [docs/api/](../docs/api/)
 - **Security Guides**: [docs/guides/](../docs/guides/)
 - **Examples**: [examples/](../examples/)
 - **Troubleshooting**: [docs/troubleshooting/](../docs/troubleshooting/)
 
 ---
 
-**Questions? Contact dev-support@openclaw.ai**
+**Questions?** Open an issue in the repository or refer to [docs/guides/](../docs/guides/) for self-service guidance.
