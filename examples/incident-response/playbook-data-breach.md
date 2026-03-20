@@ -246,6 +246,7 @@
      -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
    
    # Query audit logs for data access events
+   # ⚠️ External service — see DEPENDENCY NOTICE at the top of this playbook
    curl -X POST "https://elk.openclaw.ai/security-events-*/_search" \
      -H "Content-Type: application/json" \
      -d '{

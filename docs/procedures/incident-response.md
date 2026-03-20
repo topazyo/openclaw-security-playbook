@@ -14,6 +14,8 @@
 
 This runbook provides step-by-step procedures for responding to security incidents affecting ClawdBot/OpenClaw deployments.
 
+> **Related documents:** For concepts and implementation context, see the [Incident Response Guide](../guides/06-incident-response.md). For standalone executable playbooks (IRP-001 – IRP-004), see [examples/incident-response/](../../examples/incident-response/).
+
 ---
 
 ## Table of Contents

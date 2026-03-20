@@ -188,6 +188,7 @@
      -H "Authorization: Bearer $MONITORING_TOKEN" | jq .
    
    # Query ELK Stack for related authentication events
+   # ⚠️ External service — see DEPENDENCY NOTICE at the top of this playbook
    curl -X POST "https://elk.openclaw.ai/authentication-*/_search" \
      -H "Content-Type: application/json" \
      -d '{
