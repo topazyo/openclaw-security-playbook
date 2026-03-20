@@ -96,8 +96,8 @@ openclaw-cli scan certificates
 
 **Verification**:
 ```bash
-# Check container security
-docker inspect clawdbot | jq '.[0].HostConfig' | grep -E "(User|CapDrop|ReadonlyRootfs|SecurityOpt)"
+# Check container security (container name matches --name in docker run / container_name in compose)
+docker inspect clawdbot-production | jq '.[0].HostConfig' | grep -E "(User|CapDrop|ReadonlyRootfs|SecurityOpt)"
 
 # Expected output:
 # "User": "1000:1000"

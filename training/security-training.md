@@ -109,37 +109,31 @@ pip install -e .
    - Review Panel 10 (vulnerability metrics) for new CVEs
    - Check CPU/memory/disk usage trends
 
-2. **Scan for New Vulnerabilities**
+2. **Scan for New Vulnerabilities** *(direct scanners; `scan vulnerability` CLI wrapper is a placeholder — see `scripts/README.md`)*
    ```bash
-   openclaw-cli scan vulnerability --target production
+   # Filesystem and dependency scan — runs without any hosted services
+   trivy fs .
+   pip-audit --format json
+   # For full CI-backed scanning see .github/workflows/security-scan.yml
    ```
-   
+
 3. **Review Compliance Status**
    ```bash
    openclaw-cli scan compliance --policy SEC-003
    ```
 
-4. **Generate Rolling 24-Hour Security Report**
+4. **Generate Compliance Report** *(`report weekly` is a placeholder — see `scripts/README.md`; use `report compliance` instead)*
    ```bash
-   # Provide explicit dates; the report subcommand is 'weekly' and accepts any date range
-   # Linux (GNU date):
-   openclaw-cli report weekly \
-     --start $(date -d '1 day ago' +%Y-%m-%d) \
-     --end $(date +%Y-%m-%d)
-
-   # macOS (BSD date):
-   openclaw-cli report weekly \
-     --start $(date -v-1d +%Y-%m-%d) \
-     --end $(date +%Y-%m-%d)
+   openclaw-cli report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m-%d).json
    ```
 
 ### Weekly Tasks
 
 1. **Quarterly Access Review** (every 90 days)
-   ```bash
-   openclaw-cli scan access --days 90
-   ```
-   
+
+   > `openclaw-cli scan access` is not yet implemented (see `scripts/README.md`).
+   > Follow the manual procedure: [docs/procedures/access-review.md](../docs/procedures/access-review.md)
+
 2. **Certificate Expiry Check**
    ```bash
    openclaw-cli scan certificates
@@ -328,17 +322,17 @@ openclaw-cli scan compliance --policy SEC-005  # Incident response
 ### openclaw-cli Commands
 
 ```bash
-# Scan operations
-openclaw-cli scan vulnerability --target production
+# ── Repo-backed (work from a clean checkout) ─────────────────────────────────
+
+# Compliance and certificate scanning
 openclaw-cli scan compliance --policy SEC-003
-openclaw-cli scan access --days 90
+openclaw-cli scan certificates
 
 # Playbook execution
 openclaw-cli playbook list
 openclaw-cli playbook execute playbook-credential-theft --severity P0 --dry-run
 
-# Report generation
-openclaw-cli report weekly --start 2026-02-01 --end 2026-02-21
+# Compliance reporting
 openclaw-cli report compliance --framework SOC2
 
 # Configuration management
@@ -347,6 +341,15 @@ openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-versi
 
 # Incident simulation
 openclaw-cli simulate incident --type credential-theft --severity P1
+
+# ── Direct scanners (no CLI wrapper yet) ─────────────────────────────────────
+trivy fs .                          # filesystem vulnerability scan
+pip-audit --format json             # Python dependency audit
+
+# ── Not yet implemented (placeholder modules; see scripts/README.md) ──────────
+# openclaw-cli scan vulnerability   (requires scripts.discovery  — Placeholder)
+# openclaw-cli scan access          (requires scripts.compliance — Placeholder)
+# openclaw-cli report weekly        (requires scripts.reporting  — Placeholder)
 ```
 
 ### Python Tools
