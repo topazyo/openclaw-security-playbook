@@ -141,10 +141,15 @@ openclaw-cli playbook list
 # 6. Inspect the canonical hardened runtime definition (syntax check only)
 #    Requires env vars: CLAWDBOT_IMAGE, GATEWAY_TOKEN, ANTHROPIC_API_KEY, GRAFANA_PASSWORD
 #    See configs/examples/docker-compose-full-stack.yml header for details
+#    Build locally first (optional):
+#      docker build -f scripts/hardening/docker/Dockerfile.hardened -t clawdbot-production .
+#      export CLAWDBOT_IMAGE=clawdbot-production
 docker compose -f configs/examples/docker-compose-full-stack.yml config
 ```
 
-> **Shell support note:** scripts under `scripts/` assume bash or zsh. On Windows use WSL2 or Git Bash for shell workflows. The `openclaw-cli` command works natively on Windows via the installed Python entrypoint.
+> **Shell support note:** scripts under `scripts/` assume bash or zsh. On Windows use WSL2 or Git Bash for shell workflows. The `openclaw-cli` command works natively on Windows via the installed Python entrypoint. Credential migration scripts require macOS or Linux; Windows users should follow the manual `cmdkey` setup in [docs/guides/01-quick-start.md](docs/guides/01-quick-start.md).
+>
+> **CLI availability note:** Three `openclaw-cli` subcommands (`scan vulnerability`, `scan access`, `report weekly`) are not yet implemented and will raise an error if invoked. See the [openclaw-cli Commands](#-operational-tools--cli) section for the full availability matrix before running commands from training docs.
 >
 > **Runtime API note:** this repo ships health (`/health`, `/healthz`, `/ready`) and metrics (`/metrics`) endpoints only. It does not ship a runtime inference API. See [`docs/api/README.md`](docs/api/README.md).
 
