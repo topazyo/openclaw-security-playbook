@@ -23,10 +23,6 @@ Usage:
   openclaw-cli config validate openclaw-agent.yml
   openclaw-cli simulate incident --type credential-theft
 
-Not yet implemented (placeholder modules absent):
-  scan vulnerability, scan access, report weekly
-  See scripts/README.md for placeholder status.
-
 Installation:
   pip install click pyyaml boto3 requests tabulate
   python openclaw-cli.py --help
@@ -58,6 +54,30 @@ def _load_tool_module(filename: str, module_name: str):
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load module: {filename}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_clawdbot_module(module_name: str):
+    """Load a backend module from src/clawdbot/ by name.
+
+    Tries a standard package import first (works after ``pip install -e .``),
+    then falls back to explicit file-path loading so the CLI also works when
+    invoked directly as ``python tools/openclaw-cli.py``.
+    """
+    try:
+        import importlib as _il
+        return _il.import_module(f"clawdbot.{module_name}")
+    except ImportError:
+        pass
+    mod_path = (REPO_ROOT / "src" / "clawdbot" / f"{module_name}.py").resolve()
+    spec = importlib.util.spec_from_file_location(f"clawdbot_{module_name}", mod_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"Unable to load clawdbot.{module_name} — "
+            f"not found at {mod_path}.  Run 'pip install -e .' from the repo root."
+        )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -157,26 +177,81 @@ def scan():
 
 
 @scan.command()
-@click.option("--target", required=True, help="Scan target (production, staging, dev)")
-@click.option("--output", type=click.Path(), help="Output file path")
+@click.option("--target", required=True, help="Scan target label stored in the report (production/staging/dev)")
+@click.option("--output", type=click.Path(), help="Write the JSON result to this file")
+@click.option(
+    "--profile",
+    default="local",
+    type=click.Choice(["local", "ci"]),
+    help="local: filesystem tools only.  ci: also build and scan the hardened Docker image.",
+)
+@click.option("--strict", is_flag=True, help="Exit non-zero if any required tool (trivy, pip-audit, bandit) is missing")
+@click.option("--artifacts-dir", type=click.Path(), help="Directory to store raw per-tool artifacts")
 @click.pass_context
-def vulnerability(ctx, target, output):
-    """Run vulnerability scan using Trivy and dependency checkers.
+def vulnerability(ctx, target, output, profile, strict, artifacts_dir):
+    """Run vulnerability scan (Trivy, pip-audit, Bandit, Gitleaks, syft).
 
-    NOTE: The automated scan pipeline (scripts.discovery) is not yet
-    implemented in this repo.  Run the maintained CI tools directly:
+    Mirrors the CI pipeline in .github/workflows/security-scan.yml.
+    Missing tools are skipped by default; use --strict to treat them as failures.
 
     \b
-      trivy fs .                                  # filesystem scan
-      pip-audit --format json                     # Python dependency audit
-      See .github/workflows/security-scan.yml for the full automated pipeline.
+      openclaw-cli scan vulnerability --target production
+      openclaw-cli scan vulnerability --target production --profile ci --strict
+      openclaw-cli scan vulnerability --target staging --output vuln.json --artifacts-dir /tmp/scan
     """
-    raise click.ClickException(
-        "scan vulnerability requires scripts.discovery modules that are not yet "
-        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
-        "Run 'trivy fs .' and 'pip-audit' directly, or trigger the "
-        ".github/workflows/security-scan.yml workflow for CI-backed scanning."
+    click.echo(f"[*] Running vulnerability scan [{target}, profile: {profile}]...")
+
+    safe_output = _validate_output_path(output) if output else None
+    safe_artifacts = _validate_output_path(artifacts_dir) if artifacts_dir else None
+
+    scan_mod = _load_clawdbot_module("scan_vulnerability")
+    try:
+        result = scan_mod.run_scan(
+            target=target,
+            profile=profile,
+            strict=strict,
+            output_path=str(safe_output) if safe_output else None,
+            artifacts_dir_path=str(safe_artifacts) if safe_artifacts else None,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    # Display per-tool status table
+    click.echo("\n[*] Tool Results:")
+    rows = []
+    for tool_name, tool_res in result["tool_results"].items():
+        status = tool_res["status"].upper()
+        count = tool_res.get("finding_count", "")
+        reason = tool_res.get("reason", "")
+        detail = ""
+        if tool_res.get("details"):
+            d = tool_res["details"]
+            detail = f"  ({d.get('critical',0)} critical, {d.get('high',0)} high)"
+        extra = f"{count} findings{detail}" if count != "" else reason
+        rows.append([f"  {tool_name}", status, extra])
+    click.echo(tabulate(rows, headers=["Tool", "Status", "Detail"]))
+
+    summary = result["summary"]
+    click.echo(
+        f"\n[*] Summary: {summary['total']} total findings"
+        f" ({summary['critical']} critical, {summary['high']} high)"
     )
+    if summary["passed_tools"]:
+        click.echo(f"    Passed:  {', '.join(summary['passed_tools'])}")
+    if summary["skipped_tools"]:
+        click.echo(f"    Skipped: {', '.join(summary['skipped_tools'])}")
+
+    for w in result.get("warnings", []):
+        click.secho(f"[!] {w}", fg="yellow")
+
+    if safe_output:
+        click.secho(f"\n[\u2713] Scan complete \u2192 {safe_output}", fg="green")
+    else:
+        click.secho("[\u2713] Scan complete", fg="green")
+
+    if summary["failed_tools"]:
+        click.secho(f"[\u2717] Failed tools: {', '.join(summary['failed_tools'])}", fg="red")
+        ctx.exit(1)
 
 
 @scan.command()
@@ -202,23 +277,86 @@ def compliance(ctx, policy):
 
 
 @scan.command()
-@click.option("--days", default=90, help="Flag accounts inactive for X days")
+@click.option("--days", default=90, show_default=True, help="Flag accounts inactive for this many days")
+@click.option("--input-csv", type=click.Path(), help="Path to access-report CSV (runbook column schema)")
+@click.option(
+    "--provider",
+    type=click.Choice(["azure-ad"]),
+    help="Query a live identity provider instead of a CSV (requires AZURE_AD_* env vars)",
+)
+@click.option("--tenant-id", help="Azure AD tenant ID (or set AZURE_AD_TENANT_ID)")
+@click.option("--client-id", help="Azure AD client ID (or set AZURE_AD_CLIENT_ID)")
+@click.option("--client-secret", help="Azure AD client secret (or set AZURE_AD_CLIENT_SECRET)")
+@click.option("--output", type=click.Path(), help="Write the JSON result to this file")
+@click.option("--output-inactive-csv", type=click.Path(), help="Export inactive users as CSV")
+@click.option("--output-privilege-creep-csv", type=click.Path(), help="Export privilege-creep findings as CSV")
 @click.pass_context
-def access(ctx, days):
-    """Review user access and permissions.
+def access(ctx, days, input_csv, provider, tenant_id, client_id, client_secret,
+           output, output_inactive_csv, output_privilege_creep_csv):
+    """Review user access against the quarterly access-review runbook.
 
-    NOTE: The automated access-review pipeline (scripts.compliance) is not yet
-    implemented in this repo.  Follow the manual procedure instead:
+    Provide either a CSV export (--input-csv) or query a live identity provider
+    (--provider azure-ad).  Exactly one source is required.
 
     \b
-      docs/procedures/access-review.md
+      # CSV-based review
+      openclaw-cli scan access --input-csv access-export.csv --days 90
+
+      # Live Azure AD review (reads AZURE_AD_* env vars)
+      openclaw-cli scan access --provider azure-ad --output access.json
     """
-    raise click.ClickException(
-        "scan access requires scripts.compliance modules that are not yet "
-        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
-        "See docs/procedures/access-review.md for the manual quarterly "
-        "access-review procedure."
-    )
+    if not input_csv and not provider:
+        raise click.UsageError("Provide --input-csv or --provider azure-ad.")
+    if input_csv and provider:
+        raise click.UsageError("--input-csv and --provider are mutually exclusive.")
+
+    source_label = input_csv or provider
+    click.echo(f"[*] Running access review [source: {source_label}, threshold: {days} days]...")
+
+    safe_output = _validate_output_path(output) if output else None
+    safe_inactive = _validate_output_path(output_inactive_csv) if output_inactive_csv else None
+    safe_creep = _validate_output_path(output_privilege_creep_csv) if output_privilege_creep_csv else None
+
+    access_mod = _load_clawdbot_module("scan_access")
+    try:
+        result = access_mod.run_access_review(
+            input_csv=input_csv,
+            provider=provider,
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+            days_threshold=days,
+            output_path=str(safe_output) if safe_output else None,
+            output_inactive_csv=str(safe_inactive) if safe_inactive else None,
+            output_privilege_creep_csv=str(safe_creep) if safe_creep else None,
+        )
+    except (ValueError, ImportError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    except Exception as exc:
+        raise click.ClickException(f"Access review failed: {exc}") from exc
+
+    summary = result["summary"]
+    click.echo(f"\n[*] Loaded {summary['total_users']} users from {result['input_source']}")
+    click.echo("\n[*] Findings:")
+    rows_out = [
+        ["  Inactive users", f"\u2265{days} days", summary["inactive_count"]],
+        ["  Privilege creep", "", summary["privilege_creep_count"]],
+        ["  Orphaned approvers", "", summary["orphaned_approver_count"]],
+    ]
+    click.echo(tabulate(rows_out, headers=["Category", "Condition", "Count"]))
+
+    comp = result.get("compliance", {})
+    if comp:
+        click.echo("\n[*] Compliance:")
+        for key, status in comp.items():
+            colour = "green" if status == "pass" else "yellow"
+            label = key.replace("_", " ").upper()
+            click.secho(f"    {label:<30} {status.upper()}", fg=colour)
+
+    if safe_output:
+        click.secho(f"\n[\u2713] Review complete \u2192 {safe_output}", fg="green")
+    else:
+        click.secho("[\u2713] Review complete", fg="green")
 
 
 @scan.command(name="certificates")
@@ -342,25 +480,90 @@ def report():
 
 
 @report.command()
-@click.option("--start", required=True, help="Start date (YYYY-MM-DD)")
-@click.option("--end", required=True, help="End date (YYYY-MM-DD)")
-@click.option("--output", type=click.Path(), help="Output PDF path")
+@click.option("--start", required=True, help="Period start date (YYYY-MM-DD)")
+@click.option("--end", required=True, help="Period end date (YYYY-MM-DD)")
+@click.option("--output", type=click.Path(), help="Write the JSON report to this file")
+@click.option("--pdf", type=click.Path(), help="Also render a PDF report (requires reportlab)")
+@click.option("--vulnerability-scan", type=click.Path(), help="Path to a prior 'scan vulnerability' JSON output to embed")
+@click.option("--access-scan", type=click.Path(), help="Path to a prior 'scan access' JSON output to embed")
 @click.pass_context
-def weekly(ctx, start, end, output):
-    """Generate weekly security report.
+def weekly(ctx, start, end, output, pdf, vulnerability_scan, access_scan):
+    """Generate the weekly security report.
 
-    NOTE: The automated reporting pipeline (scripts.reporting) is not yet
-    implemented in this repo.  Use the compliance report command instead:
+    Aggregates compliance status, certificate expiry, and optionally embeds
+    the most recent vulnerability and access-review scan results.
 
     \b
-      openclaw-cli report compliance --framework SOC2
+      # Standalone (compliance + certs only)
+      openclaw-cli report weekly --start 2026-03-14 --end 2026-03-21 --output report.json
+
+      # Full report with prior scans embedded
+      openclaw-cli scan vulnerability --target production --output vuln.json
+      openclaw-cli scan access --input-csv access.csv --output access.json
+      openclaw-cli report weekly --start 2026-03-14 --end 2026-03-21 \\
+          --vulnerability-scan vuln.json --access-scan access.json \\
+          --output report.json --pdf report.pdf
     """
-    raise click.ClickException(
-        "report weekly requires scripts.reporting modules that are not yet "
-        "implemented in this repo (see scripts/README.md, status: Placeholder).\n"
-        "Use 'openclaw-cli report compliance --framework SOC2' for a "
-        "repo-backed compliance report."
-    )
+    click.echo(f"[*] Generating weekly security report [{start} \u2192 {end}]...")
+
+    safe_output = _validate_output_path(output) if output else None
+    safe_pdf = _validate_output_path(pdf) if pdf else None
+
+    weekly_mod = _load_clawdbot_module("report_weekly")
+    try:
+        result = weekly_mod.generate_weekly_report(
+            start_date=start,
+            end_date=end,
+            output_path=str(safe_output) if safe_output else None,
+            pdf_path=str(safe_pdf) if safe_pdf else None,
+            vulnerability_scan_path=vulnerability_scan,
+            access_scan_path=access_scan,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    # Compliance section
+    comp = result.get("sections", {}).get("compliance_status", {})
+    if "error" not in comp:
+        click.echo("\n[*] Compliance:")
+        for fw, data in comp.items():
+            if isinstance(data, dict) and "compliance_percentage" in data:
+                pct = data["compliance_percentage"]
+                colour = "green" if pct >= 95 else "yellow" if pct >= 80 else "red"
+                click.secho(f"    {fw.upper():<12} {pct:.1f}%", fg=colour)
+
+    # Certificate section
+    certs = result.get("sections", {}).get("certificate_status", {})
+    if "error" not in certs:
+        expiring = certs.get("expiring_soon", 0)
+        cert_colour = "yellow" if expiring > 0 else "green"
+        click.secho(
+            f"\n[*] Certificates: {certs.get('total', 0)} total, "
+            f"{expiring} expiring soon",
+            fg=cert_colour,
+        )
+
+    # Missing evidence
+    missing = result.get("missing_evidence", [])
+    if missing:
+        click.echo("\n[!] Missing evidence (report is partial):")
+        for item in missing:
+            click.secho(f"    - {item}", fg="yellow")
+
+    # Warnings
+    for w in result.get("warnings", []):
+        click.secho(f"[!] {w}", fg="yellow")
+
+    # Overall status
+    status = result.get("overall_status", "unknown")
+    status_colour = {"healthy": "green", "warning": "yellow"}.get(status, "red")
+    click.secho(f"\n[*] Overall status: {status.upper()}", fg=status_colour)
+
+    artifacts = result.get("artifacts", {})
+    if artifacts.get("json_report"):
+        click.secho(f"[\u2713] Report saved \u2192 {artifacts['json_report']}", fg="green")
+    if artifacts.get("pdf_report"):
+        click.secho(f"[\u2713] PDF saved   \u2192 {artifacts['pdf_report']}", fg="green")
 
 
 @report.command()

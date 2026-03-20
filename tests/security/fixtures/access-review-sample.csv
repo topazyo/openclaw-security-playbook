@@ -1,0 +1,8 @@
+UserID,Name,Email,Role,Systems,LastLogin,GrantedDate,GrantedBy
+u001,Alice Admin,alice@example.com,Admin,prod,2026-03-15,2023-01-10,manager1
+u002,Bob Developer,bob@example.com,Developer,staging,2025-11-20,2022-06-01,u001
+u003,Carol Viewer,carol@example.com,Viewer,prod,2026-03-18,2023-03-01,u001
+u004,Dave Ops,dave@example.com,Admin,prod,2024-12-01,2022-09-15,manager1
+u005,Eve Readonly,eve@example.com,Read-Only,dev,2026-03-10,2024-01-05,u001
+u006,Frank DevAdmin,frank@example.com,"Admin,Developer",prod,2026-03-19,2024-06-20,u002
+u007,Grace NeverLogin,grace@example.com,Developer,staging,,2025-01-01,ghost_manager
