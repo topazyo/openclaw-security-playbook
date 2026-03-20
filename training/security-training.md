@@ -109,9 +109,12 @@ pip install -e .
    - Review Panel 10 (vulnerability metrics) for new CVEs
    - Check CPU/memory/disk usage trends
 
-2. **Scan for New Vulnerabilities** *(direct scanners; `scan vulnerability` CLI wrapper is a placeholder — see `scripts/README.md`)*
+2. **Scan for New Vulnerabilities**
    ```bash
-   # Filesystem and dependency scan — runs without any hosted services
+   # CLI wrapper — mirrors the CI pipeline (Trivy, pip-audit, Bandit, Gitleaks, syft)
+   openclaw-cli scan vulnerability --target production
+
+   # Or run individual tools directly:
    trivy fs .
    pip-audit --format json
    # For full CI-backed scanning see .github/workflows/security-scan.yml
@@ -122,8 +125,13 @@ pip install -e .
    openclaw-cli scan compliance --policy SEC-003
    ```
 
-4. **Generate Compliance Report** *(`report weekly` is a placeholder — see `scripts/README.md`; use `report compliance` instead)*
+4. **Generate Weekly Security Report**
    ```bash
+   # Full weekly report aggregating compliance, certs, and optional scan results
+   openclaw-cli report weekly --start $(date -d 'last monday' +%Y-%m-%d) --end $(date +%Y-%m-%d) \
+       --output reports/weekly-$(date +%Y-%m-%d).json
+
+   # Framework-only compliance snapshot
    openclaw-cli report compliance --framework SOC2 --output reports/soc2-$(date +%Y-%m-%d).json
    ```
 
@@ -131,8 +139,14 @@ pip install -e .
 
 1. **Quarterly Access Review** (every 90 days)
 
-   > `openclaw-cli scan access` is not yet implemented (see `scripts/README.md`).
-   > Follow the manual procedure: [docs/procedures/access-review.md](../docs/procedures/access-review.md)
+   See [docs/procedures/access-review.md](../docs/procedures/access-review.md) for the full runbook.
+   ```bash
+   # CSV-based review using a runbook-format export
+   openclaw-cli scan access --input-csv exports/access-$(date +%Y-%m-%d).csv --days 90
+
+   # Live Azure AD review (requires AZURE_AD_* environment variables)
+   openclaw-cli scan access --provider azure-ad --output reports/access-review.json
+   ```
 
 2. **Certificate Expiry Check**
    ```bash
@@ -342,14 +356,16 @@ openclaw-cli config migrate configs/agent-config/openclaw-agent.yml --from-versi
 # Incident simulation
 openclaw-cli simulate incident --type credential-theft --severity P1
 
-# ── Direct scanners (no CLI wrapper yet) ─────────────────────────────────────
-trivy fs .                          # filesystem vulnerability scan
-pip-audit --format json             # Python dependency audit
+# ── Vulnerability, access, and weekly reporting ──────────────────────────────
+openclaw-cli scan vulnerability --target production --output vuln.json
+openclaw-cli scan access --input-csv access-export.csv --output access.json
+openclaw-cli report weekly --start 2026-03-14 --end 2026-03-21 \
+    --vulnerability-scan vuln.json --access-scan access.json \
+    --output report.json
 
-# ── Not yet implemented (placeholder modules; see scripts/README.md) ──────────
-# openclaw-cli scan vulnerability   (requires scripts.discovery  — Placeholder)
-# openclaw-cli scan access          (requires scripts.compliance — Placeholder)
-# openclaw-cli report weekly        (requires scripts.reporting  — Placeholder)
+# Or run individual scanners directly:
+trivy fs .
+pip-audit --format json
 ```
 
 ### Python Tools

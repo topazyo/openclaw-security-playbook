@@ -149,7 +149,7 @@ docker compose -f configs/examples/docker-compose-full-stack.yml config
 
 > **Shell support note:** scripts under `scripts/` assume bash or zsh. On Windows use WSL2 or Git Bash for shell workflows. The `openclaw-cli` command works natively on Windows via the installed Python entrypoint. Credential migration scripts require macOS or Linux; Windows users should follow the manual `cmdkey` setup in [docs/guides/01-quick-start.md](docs/guides/01-quick-start.md).
 >
-> **CLI availability note:** Three `openclaw-cli` subcommands (`scan vulnerability`, `scan access`, `report weekly`) are not yet implemented and will raise an error if invoked. See the [openclaw-cli Commands](#-operational-tools--cli) section for the full availability matrix before running commands from training docs.
+> **CLI note:** All `openclaw-cli` subcommands are implemented. See the [openclaw-cli Commands](#-operational-tools--cli) section for the full reference.
 >
 > **Runtime API note:** this repo ships health (`/health`, `/healthz`, `/ready`) and metrics (`/metrics`) endpoints only. It does not ship a runtime inference API. See [`docs/api/README.md`](docs/api/README.md).
 
@@ -421,10 +421,10 @@ openclaw-cli report compliance --framework SOC2 --output report.json
 trivy fs .
 pip-audit --format json
 
-# ── Not yet implemented (placeholder modules; see scripts/README.md) ──────────
-# openclaw-cli scan vulnerability  (requires scripts.discovery  — Placeholder)
-# openclaw-cli scan access         (requires scripts.compliance — Placeholder)
-# openclaw-cli report weekly       (requires scripts.reporting  — Placeholder)
+# ── Vulnerability & access scanning ─────────────────────────────────────────
+openclaw-cli scan vulnerability --target production
+openclaw-cli scan access --input-csv access-export.csv
+openclaw-cli report weekly --start 2026-03-14 --end 2026-03-21 --output report.json
 ```
 
 ### Python Security Tools

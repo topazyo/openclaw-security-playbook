@@ -14,11 +14,11 @@ This directory contains automation scripts for various security tasks.
 | `hardening/` | Active | Docker seccomp profiles, VPN setup, and runtime hardening scripts |
 | `credential-migration/` | Active | macOS and Linux keychain migration helpers |
 | `vulnerability-scanning/` | Active | OS-level and dependency vulnerability scan helpers |
-| `compliance/` | Placeholder | Access review and compliance helpers (see `tools/compliance-reporter.py`) |
-| `discovery/` | Placeholder | Asset and dependency discovery helpers |
-| `remediation/` | Placeholder | Remediation workflow scripts |
-| `reporting/` | Placeholder | Reporting and metric-generation scripts |
-| `incident_response/` | Placeholder | Legacy alias directory; use `incident-response/` instead |
+| `compliance/` | Reserved | Compliance helpers directory; active logic lives in `src/clawdbot/scan_access.py` |
+| `discovery/` | Reserved | Discovery helpers directory; active logic lives in `src/clawdbot/scan_vulnerability.py` |
+| `remediation/` | Reserved | Remediation workflow scripts (not yet automated) |
+| `reporting/` | Reserved | Reporting helpers directory; active logic lives in `src/clawdbot/report_weekly.py` |
+| `incident_response/` | Reserved | Legacy alias directory; use `incident-response/` instead |
 
 ## Related Tools
 
