@@ -1,7 +1,7 @@
 # OpenClaw MITRE ATLAS Threat Mapping
 
 This document maps the three primary attack vectors covered in the blog series to their
-official MITRE ATLAS taxonomy from [trust.openclaw.ai/trust/threatmodel](https://trust.openclaw.ai/trust/threatmodel).
+official MITRE ATLAS taxonomy from the [MITRE ATLAS project](https://atlas.mitre.org/).
 
 Use these IDs when filing tickets, building detection rules, and aligning with your
 security team's existing MITRE-based workflows.

@@ -6,6 +6,8 @@
 **Owner**: Security Team + HR  
 **Related Policy**: [Access Control Policy](../policies/access-control-policy.md)
 
+> ⚠️ **Automation Notice:** The `scripts/access-management/` directory referenced throughout this runbook does not yet exist. All shell commands invoking those scripts are placeholder templates for planned future automation. For each phase, follow the **manual procedure steps** described in the accompanying prose. Track all review and remediation actions via your incident-tracking system (GitHub Issues, Jira, etc.).
+
 This runbook defines the quarterly access review process to ensure least privilege and prevent unauthorized access to ClawdBot/OpenClaw systems.
 
 ---
@@ -70,14 +72,7 @@ This runbook defines the quarterly access review process to ensure least privile
 - **Security Incident**: Review access for affected systems/users
 - **Extended Leave**: Suspend access for leaves >30 days
 
-**Process**:
-```bash
-# Trigger event-driven review
-./scripts/access-management/event-driven-review.sh \
-  --event termination \
-  --user alice@company.com \
-  --effective-date 2026-02-14
-```
+**Process**: Follow the procedure in [Phase 4: Remediation](#remediation) immediately. File a ticket in your incident-tracking system recording the user, event type, and effective date before end of business.
 
 ---
 
@@ -87,19 +82,7 @@ This runbook defines the quarterly access review process to ensure least privile
 
 #### Step 1.1: Extract Current Access
 
-```bash
-# Generate access report
-./scripts/access-management/generate-access-report.sh \
-  --output access-report-2026-Q1.csv
-
-# Report includes:
-# - User ID, Name, Email
-# - Role (Developer, Operator, Admin)
-# - Systems accessed (production, staging, dev)
-# - Last login date
-# - Access granted date
-# - Access granted by (approver)
-```
+Export a user access report from your identity provider (Okta, Azure AD, Google Workspace, etc.) and save as `access-report-YYYY-QX.csv`. Include: User ID, Name, Email, Role, Systems, LastLogin, GrantedDate, and GrantedBy.
 
 **Example Output**:
 ```csv
@@ -111,30 +94,14 @@ UserID,Name,Email,Role,Systems,LastLogin,GrantedDate,GrantedBy
 
 #### Step 1.2: Identify Inactive Users
 
-```bash
-# Find users with no login in 90 days
-./scripts/access-management/find-inactive-users.sh \
-  --threshold 90 \
-  --output inactive-users.csv
-
-# Example:
-# UserID: 1003 (Carol Chen)
-# Last Login: 2025-11-20 (85 days ago)
-# Recommendation: Contact user to confirm continued need
-```
+Filter `access-report-YYYY-QX.csv` by the `LastLogin` column. Flag users with no login activity in the past 90 days, save the filtered list to `inactive-users.csv`, and note a recommendation for each (contact to confirm continued need, or flag for revocation).
 
 #### Step 1.3: Check for Privilege Creep
 
-```bash
-# Detect users with multiple roles or excessive permissions
-./scripts/access-management/detect-privilege-creep.sh \
-  --output privilege-creep-report.csv
-
-# Flags:
-# - Users with both Developer and Admin roles
-# - Production access granted to users in non-production roles
-# - Orphaned access (manager departed, approval chain broken)
-```
+Cross-reference the access report against your role matrix. Record findings in `privilege-creep-report.csv` and flag:
+- Users with both Developer and Admin roles
+- Production access granted to users in non-production roles
+- Orphaned access (approver no longer employed)
 
 ---
 
@@ -142,24 +109,7 @@ UserID,Name,Email,Role,Systems,LastLogin,GrantedDate,GrantedBy
 
 #### Step 2.1: Send Review Requests
 
-```bash
-# Email access review to all managers
-./scripts/access-management/send-review-requests.py \
-  --quarter Q1 \
-  --year 2026
-
-# Email template:
-# Subject: [ACTION REQUIRED] Q1 2026 Access Review
-# Body:
-#   Please review the attached list of your team members' access.
-#   For each user, indicate:
-#   - [KEEP] Access still required
-#   - [REMOVE] Access no longer needed
-#   - [MODIFY] Access should be changed (specify new role)
-#   
-#   Deadline: January 15, 2026
-#   Reply to access-review@company.com
-```
+Email the exported access report to each manager using your standard email system. Attach the relevant team subset of `access-report-YYYY-QX.csv`. Use the email wording from the certification template in Step 2.2 as the message body. Set the reply-to address to your access review tracking mailbox and include the certification deadline.
 
 #### Step 2.2: Manager Certification
 
@@ -188,29 +138,9 @@ Date: 2026-01-10
 
 #### Step 2.3: Track Responses
 
-```bash
-# Check review completion status
-./scripts/access-management/review-status.sh \
-  --quarter Q1
+Track completion in a shared spreadsheet or your incident-tracking system. For each manager record: department, submission date, and status (Pending / Complete / Escalated). Update the tracking sheet daily during the review window.
 
-# Output:
-# Total Managers: 15
-# Completed Reviews: 12 (80%)
-# Outstanding: 3 (20%)
-#   - Marketing (Manager: Jane Doe, Due: Jan 15)
-#   - Sales (Manager: John Smith, Due: Jan 15)
-#   - Legal (Manager: Sarah Johnson, Due: Jan 15)
-```
-
-**Escalation** (if overdue):
-```bash
-# Send reminder email
-./scripts/access-management/send-reminder.py \
-  --manager jane.doe@company.com \
-  --overdue-days 3
-
-# Escalate to CISO if still overdue after 7 days
-```
+**Escalation** (if overdue): Send a manual reminder email to outstanding managers once overdue. Open a CISO escalation ticket if still outstanding after 7 days.
 
 ---
 
@@ -223,16 +153,7 @@ Date: 2026-01-10
 2. **Compliance**: Do certifications comply with policies?
 3. **Anomalies**: Investigate flagged accounts (privilege creep, inactive users with production access)
 
-```bash
-# Run compliance checks
-./scripts/access-management/validate-certifications.sh \
-  --input manager-certifications/ \
-  --output validation-report.txt
-
-# Flags:
-# ⚠️ WARNING: User 1005 (Eve Adams) marked KEEP but terminated on 2025-12-20
-# ⚠️ WARNING: User 1006 (Frank Miller) has Admin role but manager certified Developer
-```
+Cross-check manager certifications against HR records and current IdP role assignments. Flag any KEEP decision for a terminated employee, or any role mismatch between the certification and actual IdP role. Record all findings in `validation-report.txt` with supporting evidence.
 
 #### Step 3.2: Review Privileged Access
 
@@ -241,16 +162,7 @@ Date: 2026-01-10
 - **Production Access**: Requires business justification
 - **Standing Privileges**: Should use JIT access instead
 
-```bash
-# Review admin accounts
-./scripts/access-management/review-admins.sh
-
-# Output:
-# Total Admin Accounts: 3
-#   - CISO (alice@company.com) - Justified: Executive oversight
-#   - Security Lead (bob@company.com) - Justified: Incident response
-#   - On-Call Engineer (rotating) - Justified: JIT access (4-hour grants)
-```
+Query your identity provider for all users with the Admin role. For each, verify documented executive approval, active employment, and a current business justification on file. Record findings with counts and justifications.
 
 ---
 
@@ -258,17 +170,7 @@ Date: 2026-01-10
 
 #### Step 4.1: Revoke Unnecessary Access
 
-```bash
-# Batch revocation (from manager certifications)
-./scripts/access-management/revoke-access.sh \
-  --input revocations-q1.csv \
-  --dry-run  # Preview changes
-
-# Review output, then execute:
-./scripts/access-management/revoke-access.sh \
-  --input revocations-q1.csv \
-  --execute
-```
+For each user marked REMOVE in manager certifications, work through every item in the [Revocation Checklist](#revocation-checklist) below. Log each revocation in your incident-tracking system with the user, reason, and effective date.
 
 **Revocation Actions**:
 1. **API Keys**: Rotate and delete old keys
@@ -292,19 +194,7 @@ This action is effective immediately.
 
 #### Step 4.2: Modify Access Levels
 
-```bash
-# Downgrade user from Admin to Developer
-./scripts/access-management/modify-role.sh \
-  --user dave.lee@company.com \
-  --from Admin \
-  --to Developer
-
-# Verify change
-./scripts/access-management/verify-role.sh \
-  --user dave.lee@company.com
-
-# Expected: Role=Developer, Production Access=No
-```
+Update the user's role via your identity provider admin console or Kubernetes RBAC configuration. Confirm the change in the IdP and verify that any previously granted system access matches the new role. Log the old role, new role, approver, and effective date in the tracking ticket.
 
 ---
 
@@ -312,13 +202,7 @@ This action is effective immediately.
 
 #### Step 5.1: Generate Compliance Report
 
-```bash
-# Final report for audit
-./scripts/access-management/generate-compliance-report.py \
-  --quarter Q1 \
-  --year 2026 \
-  --output Q1-2026-Access-Review-Report.pdf
-```
+Compile the quarterly compliance report using the **Report Contents** template below. Run `python tools/compliance-reporter.py` for SOC 2 / ISO 27001 evidence generation. Export to PDF and obtain CISO sign-off before the review deadline.
 
 **Report Contents**:
 1. **Executive Summary**: Total users reviewed, actions taken
@@ -363,14 +247,7 @@ Approved By: CISO
 - Revocation logs (timestamped)
 - Compliance report (signed by CISO)
 
-**Storage**:
-```bash
-# Archive to compliance folder (7-year retention)
-./scripts/access-management/archive-review.sh \
-  --quarter Q1 \
-  --year 2026 \
-  --destination /compliance/access-reviews/
-```
+**Storage**: Archive all artifacts (certifications, reports, revocation logs) into `/compliance/access-reviews/YYYY-QX/` with a minimum 7-year retention policy. Confirm archival is complete in the quarterly report before closing the review cycle.
 
 ---
 
@@ -436,14 +313,7 @@ For each user whose access is revoked:
 - [ ] **Documentation**: Update runbooks if user was on-call
 - [ ] **Notification**: Inform user and manager
 
-**Automation**:
-```bash
-# Full revocation (all systems)
-./scripts/access-management/full-revocation.sh \
-  --user carol.chen@company.com \
-  --reason "Q1 2026 Access Review: Role change to Marketing" \
-  --effective-date 2026-01-15
-```
+Complete the **Revocation Checklist** above for each affected system in sequence. Record each completed item in a remediation ticket that includes the user, reason, and effective date.
 
 ---
 
@@ -489,54 +359,11 @@ Q1 2026 vs Q4 2025:
 
 ## Tools and Scripts
 
-### Data Collection
-
-```bash
-# Generate access report
-./scripts/access-management/generate-access-report.sh
-
-# Find inactive users
-./scripts/access-management/find-inactive-users.sh --threshold 90
-
-# Detect privilege creep
-./scripts/access-management/detect-privilege-creep.sh
-```
-
-### Review Management
-
-```bash
-# Send review requests
-./scripts/access-management/send-review-requests.py --quarter Q1
-
-# Track status
-./scripts/access-management/review-status.sh
-
-# Validate certifications
-./scripts/access-management/validate-certifications.sh
-```
-
-### Remediation
-
-```bash
-# Revoke access
-./scripts/access-management/revoke-access.sh --user <email>
-
-# Modify role
-./scripts/access-management/modify-role.sh --user <email> --to <role>
-
-# Full revocation (all systems)
-./scripts/access-management/full-revocation.sh --user <email>
-```
-
-### Reporting
-
-```bash
-# Compliance report
-./scripts/access-management/generate-compliance-report.py --quarter Q1
-
-# Archive review
-./scripts/access-management/archive-review.sh --quarter Q1 --year 2026
-```
+> ⚠️ **Automation placeholder:** The `scripts/access-management/` directory does not yet exist in this repository. The commands shown throughout this runbook are proposals for future automation and **will fail if run**. Follow the manual procedures in each phase above instead.
+>
+> **Available tools that support access review work:**
+> - [`tools/compliance-reporter.py`](../../tools/compliance-reporter.py) — SOC 2 / ISO 27001 compliance report generation
+> - [`scripts/verification/verify_openclaw_security.sh`](../../scripts/verification/verify_openclaw_security.sh) — Security posture verification
 
 ---
 

@@ -14,6 +14,7 @@ These scripts automate the complete migration of credentials from:
 To:
 - ✅ **macOS Keychain** (Hardware-backed encryption)
 - ✅ **Linux Secret Service** (GNOME Keyring / KDE Wallet)
+- ⚠️ **Windows** — No automated migration script is provided. Windows users must store credentials manually via Credential Manager or `cmdkey`. See [docs/guides/01-quick-start.md](../../docs/guides/01-quick-start.md) for the full Windows setup walkthrough.
 
 ---
 

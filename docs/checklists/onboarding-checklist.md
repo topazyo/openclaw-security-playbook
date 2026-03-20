@@ -182,6 +182,11 @@ cd openclaw-security-playbook
 # Linux
 ./scripts/credential-migration/linux/migrate_credentials_linux.sh
 
+# Windows (PowerShell — no automated migration script; follow manual steps)
+# Run: cmdkey /generic:ai.openclaw.anthropic /user:api-key /pass:<your-api-key>
+# Verify: cmdkey /list | Select-String "openclaw"
+# See docs/guides/01-quick-start.md for the full Windows credential setup walkthrough.
+
 # Verify credentials stored securely
 security find-generic-password -s "ai.openclaw.anthropic"  # macOS
 secret-tool lookup service "ai.openclaw.anthropic"         # Linux
