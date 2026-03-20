@@ -41,9 +41,9 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 │  Layer 5: Supply Chain Security                             │
 │  • Skill integrity • GPG verification • Allowlists          │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 4: Runtime Security Enforcement (Optional)          │
-│  • Prompt injection guards • PII redaction                 │
-│  • openclaw-shield (external, not vendored by this repo)   │
+│  Layer 4: Runtime Security Enforcement (Optional)           │
+│  • Prompt injection guards • PII redaction                  │
+│  • openclaw-shield (external, not vendored by this repo)    │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Runtime Sandboxing                                │
 │  • Docker security • Read-only FS • Capability dropping     │
