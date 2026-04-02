@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Intentional masked examples in the secrets template"
+paths = [
+  '''^configs/agent-config/secrets-template\.vault$''',
+]
