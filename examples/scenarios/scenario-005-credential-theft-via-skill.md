@@ -170,7 +170,7 @@ for audit trail purposes per ISO 27001 requirements.
 # Attacker's automated upload script
 for doc in malicious_docs/*.pdf; do
   curl -X POST \
-    -H "Authorization: Bearer trial_user_token" \
+    -H "Authorization: Bearer <redacted example token>" \
     -F "document=@$doc" \
     https://api.clawdbot.example.com/api/v1/documents/upload
   sleep 5  # Avoid rate limiting

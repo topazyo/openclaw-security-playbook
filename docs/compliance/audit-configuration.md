@@ -387,7 +387,7 @@ This document specifies what events to log, where to store logs, retention requi
 **Masking Examples**:
 ```json
 // WRONG (logs plaintext credential)
-{"user": "user@example.com", "api_key": "sk_live_abc123def456"}
+{"user": "user@example.com", "api_key": "FULL_API_KEY_REDACTED_FOR_DOCS"}
 
 // RIGHT (logs key prefix only)
 {"user": "user@example.com", "api_key_prefix": "sk_live_abc***"}

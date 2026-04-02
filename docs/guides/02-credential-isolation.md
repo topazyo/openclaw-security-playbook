@@ -127,27 +127,27 @@ In 2023-2024, researchers found **1,200+ exposed AI agent instances** with:
 security add-generic-password \
   -s "ai.openclaw.anthropic" \
   -a "$USER" \
-  -w "sk-ant-api03-YOUR-KEY-HERE" \
+  -w "ANTHROPIC_API_KEY_PLACEHOLDER" \
   -T "${CLAWDBOT_BIN}"
 
 # OpenAI API Key
 security add-generic-password \
   -s "ai.openclaw.openai" \
   -a "$USER" \
-  -w "sk-proj-YOUR-KEY-HERE" \
+  -w "OPENAI_API_KEY_PLACEHOLDER" \
   -T "${CLAWDBOT_BIN}"
 
 # AWS Credentials
 security add-generic-password \
   -s "ai.openclaw.aws.access_key" \
   -a "$USER" \
-  -w "AKIAIOSFODNN7EXAMPLE" \
+  -w "AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL" \
   -T "${CLAWDBOT_BIN}"
 
 security add-generic-password \
   -s "ai.openclaw.aws.secret_key" \
   -a "$USER" \
-  -w "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+  -w "AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL" \
   -T "${CLAWDBOT_BIN}"
 ```
 
@@ -182,7 +182,7 @@ security find-generic-password \
   -s "ai.openclaw.anthropic" \
   -w
 
-# Output: sk-ant-api03-YOUR-KEY-HERE
+# Output: ANTHROPIC_API_KEY_PLACEHOLDER
 ```
 
 **First time:** macOS will prompt for keychain password
@@ -277,7 +277,7 @@ secret-tool search service ai.openclaw.anthropic
 # Output:
 # [/org/freedesktop/secrets/collection/login/1]
 # label = OpenClaw Anthropic API Key
-# secret = sk-ant-api03-YOUR-KEY-HERE
+# secret = ANTHROPIC_API_KEY_PLACEHOLDER
 # ...
 ```
 
@@ -290,7 +290,7 @@ secret-tool lookup \
   username $USER \
   environment production
 
-# Output: sk-ant-api03-YOUR-KEY-HERE
+# Output: ANTHROPIC_API_KEY_PLACEHOLDER
 ```
 
 **Verify:** Expected output:
@@ -339,16 +339,16 @@ Windows uses **Credential Manager** for secure credential storage.
 
 ```powershell
 # Anthropic API Key
-cmdkey /generic:openclaw_anthropic /user:$env:USERNAME /pass:"sk-ant-api03-YOUR-KEY-HERE"
+cmdkey /generic:openclaw_anthropic /user:$env:USERNAME /pass:"ANTHROPIC_API_KEY_PLACEHOLDER"
 
 # OpenAI API Key
-cmdkey /generic:openclaw_openai /user:$env:USERNAME /pass:"sk-proj-YOUR-KEY-HERE"
+cmdkey /generic:openclaw_openai /user:$env:USERNAME /pass:"OPENAI_API_KEY_PLACEHOLDER"
 
 # AWS Access Key
-cmdkey /generic:openclaw_aws_access /user:$env:USERNAME /pass:"AKIAIOSFODNN7EXAMPLE"
+cmdkey /generic:openclaw_aws_access /user:$env:USERNAME /pass:"AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL"
 
 # AWS Secret Key
-cmdkey /generic:openclaw_aws_secret /user:$env:USERNAME /pass:"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+cmdkey /generic:openclaw_aws_secret /user:$env:USERNAME /pass:"AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL"
 ```
 
 ### Step 2: Verify in Credential Manager

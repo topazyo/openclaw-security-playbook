@@ -462,7 +462,7 @@ viewer
 
 **Emergency Access** (when normal approval not possible):
 
-1. Use emergency admin account (`emergency-admin@company.com`)
+1. Use emergency admin account (`emergency-admin@example.internal`)
 2. Stored password in physical safe (CFO office)
 3. Video surveillance of safe access
 4. Security team notified immediately

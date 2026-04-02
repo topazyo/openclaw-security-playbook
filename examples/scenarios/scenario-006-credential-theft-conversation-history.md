@@ -84,7 +84,7 @@ aws s3 cp s3://conversations.clawdbot.example/users/user_abc123/conv_xyz789.json
   "messages": [
     {
       "role": "user",
-      "content": "Help me debug this API connection issue. Here are my credentials:\nAPI Key: sk-prod-abc123def456ghi789\nDatabase: postgresql://admin:SuperSecret123!@db.company.com:5432/production\nAWS Access Key: AKIAIOSFODNN7EXAMPLE",
+      "content": "Help me debug this API connection issue. Here are my credentials:\nAPI Key: EXAMPLE_API_KEY_NOT_REAL\nDatabase: postgresql://admin:REDACTED_DB_PASSWORD@db.example.internal:5432/production\nAWS Access Key: AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL",
       "timestamp": "2025-10-02T09:32:15Z"
     },
     {
@@ -94,7 +94,7 @@ aws s3 cp s3://conversations.clawdbot.example/users/user_abc123/conv_xyz789.json
     },
     {
       "role": "user",
-      "content": "Also, here's my SSH key for the server:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...[REDACTED]...\n-----END RSA PRIVATE KEY-----",
+      "content": "Also, here's my SSH key for the server:\n[BEGIN EXAMPLE PRIVATE KEY]\nMIIEpAIBAAKCAQEA...[REDACTED]...\n[END EXAMPLE PRIVATE KEY]",
       "timestamp": "2025-10-02T09:35:22Z"
     }
   ],
@@ -330,7 +330,7 @@ aws ec2 run-instances \
 3. **Accessed production databases:**
 ```bash
 # Using stolen PostgreSQL credentials
-psql postgresql://admin:SuperSecret123!@db.company.com:5432/production
+psql postgresql://admin:REDACTED_DB_PASSWORD@db.example.internal:5432/production
 
 production=> SELECT COUNT(*) FROM customers;
   count  
@@ -379,7 +379,7 @@ $ aws cloudtrail lookup-events --lookup-attributes AttributeKey=Username,Attribu
 Found: Access key used from IP 45.134.67.89 (Romania)
 
 # Rotated credentials immediately
-$ aws iam delete-access-key --access-key-id AKIAIOSFODNN7EXAMPLE
+$ aws iam delete-access-key --access-key-id AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
 ```
 
 **Customer contacted ClawdBot security team:**

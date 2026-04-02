@@ -392,7 +392,7 @@ $ curl https://api.clawdbot.example.com/health
 Response: 503 Service Unavailable
 
 # 2. Check Anthropic API status
-$ curl https://api.anthropic.com/v1/account -H "Authorization: Bearer sk-ant-..."
+$ curl https://api.anthropic.com/v1/account -H "Authorization: Bearer <redacted example token>"
 Response: 429 Rate Limit Exceeded
 
 # 3. Check ECS task count

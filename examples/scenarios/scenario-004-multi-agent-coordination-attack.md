@@ -283,13 +283,13 @@ Response: 200 OK
 }
 
 # Access admin endpoints
-curl -H "Authorization: Bearer eyJhbGci..." \
+curl -H "Authorization: Bearer <redacted example token>" \
   https://gateway.clawdbot.example.com/api/v1/admin/users
 
 Response: Full user list (15,234 users)
 
 # Export all conversations
-curl -H "Authorization: Bearer eyJhbGci..." \
+curl -H "Authorization: Bearer <redacted example token>" \
   https://gateway.clawdbot.example.com/api/v1/admin/conversations/export
 
 Response: Conversation export job started (234,567 conversations)

