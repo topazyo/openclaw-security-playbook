@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy vulnerability scanner (filesystem)
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -99,7 +99,7 @@ jobs:
           docker exec oc-agent-ci curl -sf http://127.0.0.1:8000/health >/dev/null
 
       - name: Run Trivy for Docker images
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'image'
           image-ref: 'openclaw-playbook:latest'
@@ -107,7 +107,7 @@ jobs:
           format: 'table'
 
       - name: Run Trivy for gateway image
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'image'
           image-ref: 'clawdbot-gateway:ci'
@@ -115,7 +115,7 @@ jobs:
           format: 'table'
 
       - name: Run Trivy for agent image
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'image'
           image-ref: 'clawdbot-agent:ci'
