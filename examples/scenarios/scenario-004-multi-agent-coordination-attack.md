@@ -275,7 +275,7 @@ curl -X POST https://gateway.clawdbot.example.com/api/v1/auth/login \
 
 Response: 200 OK
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "[REDACTED-JWT]",
   "user": {
     "email": "backdoor@attacker.com",
     "role": "administrator"

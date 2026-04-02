@@ -2,7 +2,22 @@
 useDefault = true
 
 [[allowlists]]
-description = "Intentional masked examples in the secrets template"
+description = "Threat scenario documentation intentionally demonstrates credential patterns"
 paths = [
-  '''^configs/agent-config/secrets-template\.vault$''',
+  '''examples/scenarios/''',
+]
+
+[[allowlists]]
+description = "Secrets vault template uses masked placeholder examples"
+paths = [
+  '''secrets-template\.vault''',
+]
+
+[[allowlists]]
+description = "Placeholder-style redaction markers used in place of real secrets"
+stopwords = [
+  "_EXAMPLE_NOT_REAL",
+  "_PLACEHOLDER",
+  "REDACTED",
+  "NOT_REAL",
 ]

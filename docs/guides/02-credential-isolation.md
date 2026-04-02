@@ -141,13 +141,13 @@ security add-generic-password \
 security add-generic-password \
   -s "ai.openclaw.aws.access_key" \
   -a "$USER" \
-  -w "AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL" \
+  -w "[REDACTED]" \
   -T "${CLAWDBOT_BIN}"
 
 security add-generic-password \
   -s "ai.openclaw.aws.secret_key" \
   -a "$USER" \
-  -w "AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL" \
+  -w "[REDACTED]" \
   -T "${CLAWDBOT_BIN}"
 ```
 
@@ -207,7 +207,7 @@ security set-generic-password-partition-list \
 security add-generic-password \
   -s "ai.openclaw.anthropic.production" \
   -a "$USER" \
-  -w "sk-ant-api03-PROD-KEY" \
+  -w "[REDACTED]" \
   -T "${CLAWDBOT_BIN}" \
   -U  # ← Requires biometric authentication
 ```
@@ -345,10 +345,10 @@ cmdkey /generic:openclaw_anthropic /user:$env:USERNAME /pass:"ANTHROPIC_API_KEY_
 cmdkey /generic:openclaw_openai /user:$env:USERNAME /pass:"OPENAI_API_KEY_PLACEHOLDER"
 
 # AWS Access Key
-cmdkey /generic:openclaw_aws_access /user:$env:USERNAME /pass:"AWS_ACCESS_KEY_ID_EXAMPLE_NOT_REAL"
+cmdkey /generic:openclaw_aws_access /user:$env:USERNAME /pass:"[REDACTED]"
 
 # AWS Secret Key
-cmdkey /generic:openclaw_aws_secret /user:$env:USERNAME /pass:"AWS_SECRET_ACCESS_KEY_EXAMPLE_NOT_REAL"
+cmdkey /generic:openclaw_aws_secret /user:$env:USERNAME /pass:"[REDACTED]"
 ```
 
 ### Step 2: Verify in Credential Manager
