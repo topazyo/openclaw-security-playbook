@@ -157,6 +157,8 @@ class TLSServer:
         self._sock.settimeout(0.5)
         self._context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self._context.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
+        # Explicitly disable weak protocols to ensure strong TLS only
+        self._context.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
         if tls_mode == "tls1_3":
             self._context.minimum_version = ssl.TLSVersion.TLSv1_3
             self._context.maximum_version = ssl.TLSVersion.TLSv1_3

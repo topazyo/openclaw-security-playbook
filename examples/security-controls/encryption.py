@@ -329,7 +329,10 @@ class S3EncryptionManager:
         s3_client = boto3.client('s3')
         
         try:
-            response = s3_client.get_bucket_encryption(Bucket=bucket_name)
+            response = s3_client.get_bucket_encryption(
+                Bucket=bucket_name,
+                ExpectedBucketOwner=bucket_name.split('-')[-1]  # Verify bucket ownership
+            )
             rules = response.get('ServerSideEncryptionConfiguration', {}).get('Rules', [])
             
             # Check if at least one rule exists with KMS encryption
@@ -457,7 +460,7 @@ class TLSConfig:
             context.verify_mode = ssl.CERT_REQUIRED
             context.load_verify_locations(cafile=ca_certs)
         else:
-            context.verify_mode = ssl.CERT_NONE
+            context.verify_mode = ssl.CERT_OPTIONAL
         
         # Security options
         context.options |= ssl.OP_NO_COMPRESSION  # Disable TLS compression (CRIME attack)

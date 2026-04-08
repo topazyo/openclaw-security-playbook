@@ -57,6 +57,7 @@ spec:
       labels:
         app: clawdbot
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

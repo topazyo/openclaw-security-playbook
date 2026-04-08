@@ -516,7 +516,8 @@ class BackupStrategy:
         # List objects in S3 bucket
         response = s3_client.list_objects_v2(
             Bucket=self.s3_backup_bucket,
-            Prefix=f"database/"
+            Prefix=f"database/",
+            ExpectedBucketOwner=self.account_id  # Verify bucket ownership
         )
         
         # Check if backup exists in offsite
