@@ -39,7 +39,7 @@ class PolicyValidator:
         # Check encryption enabled
         config = self._load_config("configs/agent-config/openclaw-agent.yml")
         
-        if not config.get("security_controls", {}).get("encryption", {}).get("algorithm") == "AES-256-GCM":
+        if config.get("security_controls", {}).get("encryption", {}).get("algorithm") != "AES-256-GCM":
             violations.append("Encryption must use AES-256-GCM")
         
         return {"compliant": len(violations) == 0, "violations": violations}

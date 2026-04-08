@@ -131,7 +131,7 @@ class AnomalyDetector:
                         "event_id": entry.get("event_id")
                     })
 
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             # Log parsing error, skip entry
             pass
 

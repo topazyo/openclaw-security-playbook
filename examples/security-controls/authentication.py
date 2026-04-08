@@ -100,7 +100,7 @@ class AccessToken:
     def decode(cls, token: str) -> Optional["AccessToken"]:
         try:
             payload = json.loads(base64.urlsafe_b64decode(token.encode("ascii")).decode("utf-8"))
-        except (ValueError, TypeError, json.JSONDecodeError):
+        except (ValueError, TypeError):
             return None
         try:
             return cls(

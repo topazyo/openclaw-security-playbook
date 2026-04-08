@@ -96,7 +96,7 @@ class TestPerUserLimits:
         user_id = "user123"
         
         # Simulate 50 requests (within 100/min limit)
-        for i in range(50):
+        for _ in range(50):
             allowed = rate_limiter_with_mock_redis.check_rate_limit(user_id)
             assert allowed is True
     
@@ -290,7 +290,8 @@ class TestRedisDistributedTracking:
             "redis_url": "redis://localhost:6379/0",
         }
         
-        limiter = RateLimiter(config)
+        # Initialize rate limiter to trigger Redis connection
+        RateLimiter(config)
         
         # Verify Redis connection was attempted
         mock_redis_class.from_url.assert_called_once_with(

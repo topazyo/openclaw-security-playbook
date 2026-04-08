@@ -32,7 +32,7 @@ class TestDataClassification:
         
         restricted_data = b"SSN: 123-45-6789"
         
-        encrypted, nonce = encryption.encrypt(restricted_data)
+        encrypted, _ = encryption.encrypt(restricted_data)
         
         # Should be encrypted
         assert encrypted != restricted_data
