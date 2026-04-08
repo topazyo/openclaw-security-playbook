@@ -39,7 +39,7 @@ import json
 import hashlib
 import subprocess  # nosec B404
 from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from enum import Enum
 import tempfile
@@ -394,7 +394,7 @@ class BackupStrategy:
         Returns:
             Path to backup file
         """
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M-%S')
         backup_filename = f"openclaw_backup_{timestamp}.sql"
         backup_path = os.path.join(backup_dir, backup_filename)
         
@@ -419,7 +419,7 @@ class BackupStrategy:
         manifest = BackupManifest(
             backup_id=f"db-{timestamp}",
             backup_type=BackupType.DATABASE.value,
-            created_at=datetime.utcnow().isoformat() + 'Z',
+            created_at=datetime.now(timezone.utc).isoformat(),
             source_system=f"openclaw-db-{self.primary_region}",
             files={
                 os.path.basename(backup_path_gz): BackupVerifier._calculate_file_checksum(backup_path_gz)
@@ -457,7 +457,7 @@ class BackupStrategy:
         
         # S3 key (preserve directory structure)
         filename = os.path.basename(local_backup_path)
-        date_prefix = datetime.utcnow().strftime('%Y/%m/%d')
+        date_prefix = datetime.now(timezone.utc).strftime('%Y/%m/%d')
         s3_key = f"database/{date_prefix}/{filename}"
         
         # Upload with encryption
@@ -590,7 +590,7 @@ class DisasterRecoveryManager:
         Returns:
             Recovery metrics
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         self.logger.info("=" * 70)
         self.logger.info("DISASTER RECOVERY INITIATED")
@@ -640,7 +640,7 @@ class DisasterRecoveryManager:
         self.logger.info("✓ Smoke tests passed")
         
         # Step 5: Measure recovery time
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         recovery_duration = (end_time - start_time).total_seconds() / 3600  # hours
         
         self.logger.info("\n[5/5] Recovery complete")
@@ -715,7 +715,7 @@ def example_backup_verification():
     manifest = BackupManifest(
         backup_id="test-backup-001",
         backup_type=BackupType.DATABASE.value,
-        created_at=datetime.utcnow().isoformat() + 'Z',
+        created_at=datetime.now(timezone.utc).isoformat(),
         source_system="test-system",
         files={
             os.path.basename(backup_path): hashlib.sha256(test_data).hexdigest()
@@ -808,7 +808,7 @@ def test_backup_verification():
     manifest = BackupManifest(
         backup_id="test-001",
         backup_type="database",
-        created_at=datetime.utcnow().isoformat() + 'Z',
+        created_at=datetime.now(timezone.utc).isoformat(),
         source_system="test",
         files={os.path.basename(backup_path): hashlib.sha256(test_data).hexdigest()},
         size_bytes=len(test_data),
