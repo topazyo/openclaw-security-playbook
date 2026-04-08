@@ -186,7 +186,7 @@ class NotificationManager:
             self.notifications_sent.append({"channel": "pagerduty", "status": "failed", "error": str(e)})
             return False
     
-    def send_email_notification(self, recipients: List[str], subject: str, body_data: Dict) -> bool:
+    def send_email_notification(self, recipients: List[str]) -> bool:
         """Send email notification"""
         logger.info(f"Email notification (not implemented - would send to {recipients})")
         # Note: Email sending requires SMTP configuration

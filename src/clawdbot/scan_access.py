@@ -261,7 +261,7 @@ def analyze_access(
             already_flagged_creep.add(user_id)
 
         prod_access = any(s.lower() in ("prod", "production") for s in systems)
-        non_prod_roles = {"developer", "operator", "viewer", "read-only", "developer"}
+        non_prod_roles = {"developer", "operator", "viewer", "read-only"}
         if prod_access and roles and roles.issubset(non_prod_roles) and user_id not in already_flagged_creep:
             privilege_creep.append({
                 "user_id": user_id,
