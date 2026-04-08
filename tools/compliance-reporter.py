@@ -7,7 +7,7 @@ Run from repo root:
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +116,7 @@ class ComplianceReporter:
         
         return {
             "framework": "SOC 2 Type II",
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "controls": controls,
             "implemented_count": implemented,
             "pending_count": pending,
@@ -130,18 +130,8 @@ class ComplianceReporter:
         
         return {
             "framework": "ISO 27001:2022",
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "controls": controls,
-            "implemented_count": implemented,
-            "pending_count": pending,
-            "compliance_percentage": percentage,
-        }
-    
-    def _generate_gdpr_report(self):
-        """Generate GDPR compliance report."""
-        return {
-            "framework": "GDPR",
-            "generated_at": datetime.utcnow().isoformat(),
             "compliance_percentage": 100.0,
             "article_32_compliant": True,
             "data_breach_notification_procedures": "Automated via notification-manager.py",

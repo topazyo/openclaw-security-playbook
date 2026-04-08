@@ -8,7 +8,7 @@ Run from repo root:
 import subprocess  # nosec B404
 import argparse
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -39,7 +39,7 @@ class CertificateManager:
         expiry_str = result.stdout.split("=")[1].strip()
         expiry_date = datetime.strptime(expiry_str, "%b %d %H:%M:%S %Y %Z")
         
-        days_until_expiry = (expiry_date - datetime.utcnow()).days
+        days_until_expiry = (expiry_date - datetime.now(timezone.utc)).days
         
         return {
             "cert_path": cert_path,
@@ -57,7 +57,7 @@ class CertificateManager:
         )
         
         if result.returncode == 0:
-            return {"status": "success", "domain": domain, "renewed_at": datetime.utcnow().isoformat()}
+            return {"status": "success", "domain": domain, "renewed_at": datetime.now(timezone.utc).isoformat()}
         else:
             return {"status": "failed", "domain": domain, "error": result.stderr}
     

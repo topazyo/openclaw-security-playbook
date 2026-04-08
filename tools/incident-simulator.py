@@ -8,7 +8,7 @@ Run from repo root:
 import argparse
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class IncidentSimulator:
@@ -44,7 +44,7 @@ class IncidentSimulator:
             "severity": severity,
             "affected_resources": scenario["affected_resources"],
             "description": scenario["description"],
-            "detected_at": datetime.utcnow().isoformat(),
+            "detected_at": datetime.now(timezone.utc).isoformat(),
             "status": "active",
         }
 

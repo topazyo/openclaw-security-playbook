@@ -22,7 +22,7 @@ Usage:
 
 import pytest
 from unittest.mock import patch
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ class TestRTOVerification:
         """Test restore completes within 4 hours."""
         from examples.backups import backup_verification
         
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Simulate restore
         mock_subprocess.return_value.returncode = 0
@@ -54,7 +54,7 @@ class TestRTOVerification:
             target_rto_hours=backup_config["rto_hours"],
         )
         
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         duration = (end_time - start_time).total_seconds() / 3600
         
         assert duration < backup_config["rto_hours"]

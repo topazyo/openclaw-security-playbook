@@ -23,7 +23,7 @@ import sys
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 
@@ -35,7 +35,7 @@ def incident_simulator():
         "severity": "P0",
         "type": "Credential Theft",
         "affected_resources": ["i-0abc123", "rds-prod-db"],
-        "detected_at": datetime.utcnow().isoformat(),
+        "detected_at": datetime.now(timezone.utc).isoformat(),
     }
 
 

@@ -23,7 +23,7 @@ Usage:
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import
 
@@ -116,8 +116,8 @@ class TestOAuth2Authentication:
         # Create valid JWT
         payload = {
             "sub": "user123",
-            "exp": datetime.utcnow() + timedelta(hours=1),
-            "iat": datetime.utcnow(),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            "iat": datetime.now(timezone.utc),
             "aud": "openclaw-mcp",
             "iss": "https://auth.openclaw.ai",
         }
@@ -131,7 +131,7 @@ class TestOAuth2Authentication:
         """Test that expired tokens are rejected."""
         payload = {
             "sub": "user123",
-            "exp": datetime.utcnow() - timedelta(hours=1),  # Expired
+            "exp": datetime.now(timezone.utc) - timedelta(hours=1),  # Expired
         }
         
         token = jwt.encode(payload, "test_secret_key", algorithm="RS256")

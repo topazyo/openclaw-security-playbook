@@ -24,7 +24,7 @@ import sys
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class TestUserEnumeration:
@@ -34,8 +34,8 @@ class TestUserEnumeration:
     def test_iam_users_listed(self, mock_boto):
         """Test IAM users are enumerated."""
         expected_users = [
-            {"UserName": "alice", "CreateDate": datetime.utcnow()},
-            {"UserName": "bob", "CreateDate": datetime.utcnow()},
+            {"UserName": "alice", "CreateDate": datetime.now(timezone.utc)},
+            {"UserName": "bob", "CreateDate": datetime.now(timezone.utc)},
         ]
         mock_iam = Mock()
         mock_iam.list_users.return_value = {"Users": expected_users}
@@ -66,7 +66,7 @@ class TestInactiveAccounts:
         mock_iam.get_user.return_value = {
             "User": {
                 "UserName": "inactive_user",
-                "PasswordLastUsed": datetime.utcnow() - timedelta(days=100),
+                "PasswordLastUsed": datetime.now(timezone.utc) - timedelta(days=100),
             }
         }
         mock_boto.return_value = mock_iam

@@ -941,7 +941,7 @@ logger.addHandler(syslog_handler)
 def log_authentication(user_id, source_ip, user_agent, auth_method, result, failure_reason=None):
     """Log authentication event in JSON format"""
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat() + 'Z',
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": "authentication",
         "action": "login",
         "user_id": user_id,
