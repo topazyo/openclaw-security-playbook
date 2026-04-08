@@ -530,7 +530,12 @@ def weekly(ctx, start, end, output, pdf, vulnerability_scan, access_scan):
         for fw, data in comp.items():
             if isinstance(data, dict) and "compliance_percentage" in data:
                 pct = data["compliance_percentage"]
-                colour = "green" if pct >= 95 else "yellow" if pct >= 80 else "red"
+                if pct >= 95:
+                    colour = "green"
+                elif pct >= 80:
+                    colour = "yellow"
+                else:
+                    colour = "red"
                 click.secho(f"    {fw.upper():<12} {pct:.1f}%", fg=colour)
 
     # Certificate section
@@ -582,7 +587,7 @@ def compliance(ctx, framework, output):
     compliance_reporter = _load_tool_module("compliance-reporter.py", "compliance_reporter")
     try:
         report = compliance_reporter.generate_report(framework=framework)
-    except (FileNotFoundError, ValueError, json.JSONDecodeError, OSError) as exc:
+    except (FileNotFoundError, ValueError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
     
     # Display control status
