@@ -211,7 +211,7 @@ class EncryptedDatabaseColumn:
         self.impl = impl
         self.encryptor = DataEncryptor(key)
     
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, _):
         """Called before INSERT/UPDATE - encrypt the value."""
         if value is None:
             return value
@@ -226,7 +226,7 @@ class EncryptedDatabaseColumn:
         # Encode as base64 for TEXT/VARCHAR storage
         return base64.b64encode(encrypted).decode('ascii')
     
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, _):
         """Called after SELECT - decrypt the value."""
         if value is None:
             return value

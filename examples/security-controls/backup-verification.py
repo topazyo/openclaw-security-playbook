@@ -513,19 +513,21 @@ class BackupStrategy:
         
         s3_client = boto3.client('s3', region_name=self.backup_region)
         
-        # List objects in S3 bucket
-        response = s3_client.list_objects_v2(
+        # List objects in S3 bucket using paginator to retrieve all results
+        paginator = s3_client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(
             Bucket=self.s3_backup_bucket,
             Prefix=f"database/",
             ExpectedBucketOwner=self.account_id  # Verify bucket ownership
         )
         
         # Check if backup exists in offsite
-        for obj in response.get('Contents', []):
-            if backup_id in obj['Key']:
-                compliance['1_offsite'] = True
-                compliance['3_copies'] = True  # At least 3 copies exist
-                compliance['2_media_types'] = True  # EBS + S3
+        for page in pages:
+            for obj in page.get('Contents', []):
+                if backup_id in obj['Key']:
+                    compliance['1_offsite'] = True
+                    compliance['3_copies'] = True  # At least 3 copies exist
+                    compliance['2_media_types'] = True  # EBS + S3
                 break
         
         return compliance

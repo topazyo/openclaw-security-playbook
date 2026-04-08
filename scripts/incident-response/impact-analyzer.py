@@ -187,9 +187,8 @@ def main():
     
     analyzer = ImpactAnalyzer(args.incident)
     
-    if args.resource:
-        if args.resource.startswith('i-'):
-            analyzer.analyze_ec2_blast_radius(args.resource)
+    if args.resource and args.resource.startswith('i-'):
+        analyzer.analyze_ec2_blast_radius(args.resource)
     
     if args.data_types:
         data_types = [t.strip() for t in args.data_types.split(',')]

@@ -157,7 +157,7 @@ class DataClassifier:
     PASSWORD_FIELD_PATTERN = re.compile(r'(password|passwd|pwd)\s*[:=]\s*[\'"]?[^\s\'"]+', re.IGNORECASE)
     
     # Passport/ID patterns (examples - add country-specific)
-    PASSPORT_PATTERN = re.compile(r'\b[A-Z]{1,2}[0-9]{6,9}\b')  # US passport format
+    PASSPORT_PATTERN = re.compile(r'\b[A-Z]{1,2}\d{6,9}\b')  # US passport format
     DRIVERS_LICENSE_PATTERN = re.compile(r'\b[A-Z]\d{7,8}\b')  # CA format (example)
     
     # Health-related patterns
