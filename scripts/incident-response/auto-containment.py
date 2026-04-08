@@ -359,7 +359,7 @@ class ContainmentManager:
         print(f"Dry Run: {self.dry_run}")
         print("\nActions:")
         for action in self.actions_taken:
-            status_icon = "✓" if action['status'] == "success" else "✗"
+            status_icon = "[+]" if action['status'] == "success" else "[-]"
             print(f"  {status_icon} {action['action']}: {action['target']} - {action['status']}")
         
         if self.rollback_commands:
