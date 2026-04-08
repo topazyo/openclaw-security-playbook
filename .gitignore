@@ -25,6 +25,9 @@ __pycache__/
 dist/
 build/
 
+# Node.js
+node_modules/
+
 # Logs
 *.log
 logs/
