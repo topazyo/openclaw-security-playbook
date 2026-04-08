@@ -17,6 +17,16 @@ azure-ad
     ``User.Read.All`` and ``AuditLog.Read.All`` delegated scopes.
     Credentials are read from explicit keyword args or from environment
     variables: AZURE_AD_TENANT_ID, AZURE_AD_CLIENT_ID, AZURE_AD_CLIENT_SECRET.
+
+SECURITY NOTE
+-------------
+Functions in this module that perform external I/O (``_graph_token``, ``_graph_get``,
+``load_azure_ad``, and the Azure AD provider path in ``run_access_review``) are marked
+with ``@read_only_io``. These functions are **backend-only** and must **never** be
+exposed via HTTP GET endpoints, as doing so would violate REST idempotency principles
+(GET requests must be side-effect-free). If you wrap these in an HTTP handler, use
+POST only. The ``@read_only_io`` decorator will raise ``ReadOnlyIOViolation`` if
+called from a GET context.
 """
 
 from __future__ import annotations
@@ -28,6 +38,8 @@ from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
 from typing import Any
+
+from .config import read_only_io
 
 # ---------------------------------------------------------------------------
 # CSV ingestion
@@ -79,6 +91,7 @@ def load_csv(path: str) -> list[dict[str, str]]:
 # Azure AD / Microsoft Graph adapter
 # ---------------------------------------------------------------------------
 
+@read_only_io
 def _graph_token(tenant_id: str, client_id: str, client_secret: str) -> str:
     """Obtain an app-only bearer token from Microsoft identity platform."""
     try:
@@ -103,6 +116,7 @@ def _graph_token(tenant_id: str, client_id: str, client_secret: str) -> str:
     return resp.json()["access_token"]
 
 
+@read_only_io
 def _graph_get(endpoint: str, token: str) -> dict[str, Any]:
     try:
         import requests  # type: ignore[import-untyped]
@@ -120,6 +134,7 @@ def _graph_get(endpoint: str, token: str) -> dict[str, Any]:
     return resp.json()
 
 
+@read_only_io
 def load_azure_ad(
     tenant_id: str | None = None,
     client_id: str | None = None,
@@ -127,6 +142,10 @@ def load_azure_ad(
 ) -> list[dict[str, str]]:
     """Fetch users from Azure AD via Microsoft Graph and normalise to the
     same row schema used by ``load_csv()``.
+
+    This function performs I/O (HTTP queries to Microsoft Graph). It is marked
+    with ``@read_only_io`` and will raise ``ReadOnlyIOViolation`` if called
+    from an HTTP GET context.
 
     signInActivity (last sign-in date) requires an Azure AD Premium P1/P2
     licence on the tenant.  If the field is absent, ``LastLogin`` will be
@@ -308,9 +327,14 @@ def run_access_review(
 
     Exactly one of ``input_csv`` or ``provider`` must be supplied.
 
+    SECURITY NOTE: If ``provider="azure-ad"`` is used, this function will call
+    ``load_azure_ad()`` (which is marked ``@read_only_io`` and performs HTTP
+    requests to Microsoft Graph). If you wrap this function in an HTTP handler,
+    use POST only when the Azure AD provider is in use; never expose it via GET.
+
     Args:
         input_csv: path to a CSV access-report file.
-        provider: ``"azure-ad"`` to query Azure AD via Microsoft Graph.
+        provider: ``"azure-ad"`` to query Azure AD via Microsoft Graph (performs I/O).
         tenant_id / client_id / client_secret: Azure AD app credentials
             (can also be set via AZURE_AD_* env vars).
         days_threshold: flag accounts with no login in this many days.
