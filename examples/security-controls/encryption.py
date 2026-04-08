@@ -49,6 +49,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from cryptography.exceptions import InvalidTag
 
+# Constants
+KMS_ALGORITHM = 'aws:kms'
 
 # ============================================================================
 # 1. OVERVIEW
@@ -280,7 +282,7 @@ class S3EncryptionManager:
             'Rules': [
                 {
                     'ApplyServerSideEncryptionByDefault': {
-                        'SSEAlgorithm': 'aws:kms',
+                        'SSEAlgorithm': KMS_ALGORITHM,
                         'KMSMasterKeyID': self.kms_key_id
                     },
                     'BucketKeyEnabled': True  # Reduces KMS costs by ~99% for high-volume buckets
@@ -306,7 +308,7 @@ class S3EncryptionManager:
             ... )
         """
         return {
-            'ServerSideEncryption': 'aws:kms',
+            'ServerSideEncryption': KMS_ALGORITHM,
             'SSEKMSKeyId': self.kms_key_id
         }
     
@@ -338,7 +340,7 @@ class S3EncryptionManager:
             # Check if at least one rule exists with KMS encryption
             for rule in rules:
                 sse_default = rule.get('ApplyServerSideEncryptionByDefault', {})
-                if sse_default.get('SSEAlgorithm') == 'aws:kms':
+                if sse_default.get('SSEAlgorithm') == KMS_ALGORITHM:
                     return True
             
             return False

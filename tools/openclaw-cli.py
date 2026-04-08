@@ -47,6 +47,7 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = Path(__file__).resolve().parent
+EXECUTION_LOG_FILE = "execution.log"
 
 
 def _load_tool_module(filename: str, module_name: str):
@@ -624,7 +625,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             "scripts/verification/runtime_security_regression.py",
             ["--scenario", "all", "--archive-root", str(runtime_dir)],
         )
-        (runtime_dir / "execution.log").write_text(
+        (runtime_dir / EXECUTION_LOG_FILE).write_text(
             runtime_result.stdout + runtime_result.stderr,
             encoding="utf-8",
         )
@@ -649,7 +650,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             "scripts/verification/validate_detection_replay.py",
             replay_args,
         )
-        (replay_dir / "execution.log").write_text(
+        (replay_dir / EXECUTION_LOG_FILE).write_text(
             replay_result.stdout + replay_result.stderr,
             encoding="utf-8",
         )
@@ -657,7 +658,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             {
                 "name": "detection-replay",
                 "exit_code": replay_result.returncode,
-                "output": str(replay_dir / "execution.log"),
+                "output": str(replay_dir / EXECUTION_LOG_FILE),
                 "skip_yara": skip_yara,
             }
         )

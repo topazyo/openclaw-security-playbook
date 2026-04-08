@@ -33,6 +33,9 @@ DEFAULT_IMAGE = "alpine:3.19"
 DEFAULT_CONTAINER_NAME = "clawdbot-production"
 GATEWAY_PORT = 18789
 TLS_PORT = 8443
+HOME_CONFIG_DIR = ".openclaw"
+GATEWAY_CONFIG_FILE = "gateway.yml"
+SKILLS_CONFIG_FILE = "skills.yml"
 GIT_WINDOWS_ROOTS = (
     Path("C:/Program Files/Git"),
     Path("C:/Program Files (x86)/Git"),
@@ -258,14 +261,14 @@ def build_skills_config(scenario: ScenarioDefinition) -> str:
 
 
 def write_fixture_home(home_dir: Path, scenario: ScenarioDefinition) -> None:
-    config_dir = home_dir / ".openclaw" / "config"
+    config_dir = home_dir / HOME_CONFIG_DIR / "config"
     shield_dir = config_dir / "shield"
     telemetry_dir = config_dir / "telemetry"
-    logs_dir = home_dir / ".openclaw" / "logs"
+    logs_dir = home_dir / HOME_CONFIG_DIR / "logs"
     for path in (config_dir, shield_dir, telemetry_dir, logs_dir):
         path.mkdir(parents=True, exist_ok=True)
 
-    (config_dir / "gateway.yml").write_text(
+    (config_dir / GATEWAY_CONFIG_FILE).write_text(
         textwrap.dedent(
             f"""
             network:
@@ -277,7 +280,7 @@ def write_fixture_home(home_dir: Path, scenario: ScenarioDefinition) -> None:
         + "\n",
         encoding="utf-8",
     )
-    (config_dir / "skills.yml").write_text(build_skills_config(scenario), encoding="utf-8")
+    (config_dir / SKILLS_CONFIG_FILE).write_text(build_skills_config(scenario), encoding="utf-8")
     (shield_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
     (telemetry_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
 
@@ -379,10 +382,10 @@ def archive_result(
     scenario_dir = archive_root / scenario.name
     scenario_dir.mkdir(parents=True, exist_ok=True)
     (scenario_dir / "verifier-output.txt").write_text(combined_output, encoding="utf-8")
-    gateway_config = fixture_home / ".openclaw" / "config" / "gateway.yml"
-    skills_config = fixture_home / ".openclaw" / "config" / "skills.yml"
-    shutil.copy2(gateway_config, scenario_dir / "gateway.yml")
-    shutil.copy2(skills_config, scenario_dir / "skills.yml")
+    gateway_config = fixture_home / HOME_CONFIG_DIR / "config" / GATEWAY_CONFIG_FILE
+    skills_config = fixture_home / HOME_CONFIG_DIR / "config" / SKILLS_CONFIG_FILE
+    shutil.copy2(gateway_config, scenario_dir / GATEWAY_CONFIG_FILE)
+    shutil.copy2(skills_config, scenario_dir / SKILLS_CONFIG_FILE)
 
     inspect_output = run_command(["docker", "inspect", container_name])
     if inspect_output.returncode == 0:

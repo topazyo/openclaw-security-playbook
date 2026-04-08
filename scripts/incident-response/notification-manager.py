@@ -49,6 +49,9 @@ JIRA_API_URL = os.getenv("JIRA_API_URL")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 JIRA_USER_EMAIL = os.getenv("JIRA_USER_EMAIL")
 
+# Content type constant
+CONTENT_TYPE_JSON = "application/json"
+
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -152,7 +155,7 @@ class NotificationManager:
         
         headers = {
             "Authorization": f"Token token={PAGERDUTY_API_KEY}",
-            "Content-Type": "application/json",
+            "Content-Type": CONTENT_TYPE_JSON,
             "Accept": "application/vnd.pagerduty+json;version=2"
         }
         
@@ -201,8 +204,8 @@ class NotificationManager:
         url = f"{JIRA_API_URL}/rest/api/3/issue/{self.incident_id}/comment"
         
         headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
+            "Accept": CONTENT_TYPE_JSON,
+            "Content-Type": CONTENT_TYPE_JSON
         }
         
         payload = {

@@ -53,6 +53,7 @@ except ImportError:
 # Configuration
 EVIDENCE_BASE_DIR = Path(os.getenv("EVIDENCE_DIR", "/var/lib/openclaw/forensics"))
 LOG_DIR = Path("/var/log/openclaw")
+LOG_DIR_STRING = "/var/log/openclaw"  # String version for dict/JSON contexts
 TCPDUMP_DURATION = int(os.getenv("TCPDUMP_DURATION", "60"))  # seconds
 
 # Logging
@@ -315,7 +316,7 @@ class ForensicsCollector:
                 logger.warning(f"Failed to collect journalctl: {e}")
         
         # Collect OpenClaw logs
-        openclaw_logs_dir = Path("/var/log/openclaw")
+        openclaw_logs_dir = LOG_DIR
         if openclaw_logs_dir.exists():
             try:
                 shutil.copytree(openclaw_logs_dir, logs_dir / "openclaw", dirs_exist_ok=True)
@@ -326,7 +327,7 @@ class ForensicsCollector:
                         f"openclaw_log_{log_file.name}",
                         log_file,
                         f"OpenClaw log file: {log_file.name}",
-                        {"source": "/var/log/openclaw"}
+                        {"source": LOG_DIR_STRING}
                     )
             except Exception as e:
                 logger.warning(f"Failed to collect OpenClaw logs: {e}")
