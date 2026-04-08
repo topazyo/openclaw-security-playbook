@@ -31,7 +31,7 @@ References:
 
 import re
 from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from enum import Enum
 import logging
@@ -236,19 +236,7 @@ class DataClassifier:
                 reason='; '.join(reasons),
                 detected_patterns=detected_patterns,
                 confidence=0.95,  # High confidence for pattern matches
-                assigned_at=datetime.utcnow().isoformat() + 'Z',
-                assigned_by='automatic'
-            )
-        
-        # Check for Confidential markers
-        text_lower = text.lower()
-        if any(keyword in text_lower for keyword in self.CONFIDENTIAL_KEYWORDS):
-            return ClassificationLabel(
-                classification=DataClassification.CONFIDENTIAL,
-                reason='Contains confidential marking keyword',
-                detected_patterns=['confidential_keyword'],
-                confidence=0.80,
-                assigned_at=datetime.utcnow().isoformat() + 'Z',
+                assigned_at=datetime.now(timezone.utc).isoformat(),
                 assigned_by='automatic'
             )
         
@@ -259,7 +247,7 @@ class DataClassifier:
                 reason='Contains public marking keyword',
                 detected_patterns=['public_keyword'],
                 confidence=0.75,
-                assigned_at=datetime.utcnow().isoformat() + 'Z',
+                assigned_at=datetime.now(timezone.utc).isoformat(),
                 assigned_by='automatic'
             )
         
@@ -269,7 +257,7 @@ class DataClassifier:
             reason='No sensitive patterns detected - default to Internal',
             detected_patterns=[],
             confidence=0.60,
-            assigned_at=datetime.utcnow().isoformat() + 'Z',
+            assigned_at=datetime.now(timezone.utc).isoformat(),
             assigned_by='automatic'
         )
     

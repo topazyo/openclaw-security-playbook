@@ -38,7 +38,7 @@ import ssl
 import json
 import base64
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 # Cryptography library for encryption
@@ -552,11 +552,11 @@ class EncryptionKey:
     
     def is_expired(self) -> bool:
         """Check if key has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
     
     def days_until_expiration(self) -> int:
         """Days until key expires."""
-        delta = self.expires_at - datetime.utcnow()
+        delta = self.expires_at - datetime.now(timezone.utc)
         return max(0, delta.days)
 
 

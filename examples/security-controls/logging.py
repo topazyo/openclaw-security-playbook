@@ -36,7 +36,7 @@ import json
 import hashlib
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from enum import Enum
 import socket
@@ -228,7 +228,7 @@ class StructuredLogger:
             **kwargs: Additional metadata
         """
         entry = SecurityLogEntry(
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat(),
             event_type=event_type.value,
             user_id=user_id,
             action=action,
@@ -486,7 +486,7 @@ class TamperEvidendAuditLog:
         # Create entry (without hash yet)
         entry_data = {
             'sequence_number': self.sequence_number,
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'user_id': user_id,
             'action': action,
             'resource': resource,
@@ -603,7 +603,7 @@ class ElasticsearchLogger:
         - ...
         """
         # Daily index name
-        date_str = datetime.utcnow().strftime('%Y.%m.%d')
+        date_str = datetime.now(timezone.utc).strftime('%Y.%m.%d')
         index_name = f"{self.index_prefix}-{date_str}"
         
         # Index document

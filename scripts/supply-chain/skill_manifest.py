@@ -44,7 +44,7 @@ import os
 import re
 import sys
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -143,7 +143,7 @@ class SkillManifest:
             Dict containing skill hashes, metadata, and security warnings
         """
         manifest = {
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "skills_directory": str(self.skills_dir),
             "skills": {},
             "security_warnings": []
