@@ -1,7 +1,5 @@
 """Minimal gateway runtime used by the hardened container assets."""
 
-from __future__ import annotations
-
 import argparse
 
 from .config import load_config

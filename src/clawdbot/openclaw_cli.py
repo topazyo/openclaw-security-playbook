@@ -4,8 +4,6 @@ This entrypoint supports editable installs and source checkouts by locating the
 repository root and dispatching to ``tools/openclaw-cli.py``.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import sys
 from pathlib import Path

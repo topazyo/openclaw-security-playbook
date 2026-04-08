@@ -1,7 +1,5 @@
 """Configuration loading helpers for the minimal ClawdBot runtime."""
 
-from __future__ import annotations
-
 import functools
 import os
 from pathlib import Path

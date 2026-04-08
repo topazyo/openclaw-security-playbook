@@ -21,8 +21,8 @@ Usage:
 """
 
 import pytest
-from unittest.mock import Mock, patch
-from datetime import datetime, timedelta
+from unittest.mock import patch
+from datetime import datetime
 
 
 @pytest.fixture

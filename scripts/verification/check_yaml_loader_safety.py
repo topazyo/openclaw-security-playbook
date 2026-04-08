@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Fail if unsafe PyYAML loaders are used in workspace Python files."""
 
-from __future__ import annotations
-
 import re
 import sys
 from pathlib import Path

@@ -37,15 +37,13 @@ import os
 import ssl
 import json
 import base64
-import hashlib
-from typing import Optional, Tuple, Dict, Any
-from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from datetime import datetime
 from dataclasses import dataclass
-from enum import Enum
 
 # Cryptography library for encryption
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509

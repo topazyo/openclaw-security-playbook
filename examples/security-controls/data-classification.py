@@ -30,8 +30,7 @@ References:
 """
 
 import re
-import hashlib
-from typing import Optional, Dict, Any, List, Set, Tuple
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from enum import Enum

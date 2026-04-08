@@ -4,8 +4,6 @@ This module intentionally stays dependency-light so CI can compile and lint it
 without optional third-party packages.
 """
 
-from __future__ import annotations
-
 import base64
 import hashlib
 import hmac

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Validate replay fixtures against OpenClaw Sigma and YARA detections."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import re

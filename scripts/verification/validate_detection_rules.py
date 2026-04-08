@@ -5,8 +5,6 @@ Runs Sigma validation for all OpenClaw Sigma rules and compiles the YARA IOC
 rule set using `yarac` when available.
 """
 
-from __future__ import annotations
-
 import shutil
 import subprocess  # nosec B404
 import sys

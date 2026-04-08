@@ -16,8 +16,6 @@ Primary: canonical JSON report (--output).
 Optional: PDF rendered from the same JSON payload (--pdf), requires reportlab.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import json
 from datetime import UTC, datetime

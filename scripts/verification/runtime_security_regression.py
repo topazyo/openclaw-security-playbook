@@ -6,8 +6,6 @@ verify_openclaw_security.sh, captures the verifier output, and archives
 evidence for future audit comparison.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

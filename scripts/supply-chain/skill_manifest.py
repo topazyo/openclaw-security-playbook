@@ -46,7 +46,7 @@ import sys
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 try:
     import fcntl

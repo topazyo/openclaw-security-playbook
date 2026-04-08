@@ -29,8 +29,6 @@ POST only. The ``@read_only_io`` decorator will raise ``ReadOnlyIOViolation`` if
 called from a GET context.
 """
 
-from __future__ import annotations
-
 import csv
 import json
 import os

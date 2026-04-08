@@ -28,7 +28,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Dict, Set
+from typing import Set
 
 try:
     import boto3

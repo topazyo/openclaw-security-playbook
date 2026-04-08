@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Generate a correlated local malicious-skill incident exercise for Cycle 4."""
 
-from __future__ import annotations
-
 import argparse
 import hashlib
 import importlib.util

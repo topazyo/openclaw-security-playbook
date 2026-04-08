@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Capture a small runner-environment snapshot for hosted CI evidence."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import platform
