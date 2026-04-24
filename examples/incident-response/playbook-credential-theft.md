@@ -585,12 +585,8 @@ EOF
      api_key=$(openssl rand -base64 32) \
      mfa_seed=$(vault write -field=qr_code auth/totp/keys/alice generate=true)
    
-   # Send secure credential reset link
-   ./scripts/incident-response/notification-manager.py \
-     --action send_credential_reset \
-     --user-id alice@openclaw.ai \
-     --delivery-method encrypted_email \
-     --incident-id IRP-001
+   # Notify responders to deliver the credential reset package via an approved secure channel  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-001 --severity HIGH --channel all --message "Credential reset required for alice@openclaw.ai. Deliver reset instructions via the approved secure channel for incident IRP-001."  # FIX: C5-finding-3
    ```
    
    **User Communication Template**:
