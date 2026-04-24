@@ -296,51 +296,55 @@ class ForensicsCollector:
         
         return True
     
-    def collect_logs(self) -> bool:
-        """Collect relevant log files"""
-        logger.info("Collecting system logs...")
+    def collect_logs(self) -> bool:  # FIX: C5-finding-3
+        """Collect relevant log files"""  # FIX: C5-finding-3
+        logger.info("Collecting system logs...")  # FIX: C5-finding-3
         
-        logs_dir = self.evidence_dir / "logs"
-        logs_dir.mkdir(exist_ok=True)
+        logs_dir = self.evidence_dir / "logs"  # FIX: C5-finding-3
+        logs_dir.mkdir(exist_ok=True)  # FIX: C5-finding-3
+        collection_succeeded = True  # FIX: C5-finding-3
         
-        # Collect journal logs (Linux)
-        if shutil.which("journalctl"):
-            journal_file = logs_dir / "journalctl.log"
-            try:
-                subprocess.run([  # nosec B603 B607
-                    "journalctl",
-                    "--since", "24 hours ago",
-                    "--no-pager",
-                    "-o", "json"
-                ], stdout=open(journal_file, 'w'), check=True, timeout=30)
+        # Collect journal logs (Linux)  # FIX: C5-finding-3
+        if shutil.which("journalctl"):  # FIX: C5-finding-3
+            journal_file = logs_dir / "journalctl.log"  # FIX: C5-finding-3
+            try:  # FIX: C5-finding-3
+                with open(journal_file, 'w') as journal_handle:  # FIX: C5-finding-3
+                    subprocess.run([  # nosec B603 B607  # FIX: C5-finding-3
+                        "journalctl",  # FIX: C5-finding-3
+                        "--since", "24 hours ago",  # FIX: C5-finding-3
+                        "--no-pager",  # FIX: C5-finding-3
+                        "-o", "json"  # FIX: C5-finding-3
+                    ], stdout=journal_handle, check=True, timeout=30)  # FIX: C5-finding-3
                 
-                self.add_evidence_item(
-                    "journalctl_logs",
-                    journal_file,
-                    "System journal logs (last 24 hours)",
-                    {"tool": "journalctl", "time_range": "24h"}
-                )
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-                logger.warning(f"Failed to collect journalctl: {e}")
+                self.add_evidence_item(  # FIX: C5-finding-3
+                    "journalctl_logs",  # FIX: C5-finding-3
+                    journal_file,  # FIX: C5-finding-3
+                    "System journal logs (last 24 hours)",  # FIX: C5-finding-3
+                    {"tool": "journalctl", "time_range": "24h"}  # FIX: C5-finding-3
+                )  # FIX: C5-finding-3
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:  # FIX: C5-finding-3
+                logger.warning(f"Failed to collect journalctl: {e}")  # FIX: C5-finding-3
+                collection_succeeded = False  # FIX: C5-finding-3
         
-        # Collect OpenClaw logs
-        openclaw_logs_dir = LOG_DIR
-        if openclaw_logs_dir.exists():
-            try:
-                shutil.copytree(openclaw_logs_dir, logs_dir / "openclaw", dirs_exist_ok=True)
+        # Collect OpenClaw logs  # FIX: C5-finding-3
+        openclaw_logs_dir = LOG_DIR  # FIX: C5-finding-3
+        if openclaw_logs_dir.exists():  # FIX: C5-finding-3
+            try:  # FIX: C5-finding-3
+                shutil.copytree(openclaw_logs_dir, logs_dir / "openclaw", dirs_exist_ok=True)  # FIX: C5-finding-3
                 
-                # Add each log file
-                for log_file in (logs_dir / "openclaw").rglob("*.log"):
-                    self.add_evidence_item(
-                        f"openclaw_log_{log_file.name}",
-                        log_file,
-                        f"OpenClaw log file: {log_file.name}",
-                        {"source": LOG_DIR_STRING}
-                    )
-            except Exception as e:
-                logger.warning(f"Failed to collect OpenClaw logs: {e}")
+                # Add each log file  # FIX: C5-finding-3
+                for log_file in (logs_dir / "openclaw").rglob("*.log"):  # FIX: C5-finding-3
+                    self.add_evidence_item(  # FIX: C5-finding-3
+                        f"openclaw_log_{log_file.name}",  # FIX: C5-finding-3
+                        log_file,  # FIX: C5-finding-3
+                        f"OpenClaw log file: {log_file.name}",  # FIX: C5-finding-3
+                        {"source": LOG_DIR_STRING}  # FIX: C5-finding-3
+                    )  # FIX: C5-finding-3
+            except Exception as e:  # FIX: C5-finding-3
+                logger.warning(f"Failed to collect OpenClaw logs: {e}")  # FIX: C5-finding-3
+                collection_succeeded = False  # FIX: C5-finding-3
         
-        return True
+        return collection_succeeded  # FIX: C5-finding-3
     
     def collect_network_capture(self, duration: int = 60) -> bool:
         """Collect network packet capture"""
@@ -400,42 +404,52 @@ class ForensicsCollector:
         logger.info(f"✓ Chain of custody manifest saved: {manifest_file}")
         logger.info(f"✓ Checksums saved: {checksum_file}")
     
-    def collect_all(self, include_memory: bool = True, include_network: bool = True):
-        """Collect all forensic evidence"""
-        logger.info(f"Starting forensic collection for incident: {self.incident_id}")
-        logger.info(f"Collection level: {self.level}")
+    def collect_all(self, include_memory: bool = True, include_network: bool = True):  # FIX: C5-finding-3
+        """Collect all forensic evidence"""  # FIX: C5-finding-3
+        logger.info(f"Starting forensic collection for incident: {self.incident_id}")  # FIX: C5-finding-3
+        logger.info(f"Collection level: {self.level}")  # FIX: C5-finding-3
+        failed_steps = []  # FIX: C5-finding-3
         
-        # Memory dump (optional, resource-intensive)
-        if include_memory and self.level == "full":
-            self.collect_memory_dump()
+        # Memory dump (optional, resource-intensive)  # FIX: C5-finding-3
+        if include_memory and self.level == "full":  # FIX: C5-finding-3
+            if not self.collect_memory_dump():  # FIX: C5-finding-3
+                failed_steps.append("collect_memory_dump")  # FIX: C5-finding-3
         
-        # Disk metadata
-        self.collect_disk_metadata()
+        # Disk metadata  # FIX: C5-finding-3
+        if not self.collect_disk_metadata():  # FIX: C5-finding-3
+            failed_steps.append("collect_disk_metadata")  # FIX: C5-finding-3
         
-        # Process information
-        self.collect_process_list()
+        # Process information  # FIX: C5-finding-3
+        if not self.collect_process_list():  # FIX: C5-finding-3
+            failed_steps.append("collect_process_list")  # FIX: C5-finding-3
         
-        # Network connections
-        self.collect_network_connections()
+        # Network connections  # FIX: C5-finding-3
+        if not self.collect_network_connections():  # FIX: C5-finding-3
+            failed_steps.append("collect_network_connections")  # FIX: C5-finding-3
         
-        # Logs
-        self.collect_logs()
+        # Logs  # FIX: C5-finding-3
+        if not self.collect_logs():  # FIX: C5-finding-3
+            failed_steps.append("collect_logs")  # FIX: C5-finding-3
         
-        # Network capture (optional)
-        if include_network and self.level in ["full", "network"]:
-            self.collect_network_capture(TCPDUMP_DURATION)
+        # Network capture (optional)  # FIX: C5-finding-3
+        if include_network and self.level in ["full", "network"]:  # FIX: C5-finding-3
+            if not self.collect_network_capture(TCPDUMP_DURATION):  # FIX: C5-finding-3
+                failed_steps.append("collect_network_capture")  # FIX: C5-finding-3
         
-        # Save manifest
-        self.save_manifest()
+        # Save manifest  # FIX: C5-finding-3
+        self.save_manifest()  # FIX: C5-finding-3
         
-        logger.info("=" * 80)
-        logger.info("Forensic Collection Summary")
-        logger.info("=" * 80)
-        logger.info(f"Incident ID: {self.incident_id}")
-        logger.info(f"Evidence Directory: {self.evidence_dir}")
-        logger.info(f"Items Collected: {len(self.manifest['evidence_items'])}")
-        logger.info(f"Total Size: {sum(item['file_size_bytes'] for item in self.manifest['evidence_items']) / 1024 / 1024:.2f} MB")
-        logger.info("=" * 80)
+        logger.info("=" * 80)  # FIX: C5-finding-3
+        logger.info("Forensic Collection Summary")  # FIX: C5-finding-3
+        logger.info("=" * 80)  # FIX: C5-finding-3
+        logger.info(f"Incident ID: {self.incident_id}")  # FIX: C5-finding-3
+        logger.info(f"Evidence Directory: {self.evidence_dir}")  # FIX: C5-finding-3
+        logger.info(f"Items Collected: {len(self.manifest['evidence_items'])}")  # FIX: C5-finding-3
+        logger.info(f"Total Size: {sum(item['file_size_bytes'] for item in self.manifest['evidence_items']) / 1024 / 1024:.2f} MB")  # FIX: C5-finding-3
+        logger.info("=" * 80)  # FIX: C5-finding-3
+        if failed_steps:  # FIX: C5-finding-3
+            raise RuntimeError(f"Incomplete forensic collection: {', '.join(failed_steps)}")  # FIX: C5-finding-3
+        return True  # FIX: C5-finding-3
 
 
 def main():

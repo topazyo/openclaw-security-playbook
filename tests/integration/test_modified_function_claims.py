@@ -12,6 +12,7 @@ import pytest
 
 AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"
 FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"
+NOTIFICATION_MANAGER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "notification-manager.py"
 
 
 def _load_module_from_path(module_path: Path, module_name: str, patched_modules=None):
@@ -112,6 +113,10 @@ def _load_auto_containment_context(tmp_path, module_name: str):
 
 def _load_forensics_collector_module(module_name: str):
     return _load_module_from_path(FORENSICS_COLLECTOR_PATH, module_name)
+
+
+def _load_notification_manager_module(module_name: str):
+    return _load_module_from_path(NOTIFICATION_MANAGER_PATH, module_name)
 
 
 def _read_single_report(log_dir: Path):
@@ -383,3 +388,85 @@ def test_collect_process_list_claim_collects_running_process_details(tmp_path):
     processes = json.loads(processes_file.read_text(encoding="utf-8"))
     assert processes[0]["connections_detail"][0]["raddr"] == "198.51.100.10:443"
     assert processes[1]["connections_detail"] == []
+
+
+def test_notify_all_claim_reports_overall_delivery_status():
+    module = _load_notification_manager_module("notification_manager_claim_notify_all")
+
+    manager = module.NotificationManager("INC-NOTIFY-SUCCESS", "HIGH")
+    with patch.object(manager, "send_slack_notification", return_value=False) as slack_send, patch.object(
+        manager,
+        "create_pagerduty_incident",
+        return_value=True,
+    ) as pagerduty_send, patch.object(manager, "update_jira_ticket", return_value=False) as jira_update:
+        assert manager.notify_all("Escalate immediately", create_pagerduty=True) is True
+    slack_send.assert_called_once_with("Escalate immediately")
+    pagerduty_send.assert_called_once()
+    jira_update.assert_called_once_with("Escalate immediately")
+
+    adversarial_manager = module.NotificationManager("INC-NOTIFY-FAIL", "HIGH")
+    with patch.object(adversarial_manager, "send_slack_notification", return_value=False), patch.object(
+        adversarial_manager,
+        "create_pagerduty_incident",
+        return_value=False,
+    ), patch.object(adversarial_manager, "update_jira_ticket", return_value=False):
+        assert adversarial_manager.notify_all("", create_pagerduty=True) is False
+
+
+def test_main_claim_returns_nonzero_when_all_notifications_fail():
+    module = _load_notification_manager_module("notification_manager_claim_main")
+
+    with patch.object(module.NotificationManager, "notify_all", return_value=False):
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "notification-manager.py",
+                "--incident",
+                "INC-NOTIFY-MAIN",
+                "--severity",
+                "HIGH",
+                "--channel",
+                "all",
+                "--message",
+                "Respond now",
+            ],
+        ):
+            assert module.main() == 1
+
+
+def test_collect_logs_claim_surfaces_system_log_collection_failure(tmp_path):
+    module = _load_forensics_collector_module("forensics_collector_claim_logs")
+    collector = module.ForensicsCollector("IRP-LOGS-001", "quick")
+    collector.evidence_dir = tmp_path / "forensics-logs"
+    collector.evidence_dir.mkdir(parents=True, exist_ok=True)
+    collector.manifest["evidence_items"] = []
+
+    with patch.object(module.shutil, "which", return_value="journalctl"), patch.object(
+        module.subprocess,
+        "run",
+        side_effect=module.subprocess.CalledProcessError(1, ["journalctl"]),
+    ), patch.object(module, "LOG_DIR", tmp_path / "missing-openclaw-logs"):
+        assert collector.collect_logs() is False
+
+
+def test_collect_all_claim_surfaces_partial_collection_failure(tmp_path):
+    module = _load_forensics_collector_module("forensics_collector_claim_collect_all")
+    collector = module.ForensicsCollector("IRP-COLLECT-001", "quick")
+    collector.evidence_dir = tmp_path / "forensics-collect-all"
+    collector.evidence_dir.mkdir(parents=True, exist_ok=True)
+    collector.manifest["evidence_items"] = []
+
+    with patch.object(collector, "collect_disk_metadata", return_value=True), patch.object(
+        collector,
+        "collect_process_list",
+        return_value=True,
+    ), patch.object(collector, "collect_network_connections", return_value=True), patch.object(
+        collector,
+        "collect_logs",
+        return_value=False,
+    ), patch.object(collector, "save_manifest") as save_manifest:
+        with pytest.raises(RuntimeError, match="collect_logs"):
+            collector.collect_all(include_memory=False, include_network=False)
+
+    save_manifest.assert_called_once()

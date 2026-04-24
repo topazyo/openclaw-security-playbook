@@ -236,26 +236,31 @@ class NotificationManager:
             self.notifications_sent.append({"channel": "jira", "status": "failed", "error": str(e)})
             return False
     
-    def notify_all(self, message: str, create_pagerduty: bool = False):
-        """Send notifications to all configured channels"""
-        logger.info(f"Sending notifications for {self.incident_id}")
+    def notify_all(self, message: str, create_pagerduty: bool = False) -> bool:  # FIX: C5-finding-3
+        """Send notifications to all configured channels"""  # FIX: C5-finding-3
+        logger.info(f"Sending notifications for {self.incident_id}")  # FIX: C5-finding-3
+        delivery_results = []  # FIX: C5-finding-3
         
-        # Slack
-        self.send_slack_notification(message)
+        # Slack  # FIX: C5-finding-3
+        delivery_results.append(("slack", self.send_slack_notification(message)))  # FIX: C5-finding-3
         
-        # PagerDuty (for CRITICAL/HIGH only)
-        if create_pagerduty and self.severity in ["CRITICAL", "HIGH"]:
-            self.create_pagerduty_incident(
-                title=f"Security Incident: {self.incident_id}",
-                description=message
-            )
+        # PagerDuty (for CRITICAL/HIGH only)  # FIX: C5-finding-3
+        if create_pagerduty and self.severity in ["CRITICAL", "HIGH"]:  # FIX: C5-finding-3
+            delivery_results.append((  # FIX: C5-finding-3
+                "pagerduty",  # FIX: C5-finding-3
+                self.create_pagerduty_incident(  # FIX: C5-finding-3
+                    title=f"Security Incident: {self.incident_id}",  # FIX: C5-finding-3
+                    description=message  # FIX: C5-finding-3
+                )  # FIX: C5-finding-3
+            ))  # FIX: C5-finding-3
         
-        # Jira
-        self.update_jira_ticket(message)
+        # Jira  # FIX: C5-finding-3
+        delivery_results.append(("jira", self.update_jira_ticket(message)))  # FIX: C5-finding-3
         
-        # Summary
-        success_count = sum(1 for n in self.notifications_sent if n['status'] == 'success')
-        logger.info(f"✓ Notifications sent: {success_count}/{len(self.notifications_sent)}")
+        # Summary  # FIX: C5-finding-3
+        success_count = sum(1 for _channel, delivered in delivery_results if delivered)  # FIX: C5-finding-3
+        logger.info(f"✓ Notifications sent: {success_count}/{len(delivery_results)}")  # FIX: C5-finding-3
+        return success_count > 0  # FIX: C5-finding-3
 
 
 def main():
@@ -272,16 +277,19 @@ def main():
     
     message = args.message or args.update or f"Incident {args.incident} detected"
     
-    if args.channel == "all":
-        manager.notify_all(message, create_pagerduty=True)
-    elif args.channel == "slack":
-        manager.send_slack_notification(message)
-    elif args.channel == "pagerduty":
-        manager.create_pagerduty_incident(f"Incident: {args.incident}", message)
-    elif args.channel == "jira":
-        manager.update_jira_ticket(message)
-    
-    return 0
+    success = False  # FIX: C5-finding-3
+    if args.channel == "all":  # FIX: C5-finding-3
+        success = manager.notify_all(message, create_pagerduty=True)  # FIX: C5-finding-3
+    elif args.channel == "slack":  # FIX: C5-finding-3
+        success = manager.send_slack_notification(message)  # FIX: C5-finding-3
+    elif args.channel == "pagerduty":  # FIX: C5-finding-3
+        success = manager.create_pagerduty_incident(f"Incident: {args.incident}", message)  # FIX: C5-finding-3
+    elif args.channel == "jira":  # FIX: C5-finding-3
+        success = manager.update_jira_ticket(message)  # FIX: C5-finding-3
+    if not success:  # FIX: C5-finding-3
+        logger.error("✗ Notification delivery failed")  # FIX: C5-finding-3
+        return 1  # FIX: C5-finding-3
+    return 0  # FIX: C5-finding-3
 
 
 if __name__ == "__main__":
