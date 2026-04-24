@@ -260,17 +260,11 @@
    **For User Credentials**:
    ```bash
    # Revoke user session immediately via the auth gateway or identity provider  # FIX: C5-finding-3
-   curl -X POST "https://gateway.openclaw.ai/admin/sessions/revoke" \  # FIX: C5-finding-3
-     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
-     -H "Content-Type: application/json" \  # FIX: C5-finding-3
-     -d '{"user_id": "alice@openclaw.ai", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/sessions/revoke" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"user_id": "alice@openclaw.ai", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
    
    # Disable user account temporarily  # FIX: C5-finding-3
    # (Requires admin approval for permanent disable)  # FIX: C5-finding-3
-   curl -X POST "https://gateway.openclaw.ai/admin/accounts/disable" \  # FIX: C5-finding-3
-     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
-     -H "Content-Type: application/json" \  # FIX: C5-finding-3
-     -d '{"user_id": "alice@openclaw.ai", "duration": "24h", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/accounts/disable" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"user_id": "alice@openclaw.ai", "duration": "24h", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
    ```
    
    **For Service Account / API Keys**:
@@ -325,10 +319,7 @@ EOF
    
    ```bash
    # Force MFA re-enrollment for all users in the affected group  # FIX: C5-finding-3
-   curl -X POST "https://gateway.openclaw.ai/admin/mfa/force-reenroll" \  # FIX: C5-finding-3
-     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
-     -H "Content-Type: application/json" \  # FIX: C5-finding-3
-     -d '{"group": "engineering", "reason": "Security incident IRP-001"}'  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/mfa/force-reenroll" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"group": "engineering", "reason": "Security incident IRP-001"}'  # FIX: C5-finding-3
    ```
 
 4. **Block Source IP Addresses**
@@ -663,10 +654,7 @@ EOF
    
    ```bash
    # Re-enable user account after credential reset confirmation  # FIX: C5-finding-3
-   curl -X POST "https://gateway.openclaw.ai/admin/accounts/enable" \  # FIX: C5-finding-3
-     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
-     -H "Content-Type: application/json" \  # FIX: C5-finding-3
-     -d '{"user_id": "alice@openclaw.ai", "require_mfa_verification": true, "reason": "Incident IRP-001 resolved, user credentials reset"}'  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/accounts/enable" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"user_id": "alice@openclaw.ai", "require_mfa_verification": true, "reason": "Incident IRP-001 resolved, user credentials reset"}'  # FIX: C5-finding-3
    ```
 
 ### Phase 2: Enhanced Monitoring (ongoing)
