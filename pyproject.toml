@@ -15,6 +15,9 @@ dependencies = [
   "requests>=2.32",
   "cryptography>=44.0",
   "boto3>=1.35",
+  "jinja2>=3.1", # FIX: C5-finding-3
+  "networkx>=3.3", # FIX: C5-finding-3
+  "psutil>=6.0", # FIX: C5-finding-3
 ]
 
 [project.scripts]
