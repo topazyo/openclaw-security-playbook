@@ -30,9 +30,11 @@ Installation:
 
 import click
 import json
+import os
 import sys
 import subprocess  # nosec B404
 import importlib.util
+import shutil
 from pathlib import Path
 from datetime import UTC, datetime, timedelta
 
@@ -48,6 +50,71 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = Path(__file__).resolve().parent
 EXECUTION_LOG_FILE = "execution.log"
+PLAYBOOK_PHASES = ["Detection", "Containment", "Eradication", "Recovery", "PIR"]  # FIX: C5-finding-2
+PLAYBOOK_EXECUTION_PROFILES = {  # FIX: C5-finding-2
+    "playbook-credential-theft": {  # FIX: C5-finding-2
+        "incident_slug": "credential-theft",  # FIX: C5-finding-2
+        "notification_severity": "HIGH",  # FIX: C5-finding-2
+        "ioc_domain": "credential-reset-alerts.xyz",  # FIX: C5-finding-2
+        "containment_args": ["--action", "revoke-credentials", "--target", "user:compromised-user"],  # FIX: C5-finding-2
+        "impact_args": ["--data-types", "Credentials", "--users", "1", "--downtime", "1"],  # FIX: C5-finding-2
+        "notification_message": "Credential-theft response executing. Rotate compromised credentials and validate provider activity immediately.",  # FIX: C5-finding-2
+    },  # FIX: C5-finding-2
+    "playbook-skill-compromise": {  # FIX: C5-finding-2
+        "incident_slug": "skill-compromise",  # FIX: C5-finding-2
+        "notification_severity": "CRITICAL",  # FIX: C5-finding-2
+        "ioc_domain": "skill-quarantine-control.xyz",  # FIX: C5-finding-2
+        "containment_args": ["--action", "isolate_container", "--target", "container:agent-prod-42", "--reason", "Potential malicious skill execution"],  # FIX: C5-finding-2
+        "impact_args": ["--data-types", "Internal", "--users", "12", "--downtime", "2"],  # FIX: C5-finding-2
+        "notification_message": "Skill-compromise response executing. Quarantine affected skill runtimes and inspect persistence paths.",  # FIX: C5-finding-2
+    },  # FIX: C5-finding-2
+    "playbook-prompt-injection": {  # FIX: C5-finding-2
+        "incident_slug": "prompt-injection",  # FIX: C5-finding-2
+        "notification_severity": "HIGH",  # FIX: C5-finding-2
+        "ioc_domain": "prompt-sanitizer-review.xyz",  # FIX: C5-finding-2
+        "containment_args": ["--action", "block_domain", "--domain", "prompt-injection-collector.xyz", "--reason", "Prompt injection containment"],  # FIX: C5-finding-2
+        "impact_args": ["--data-types", "Internal", "--users", "5", "--downtime", "1"],  # FIX: C5-finding-2
+        "notification_message": "Prompt-injection response executing. Review untrusted content flows before restoring normal operations.",  # FIX: C5-finding-2
+    },  # FIX: C5-finding-2
+    "playbook-data-breach": {  # FIX: C5-finding-2
+        "incident_slug": "data-breach",  # FIX: C5-finding-2
+        "notification_severity": "CRITICAL",  # FIX: C5-finding-2
+        "ioc_domain": "breach-disclosure-review.xyz",  # FIX: C5-finding-2
+        "containment_args": ["--action", "block_domain", "--domain", "exfiltration-endpoint.xyz", "--reason", "Data exfiltration containment"],  # FIX: C5-finding-2
+        "impact_args": ["--data-types", "PII,Credentials", "--users", "234", "--downtime", "4"],  # FIX: C5-finding-2
+        "notification_message": "Data-breach response executing. Notify security, legal, and privacy owners with current scope.",  # FIX: C5-finding-2
+    },  # FIX: C5-finding-2
+    "playbook-denial-of-service": {  # FIX: C5-finding-2
+        "incident_slug": "dos-attack",  # FIX: C5-finding-2
+        "notification_severity": "CRITICAL",  # FIX: C5-finding-2
+        "ioc_domain": "rate-limit-escalation.xyz",  # FIX: C5-finding-2
+        "containment_args": ["--action", "update_rate_limits", "--mode", "aggressive", "--limits", '{"per_ip_per_minute": 10, "per_user_per_minute": 20, "global_per_second": 500}', "--reason", "DoS containment"],  # FIX: C5-finding-2
+        "impact_args": ["--data-types", "Availability", "--users", "500", "--downtime", "3"],  # FIX: C5-finding-2
+        "notification_message": "DoS response executing. Tighten rate limits, confirm service health, and track attacker pressure.",  # FIX: C5-finding-2
+    },  # FIX: C5-finding-2
+}  # FIX: C5-finding-2
+SIMULATED_INCIDENT_PLAYBOOKS = {  # FIX: C5-finding-8
+    "credential-theft": "playbook-credential-theft",  # FIX: C5-finding-8
+    "mcp-compromise": "playbook-data-breach",  # FIX: C5-finding-8
+    "dos-attack": "playbook-denial-of-service",  # FIX: C5-finding-8
+}  # FIX: C5-finding-8
+SIMULATED_INCIDENT_OVERRIDES = {  # FIX: C5-finding-8
+    "credential-theft": {  # FIX: C5-finding-8
+        "incident_slug": "credential-theft",  # FIX: C5-finding-8
+        "notification_message": "Simulated credential-theft response executing. Validate credential rotation and provider audit log review.",  # FIX: C5-finding-8
+    },  # FIX: C5-finding-8
+    "mcp-compromise": {  # FIX: C5-finding-8
+        "incident_slug": "mcp-compromise",  # FIX: C5-finding-8
+        "ioc_domain": "slack-mcp-server-compromise.xyz",  # FIX: C5-finding-8
+        "containment_args": ["--action", "block_domain", "--domain", "compromised-mcp-gateway.xyz", "--reason", "MCP server compromise containment"],  # FIX: C5-finding-8
+        "impact_args": ["--data-types", "Credentials,Internal", "--users", "48", "--downtime", "2"],  # FIX: C5-finding-8
+        "notification_message": "Simulated MCP-compromise response executing. Contain the compromised MCP path and review lateral movement indicators.",  # FIX: C5-finding-8
+    },  # FIX: C5-finding-8
+    "dos-attack": {  # FIX: C5-finding-8
+        "incident_slug": "dos-attack",  # FIX: C5-finding-8
+        "notification_message": "Simulated DoS response executing. Confirm aggressive rate limiting and capacity protection actions.",  # FIX: C5-finding-8
+    },  # FIX: C5-finding-8
+}  # FIX: C5-finding-8
 
 
 def _load_tool_module(filename: str, module_name: str):
@@ -114,6 +181,176 @@ def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.Comple
         text=True,
         check=False,
     )
+
+
+def _run_shell_tool(relative_script: str, args: list[str]) -> subprocess.CompletedProcess[str]:  # FIX: C5-finding-2
+    script_path = (REPO_ROOT / relative_script).resolve()  # FIX: C5-finding-2
+    shell_executable = shutil.which("bash") or shutil.which("sh")  # FIX: C5-finding-2
+    if shell_executable is None:  # FIX: C5-finding-2
+        raise RuntimeError(f"No shell interpreter available for {relative_script}")  # FIX: C5-finding-2
+    return subprocess.run(  # nosec B603
+        [shell_executable, str(script_path), *args],  # FIX: C5-finding-2
+        cwd=REPO_ROOT,  # FIX: C5-finding-2
+        capture_output=True,  # FIX: C5-finding-2
+        text=True,  # FIX: C5-finding-2
+        check=False,  # FIX: C5-finding-2
+    )  # FIX: C5-finding-2
+
+
+def _build_execution_profile(playbook_stem: str, incident_slug: str | None = None, overrides: dict | None = None) -> dict:  # FIX: C5-finding-2
+    profile = dict(PLAYBOOK_EXECUTION_PROFILES.get(playbook_stem, {}))  # FIX: C5-finding-2
+    profile.setdefault("incident_slug", incident_slug or playbook_stem.replace("playbook-", ""))  # FIX: C5-finding-2
+    profile.setdefault("notification_severity", "HIGH")  # FIX: C5-finding-2
+    profile.setdefault("ioc_domain", f"{profile['incident_slug']}.xyz")  # FIX: C5-finding-2
+    profile.setdefault("containment_args", ["--action", "block_domain", "--domain", f"{profile['incident_slug']}-containment.xyz", "--reason", f"{profile['incident_slug']} containment"])  # FIX: C5-finding-2
+    profile.setdefault("impact_args", ["--data-types", "Internal", "--users", "1", "--downtime", "1"])  # FIX: C5-finding-2
+    profile.setdefault("notification_message", f"{profile['incident_slug']} response executing.")  # FIX: C5-finding-2
+    if overrides:  # FIX: C5-finding-2
+        profile.update(overrides)  # FIX: C5-finding-2
+    return profile  # FIX: C5-finding-2
+
+
+def _build_incident_artifact_paths(incident_slug: str, incident_id: str, create: bool = False) -> dict:  # FIX: C5-finding-2
+    artifact_root = REPO_ROOT / "tmp" / "cli-orchestration" / incident_slug / incident_id  # FIX: C5-finding-2
+    if create:  # FIX: C5-finding-2
+        artifact_root.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-2
+    return {  # FIX: C5-finding-2
+        "root": artifact_root,  # FIX: C5-finding-2
+        "ioc_report": artifact_root / f"{incident_slug}-ioc-report.json",  # FIX: C5-finding-2
+        "impact_report": artifact_root / f"{incident_slug}-impact-report.json",  # FIX: C5-finding-2
+        "forensics_dir": artifact_root / "forensics",  # FIX: C5-finding-2
+    }  # FIX: C5-finding-2
+
+
+def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False) -> list[dict]:  # FIX: C5-finding-2
+    profile = _build_execution_profile(playbook_stem, incident_slug=incident_slug, overrides=overrides)  # FIX: C5-finding-2
+    artifact_paths = _build_incident_artifact_paths(profile["incident_slug"], incident_id, create=create_artifacts)  # FIX: C5-finding-2
+    notification_severity = profile["notification_severity"]  # FIX: C5-finding-2
+    command_specs = [  # FIX: C5-finding-2
+        {  # FIX: C5-finding-2
+            "phase": "Detection",  # FIX: C5-finding-2
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/ioc-scanner.py",  # FIX: C5-finding-2
+            "args": ["--domain", profile["ioc_domain"], "--output", str(artifact_paths["ioc_report"])],  # FIX: C5-finding-2
+        },  # FIX: C5-finding-2
+        {  # FIX: C5-finding-2
+            "phase": "Containment",  # FIX: C5-finding-2
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/auto-containment.py",  # FIX: C5-finding-2
+            "args": ["--incident", incident_id, *profile["containment_args"]],  # FIX: C5-finding-2
+        },  # FIX: C5-finding-2
+        {  # FIX: C5-finding-2
+            "phase": "Eradication",  # FIX: C5-finding-2
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/impact-analyzer.py",  # FIX: C5-finding-2
+            "args": ["--incident", incident_id, *profile["impact_args"], "--output", str(artifact_paths["impact_report"])],  # FIX: C5-finding-2
+        },  # FIX: C5-finding-2
+        {  # FIX: C5-finding-2
+            "phase": "Recovery",  # FIX: C5-finding-2
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/notification-manager.py",  # FIX: C5-finding-2
+            "args": ["--incident", incident_id, "--severity", notification_severity, "--channel", "all", "--message", profile["notification_message"]],  # FIX: C5-finding-2
+        },  # FIX: C5-finding-2
+        {  # FIX: C5-finding-2
+            "phase": "PIR",  # FIX: C5-finding-2
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/forensics-collector.py",  # FIX: C5-finding-2
+            "args": ["--incident", incident_id, "--level", "quick", "--no-memory", "--no-network"],  # FIX: C5-finding-2
+            "env": {"EVIDENCE_DIR": str(artifact_paths["forensics_dir"])},  # FIX: C5-finding-2
+        },  # FIX: C5-finding-2
+    ]  # FIX: C5-finding-2
+    return command_specs  # FIX: C5-finding-2
+
+
+def _format_command_spec(command_spec: dict) -> str:  # FIX: C5-finding-2
+    executable = sys.executable if command_spec["kind"] == "python" else "bash"  # FIX: C5-finding-2
+    return " ".join([executable, command_spec["script"], *command_spec.get("args", [])])  # FIX: C5-finding-2
+
+
+def _run_command_spec(command_spec: dict) -> subprocess.CompletedProcess[str]:  # FIX: C5-finding-2
+    extra_env = command_spec.get("env", {})  # FIX: C5-finding-2
+    original_env = {}  # FIX: C5-finding-2
+    try:  # FIX: C5-finding-2
+        for key, value in extra_env.items():  # FIX: C5-finding-2
+            original_env[key] = os.environ.get(key)  # FIX: C5-finding-2
+            os.environ[key] = value  # FIX: C5-finding-2
+        if command_spec["kind"] == "python":  # FIX: C5-finding-2
+            return _run_python_tool(command_spec["script"], command_spec.get("args", []))  # FIX: C5-finding-2
+        return _run_shell_tool(command_spec["script"], command_spec.get("args", []))  # FIX: C5-finding-2
+    finally:  # FIX: C5-finding-2
+        for key, value in original_env.items():  # FIX: C5-finding-2
+            if value is None:  # FIX: C5-finding-2
+                os.environ.pop(key, None)  # FIX: C5-finding-2
+            else:  # FIX: C5-finding-2
+                os.environ[key] = value  # FIX: C5-finding-2
+
+
+def _build_evidence_command_spec() -> dict:  # FIX: C5-finding-2
+    return {  # FIX: C5-finding-2
+        "phase": "Evidence",  # FIX: C5-finding-2
+        "kind": "shell",  # FIX: C5-finding-2
+        "script": "scripts/forensics/collect_evidence.sh",  # FIX: C5-finding-2
+        "args": [],  # FIX: C5-finding-2
+    }  # FIX: C5-finding-2
+
+
+def _execute_playbook_orchestration(ctx, playbook_id: str, severity: str, dry_run: bool, execute_flag: bool = False, incident_slug: str | None = None, overrides: dict | None = None, incident_id: str | None = None) -> dict:  # FIX: C5-finding-2
+    playbook_path = _resolve_playbook(playbook_id)  # FIX: C5-finding-2
+    if playbook_path is None:  # FIX: C5-finding-2
+        click.secho(  # FIX: C5-finding-2
+            f"[✗] Playbook not found for '{playbook_id}'.\n"  # FIX: C5-finding-2
+            "    Run 'openclaw-cli playbook list' to see available playbooks.",  # FIX: C5-finding-2
+            fg="red",  # FIX: C5-finding-2
+        )  # FIX: C5-finding-2
+        ctx.exit(1)  # FIX: C5-finding-2
+        return {"success": False, "playbook_path": None, "incident_id": None}  # FIX: C5-finding-2
+    if dry_run and execute_flag:  # FIX: C5-finding-2
+        raise click.ClickException("Use either --dry-run or --execute, not both")  # FIX: C5-finding-2
+    effective_execute = execute_flag or not dry_run  # FIX: C5-finding-2
+    execution_profile = _build_execution_profile(playbook_path.stem, incident_slug=incident_slug, overrides=overrides)  # FIX: C5-finding-2
+    active_incident_id = incident_id or f"INC-{execution_profile['incident_slug'].upper()}-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"  # FIX: C5-finding-2
+    click.echo(f"[*] Executing playbook {playbook_path.stem} (severity: {severity})...")  # FIX: C5-finding-2
+    click.echo(f"[*] Playbook file: {playbook_path}")  # FIX: C5-finding-2
+    click.echo(f"[*] Incident ID: {active_incident_id}")  # FIX: C5-finding-2
+    if dry_run:  # FIX: C5-finding-2
+        click.echo("[*] DRY RUN - No changes will be made")  # FIX: C5-finding-2
+    command_specs = _build_phase_command_specs(  # FIX: C5-finding-2
+        playbook_path.stem,  # FIX: C5-finding-2
+        severity,  # FIX: C5-finding-2
+        active_incident_id,  # FIX: C5-finding-2
+        incident_slug=execution_profile["incident_slug"],  # FIX: C5-finding-2
+        overrides=execution_profile,  # FIX: C5-finding-2
+        create_artifacts=effective_execute,  # FIX: C5-finding-2
+    )  # FIX: C5-finding-2
+    for phase_name in PLAYBOOK_PHASES:  # FIX: C5-finding-2
+        phase_command = next(spec for spec in command_specs if spec["phase"] == phase_name)  # FIX: C5-finding-2
+        click.echo(f"\n[*] Phase: {phase_name}")  # FIX: C5-finding-2
+        click.echo(f"    Command: {_format_command_spec(phase_command)}")  # FIX: C5-finding-2
+        if not effective_execute:  # FIX: C5-finding-2
+            click.echo(f"    [DRY RUN] Would execute {phase_command['script']}")  # FIX: C5-finding-2
+            continue  # FIX: C5-finding-2
+        phase_result = _run_command_spec(phase_command)  # FIX: C5-finding-2
+        if phase_result.stdout:  # FIX: C5-finding-2
+            click.echo(phase_result.stdout.rstrip())  # FIX: C5-finding-2
+        if phase_result.returncode != 0:  # FIX: C5-finding-2
+            if phase_result.stderr:  # FIX: C5-finding-2
+                click.echo(phase_result.stderr.rstrip())  # FIX: C5-finding-2
+            raise click.ClickException(f"{phase_name} phase failed while running {phase_command['script']}")  # FIX: C5-finding-2
+    evidence_command = _build_evidence_command_spec()  # FIX: C5-finding-2
+    click.echo("\n[*] Post-Phase Evidence Collection")  # FIX: C5-finding-2
+    click.echo(f"    Command: {_format_command_spec(evidence_command)}")  # FIX: C5-finding-2
+    if not effective_execute:  # FIX: C5-finding-2
+        click.echo(f"    [DRY RUN] Would execute {evidence_command['script']}")  # FIX: C5-finding-2
+    else:  # FIX: C5-finding-2
+        evidence_result = _run_command_spec(evidence_command)  # FIX: C5-finding-2
+        if evidence_result.stdout:  # FIX: C5-finding-2
+            click.echo(evidence_result.stdout.rstrip())  # FIX: C5-finding-2
+        if evidence_result.returncode != 0:  # FIX: C5-finding-2
+            if evidence_result.stderr:  # FIX: C5-finding-2
+                click.echo(evidence_result.stderr.rstrip())  # FIX: C5-finding-2
+            raise click.ClickException(f"Evidence collection failed while running {evidence_command['script']}")  # FIX: C5-finding-2
+    click.secho(f"\n[✓] Playbook {playbook_path.stem} {'planned' if not effective_execute else 'executed'} for incident {active_incident_id}", fg="green")  # FIX: C5-finding-2
+    return {"success": True, "playbook_path": playbook_path, "incident_id": active_incident_id, "incident_slug": execution_profile["incident_slug"]}  # FIX: C5-finding-2
 
 
 def _resolve_playbook(playbook_id: str) -> "Path | None":
@@ -399,45 +636,22 @@ def playbook():
 @click.argument("playbook_id")
 @click.option("--severity", required=True, type=click.Choice(["P0", "P1", "P2", "P3"]))
 @click.option("--dry-run", is_flag=True, help="Simulate without making changes")
+@click.option("--execute", "execute_flag", is_flag=True, help="Execute the repo-native playbook helpers")
 @click.pass_context
-def execute(ctx, playbook_id, severity, dry_run):
+def execute(ctx, playbook_id, severity, dry_run, execute_flag):
     """Execute incident response playbook.
 
     PLAYBOOK_ID may be a filename stem (playbook-credential-theft) or a
     Playbook ID (IRP-001).  Run 'openclaw-cli playbook list' to see all
     available playbooks and their identifiers.
     """
-    playbook_path = _resolve_playbook(playbook_id)
-
-    if playbook_path is None:
-        click.secho(
-            f"[✗] Playbook not found for '{playbook_id}'.\n"
-            "    Run 'openclaw-cli playbook list' to see available playbooks.",
-            fg="red",
-        )
-        ctx.exit(1)
-        return
-
-    click.echo(f"[*] Executing playbook {playbook_path.stem} (severity: {severity})...")
-
-    if dry_run:
-        click.echo("[*] DRY RUN - No changes will be made")
-
-    click.echo(f"[*] Playbook file: {playbook_path}")
-
-    # Walk the five standard IR phases
-    phases = ["Detection", "Containment", "Eradication", "Recovery", "PIR"]
-    for phase in phases:
-        click.echo(f"\n[*] Phase: {phase}")
-        if dry_run:
-            click.echo(f"    [DRY RUN] Would execute {phase} phase")
-        else:
-            click.echo(
-                f"    Follow the '{phase}' section in {playbook_path.name}. "
-                "For automated helpers see scripts/incident-response/."
-            )
-
-    click.secho(f"\n[✓] Playbook {playbook_path.stem} ready for execution", fg="green")
+    _execute_playbook_orchestration(  # FIX: C5-finding-2
+        ctx,  # FIX: C5-finding-2
+        playbook_id=playbook_id,  # FIX: C5-finding-2
+        severity=severity,  # FIX: C5-finding-2
+        dry_run=dry_run,  # FIX: C5-finding-2
+        execute_flag=execute_flag,  # FIX: C5-finding-2
+    )  # FIX: C5-finding-2
 
 
 @playbook.command()
@@ -784,9 +998,18 @@ def incident(ctx, type, severity):
     click.echo(f"  - Affected resources: {len(incident_data['affected_resources'])}")
     
     click.echo(f"\n[*] Triggering incident response...")
-    
-    # Execute playbook
-    ctx.invoke(playbook.execute, playbook_id="playbook-credential-theft", severity=severity, dry_run=False)
+    playbook_id = SIMULATED_INCIDENT_PLAYBOOKS[type]  # FIX: C5-finding-8
+    click.echo(f"  - Routed playbook: {playbook_id}")  # FIX: C5-finding-8
+    _execute_playbook_orchestration(  # FIX: C5-finding-8
+        ctx,  # FIX: C5-finding-8
+        playbook_id=playbook_id,  # FIX: C5-finding-8
+        severity=severity,  # FIX: C5-finding-8
+        dry_run=False,  # FIX: C5-finding-8
+        execute_flag=True,  # FIX: C5-finding-8
+        incident_slug=SIMULATED_INCIDENT_OVERRIDES[type]["incident_slug"],  # FIX: C5-finding-8
+        overrides=SIMULATED_INCIDENT_OVERRIDES[type],  # FIX: C5-finding-8
+        incident_id=incident_data["incident_id"],  # FIX: C5-finding-8
+    )  # FIX: C5-finding-8
 
 
 # ============================================================================
