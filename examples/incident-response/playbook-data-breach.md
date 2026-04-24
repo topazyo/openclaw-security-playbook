@@ -427,13 +427,13 @@
      --incident-id IRP-004-20260214 \
      --query credentials_accessed)
    
-   # Batch revoke and rotate
-   echo "$ACCESS_LOG_ENTRIES" | jq -r '.credentials[]' | while read cred_id; do
-     ./scripts/incident-response/auto-containment.py \
-       --action revoke_credential \
-       --credential-id "$cred_id" \
-       --reason "Data breach - IRP-004"
-   done
+   # Batch revoke and rotate through the credential management API  # FIX: C5-finding-3
+   echo "$ACCESS_LOG_ENTRIES" | jq -r '.credentials[]' | while read cred_id; do  # FIX: C5-finding-3
+     curl -X POST "https://gateway.openclaw.ai/admin/credentials/revoke" \  # FIX: C5-finding-3
+       -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
+       -H "Content-Type: application/json" \  # FIX: C5-finding-3
+       -d '{"credential_id": "'"$cred_id"'", "reason": "Data breach - IRP-004"}'  # FIX: C5-finding-3
+   done  # FIX: C5-finding-3
    ```
 
 4. **Preserve Evidence** (chain of custody)
