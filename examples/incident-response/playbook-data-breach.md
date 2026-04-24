@@ -277,15 +277,11 @@
 3. **Assess Breach Scope**
    
    ```bash
-   # Run impact analyzer to determine affected data
-   ./scripts/incident-response/impact-analyzer.py \
-     --start-time "2026-02-14T16:00:00Z" \
-     --end-time "2026-02-14T17:00:00Z" \
-     --affected-resources "agent-prod-19,s3://openclaw-conversation-logs" \
-     --output impact-assessment.json
+   # Generate a baseline impact report from the confirmed data classes and affected user count  # FIX: C5-finding-3
+   ./scripts/incident-response/impact-analyzer.py --incident IRP-004-20260214 --data-types PII,Credentials --users 234 --downtime 4 --output impact-assessment.json  # FIX: C5-finding-3
    ```
    
-   **Impact Assessment Output**:
+   **Example analyst-enriched breach summary**: <!-- FIX: C5-finding-3 -->
    ```json
    {
      "incident_id": "IRP-004-20260214",
@@ -349,13 +345,8 @@
    - ✅ Audit Committee (for SOC 2 incidents)
    
    ```bash
-   # Automated escalation
-   ./scripts/incident-response/notification-manager.py \
-     --incident-id "IRP-004-20260214" \
-     --severity P0 \
-     --type data_breach \
-     --escalate-to ciso,legal,dpo,pr \
-     --include-impact-assessment impact-assessment.json
+   # Send the internal escalation update to the configured incident channels  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-004-20260214 --severity CRITICAL --channel all --message "P0 data breach escalation for IRP-004-20260214. Notify CISO, legal, DPO, PR, and review impact-assessment.json immediately."  # FIX: C5-finding-3
    ```
 
 ---
@@ -422,13 +413,10 @@
    
    If credentials were part of the breach:
    ```bash
-   # Identify which credentials were accessed
-   ACCESS_LOG_ENTRIES=$(./scripts/incident-response/impact-analyzer.py \
-     --incident-id IRP-004-20260214 \
-     --query credentials_accessed)
-   
-   # Batch revoke and rotate through the credential management API  # FIX: C5-finding-3
-   echo "$ACCESS_LOG_ENTRIES" | jq -r '.credentials[]' | while read cred_id; do  # FIX: C5-finding-3
+   # Check local credential exposure scope before revoking provider-side secrets  # FIX: C5-finding-3
+   ./scripts/forensics/check_credential_scope.sh 2026-02-14  # FIX: C5-finding-3
+   # Replace the sample credential IDs below with the IDs confirmed by the scope review and provider audit logs  # FIX: C5-finding-3
+   for cred_id in cred-prod-001 cred-prod-002; do  # FIX: C5-finding-3
      curl -X POST "https://gateway.openclaw.ai/admin/credentials/revoke" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"credential_id": "'"$cred_id"'", "reason": "Data breach - IRP-004"}'  # FIX: C5-finding-3
    done  # FIX: C5-finding-3
    ```
@@ -436,14 +424,8 @@
 4. **Preserve Evidence** (chain of custody)
    
    ```bash
-   # Collect forensic evidence before making changes
-   ./scripts/incident-response/forensics-collector.py \
-     --incident-id "IRP-004-20260214" \
-     --scope comprehensive \
-     --targets "agent-prod-19,s3://openclaw-conversation-logs,db:openclaw_conversations" \
-     --output-dir /secure/forensics/IRP-004/ \
-     --encrypt-with-key $FORENSICS_PGP_KEY \
-     --preserve-chain-of-custody
+   # Collect a quick forensic evidence bundle before making changes; escalate to full privileged collection if required  # FIX: C5-finding-3
+   ./scripts/incident-response/forensics-collector.py --incident IRP-004-20260214 --level quick --no-memory --no-network  # FIX: C5-finding-3
    ```
 
 ### Phase 2: Forensic Analysis (15-60 minutes)
@@ -482,11 +464,8 @@
 7. **Categorize Personal Data** (GDPR Article 4)
    
    ```bash
-   # Analyze exfiltrated data for GDPR personal data categories
-   ./scripts/incident-response/impact-analyzer.py \
-     --incident-id IRP-004-20260214 \
-     --analyze-personal-data \
-     --output gdpr-data-categories.json
+   # Generate a baseline GDPR impact report from the confirmed exposed data classes  # FIX: C5-finding-3
+   ./scripts/incident-response/impact-analyzer.py --incident IRP-004-20260214 --data-types PII,Credentials --users 234 --downtime 4 --output gdpr-impact-baseline.json  # FIX: C5-finding-3
    ```
    
    **GDPR Data Categories** (Article 9 "special categories"):
@@ -723,13 +702,8 @@
 1. **Internal Notification** (within 1 hour of P0 classification)
    
    ```bash
-   # Automated internal stakeholder notification
-   ./scripts/incident-response/notification-manager.py \
-     --incident-id IRP-004-20260214 \
-     --type data_breach \
-     --notify-internal \
-     --recipients ciso,legal,dpo,audit_committee \
-     --include-impact-assessment
+   # Send the internal breach update to the configured incident channels  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-004-20260214 --severity CRITICAL --channel all --message "Internal data breach notification for IRP-004-20260214. Notify CISO, legal, DPO, and audit committee. Review impact-assessment.json for current scope."  # FIX: C5-finding-3
    ```
 
 2. **Supervisory Authority Notification** (within 72 hours if GDPR applicable)
@@ -741,11 +715,8 @@
    - (d) Measures taken or proposed to address the breach
    
    ```bash
-   # Generate GDPR breach notification report
-   ./scripts/incident-response/notification-manager.py \
-     --incident-id IRP-004-20260214 \
-     --generate-gdpr-report \
-     --output gdpr-breach-notification.pdf
+   # Create a tracked internal task to prepare the GDPR Article 33 notification package  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-004-20260214 --severity CRITICAL --channel jira --message "Prepare the GDPR Article 33 supervisory authority notification package for IRP-004-20260214 within 72 hours."  # FIX: C5-finding-3
    ```
    
    **Notification Template**: See [Appendix B](#b-gdpr-breach-notification-template)
@@ -759,13 +730,8 @@
    - Large-scale breach (>1000 individuals)
    
    ```bash
-   # Notify affected individuals
-   ./scripts/incident-response/notification-manager.py \
-     --incident-id IRP-004-20260214 \
-     --notify-data-subjects \
-     --recipients-file affected-individuals.csv \
-     --delivery-method encrypted_email \
-     --template data-subject-breach-notification
+   # Create a tracked action for affected-individual outreach via the approved encrypted delivery workflow  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-004-20260214 --severity CRITICAL --channel jira --message "Prepare affected-individual notification for IRP-004-20260214 using affected-individuals.csv and the approved encrypted delivery process."  # FIX: C5-finding-3
    ```
    
    **Data Subject Notification Template**: See [Appendix C](#c-data-subject-notification-template)
@@ -773,12 +739,8 @@
 4. **Customer Notification** (if customer data affected)
    
    ```bash
-   # Notify business customers (enterprise clients)
-   ./scripts/incident-response/notification-manager.py \
-     --incident-id IRP-004-20260214 \
-     --notify-customers \
-     --delivery-method email,support_ticket \
-     --template customer-breach-notification
+   # Create a tracked enterprise-customer communication task for the approved outreach workflow  # FIX: C5-finding-3
+   ./scripts/incident-response/notification-manager.py --incident IRP-004-20260214 --severity CRITICAL --channel jira --message "Prepare enterprise customer notification for IRP-004-20260214 using the approved email and support-ticket process."  # FIX: C5-finding-3
    ```
 
 ---
