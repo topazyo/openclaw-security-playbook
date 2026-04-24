@@ -30,6 +30,7 @@ Related: playbook-prompt-injection.md, IRP-001.md
 """
 
 import argparse
+import ipaddress  # FIX: C5-finding-3
 import json
 import logging
 import os
@@ -50,6 +51,9 @@ QUARANTINE_SUBNET_ID = os.getenv("QUARANTINE_SUBNET_ID")
 QUARANTINE_SG_ID = os.getenv("QUARANTINE_SG_ID")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 CONTAINMENT_LOG_DIR = Path("/var/log/openclaw/containment")
+BLOCK_NETWORK_ACL_ID = os.getenv("BLOCK_NETWORK_ACL_ID")  # FIX: C5-finding-3
+DNS_FIREWALL_DOMAIN_LIST_ID = os.getenv("DNS_FIREWALL_DOMAIN_LIST_ID")  # FIX: C5-finding-3
+RATE_LIMIT_CONFIG_PATH = os.getenv("RATE_LIMIT_CONFIG_PATH")  # FIX: C5-finding-3
 
 # Logging
 logging.basicConfig(
@@ -71,6 +75,7 @@ class ContainmentManager:
         # Initialize AWS clients
         self.ec2 = boto3.client('ec2', region_name=AWS_REGION)
         self.iam = boto3.client('iam')
+        self.route53resolver = boto3.client('route53resolver', region_name=AWS_REGION)  # FIX: C5-finding-3
         
         # Initialize Docker client
         try:
@@ -104,6 +109,133 @@ class ContainmentManager:
                 f.write(json.dumps(action_record) + "\n")
         except Exception as e:
             logger.error(f"Failed to write log: {e}")
+
+    def _resolve_network_acl_id(self) -> str:  # FIX: C5-finding-3
+        """Resolve the network ACL used for IP blocking."""  # FIX: C5-finding-3
+        if BLOCK_NETWORK_ACL_ID:  # FIX: C5-finding-3
+            return BLOCK_NETWORK_ACL_ID  # FIX: C5-finding-3
+        response = self.ec2.describe_network_acls(Filters=[{"Name": "default", "Values": ["true"]}])  # FIX: C5-finding-3
+        network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
+        if network_acls and isinstance(network_acls[0], dict) and network_acls[0].get("NetworkAclId"):  # FIX: C5-finding-3
+            return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3
+        return f"acl-auto-containment-{self.incident_id.lower()}"  # FIX: C5-finding-3
+
+    def _resolve_firewall_domain_list_id(self) -> str:  # FIX: C5-finding-3
+        """Resolve the DNS firewall domain list used for domain blocking."""  # FIX: C5-finding-3
+        if DNS_FIREWALL_DOMAIN_LIST_ID:  # FIX: C5-finding-3
+            return DNS_FIREWALL_DOMAIN_LIST_ID  # FIX: C5-finding-3
+        response = self.route53resolver.list_firewall_domain_lists(MaxResults=100)  # FIX: C5-finding-3
+        firewall_domain_lists = response.get("FirewallDomainLists", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
+        for firewall_domain_list in firewall_domain_lists:  # FIX: C5-finding-3
+            if isinstance(firewall_domain_list, dict) and firewall_domain_list.get("Name") == "openclaw-auto-containment":  # FIX: C5-finding-3
+                return firewall_domain_list["Id"]  # FIX: C5-finding-3
+        created_domain_list = self.route53resolver.create_firewall_domain_list(  # FIX: C5-finding-3
+            CreatorRequestId=f"{self.incident_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",  # FIX: C5-finding-3
+            Name="openclaw-auto-containment",  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        created_record = created_domain_list.get("FirewallDomainList", {}) if isinstance(created_domain_list, dict) else {}  # FIX: C5-finding-3
+        if created_record.get("Id"):  # FIX: C5-finding-3
+            return created_record["Id"]  # FIX: C5-finding-3
+        return f"fdl-auto-containment-{self.incident_id.lower()}"  # FIX: C5-finding-3
+
+    def block_ip_address(self, ip_address: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+        """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
+        logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
+        try:  # FIX: C5-finding-3
+            cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
+            network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
+            rule_seed = sum(ord(character) for character in cidr_block) % 10000  # FIX: C5-finding-3
+            ingress_rule_number = 100 + rule_seed  # FIX: C5-finding-3
+            egress_rule_number = 200 + rule_seed  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C5-finding-3
+                logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C5-finding-3
+                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+                return True  # FIX: C5-finding-3
+            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)  # FIX: C5-finding-3
+            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=egress_rule_number, Protocol='-1', RuleAction='deny', Egress=True, CidrBlock=cidr_block)  # FIX: C5-finding-3
+            self.rollback_commands.append({"action": "delete_network_acl_entry", "network_acl_id": network_acl_id, "rule_numbers": [ingress_rule_number, egress_rule_number]})  # FIX: C5-finding-3
+            self.log_action("block_ip", ip_address, "success", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+            logger.info(f"✓ IP address {ip_address} blocked successfully")  # FIX: C5-finding-3
+            return True  # FIX: C5-finding-3
+        except Exception as e:  # FIX: C5-finding-3
+            logger.error(f"Failed to block IP address: {e}")  # FIX: C5-finding-3
+            self.log_action("block_ip", ip_address, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
+
+    def block_domain_name(self, domain: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+        """Block a domain by adding it to the emergency DNS firewall list."""  # FIX: C5-finding-3
+        logger.info(f"Blocking domain: {domain}")  # FIX: C5-finding-3
+        try:  # FIX: C5-finding-3
+            normalized_domain = domain.strip().lower()  # FIX: C5-finding-3
+            if not normalized_domain:  # FIX: C5-finding-3
+                raise ValueError("Domain cannot be empty")  # FIX: C5-finding-3
+            firewall_domain_list_id = self._resolve_firewall_domain_list_id()  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C5-finding-3
+                logger.info("[DRY-RUN] Would add the domain to the emergency DNS firewall list")  # FIX: C5-finding-3
+                self.log_action("block_domain", normalized_domain, "dry_run", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3
+                return True  # FIX: C5-finding-3
+            self.route53resolver.update_firewall_domains(FirewallDomainListId=firewall_domain_list_id, Operation="ADD", Domains=[normalized_domain])  # FIX: C5-finding-3
+            self.rollback_commands.append({"action": "remove_firewall_domain", "firewall_domain_list_id": firewall_domain_list_id, "domain": normalized_domain})  # FIX: C5-finding-3
+            self.log_action("block_domain", normalized_domain, "success", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3
+            logger.info(f"✓ Domain {normalized_domain} blocked successfully")  # FIX: C5-finding-3
+            return True  # FIX: C5-finding-3
+        except Exception as e:  # FIX: C5-finding-3
+            logger.error(f"Failed to block domain: {e}")  # FIX: C5-finding-3
+            self.log_action("block_domain", domain, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
+
+    def isolate_container(self, container_id: str, reason: str = None) -> bool:  # FIX: C5-finding-3
+        """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
+        logger.info(f"Isolating container: {container_id}")  # FIX: C5-finding-3
+        if not self.docker_client:  # FIX: C5-finding-3
+            logger.error("Docker client not available")  # FIX: C5-finding-3
+            self.log_action("isolate_container", container_id, "failed", {"error": "Docker client not available", "reason": reason})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
+        try:  # FIX: C5-finding-3
+            container = self.docker_client.containers.get(container_id)  # FIX: C5-finding-3
+            networks = container.attrs['NetworkSettings']['Networks']  # FIX: C5-finding-3
+            original_networks = list(networks.keys())  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C5-finding-3
+                logger.info("[DRY-RUN] Would disconnect container from networks")  # FIX: C5-finding-3
+                self.log_action("isolate_container", container_id, "dry_run", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
+                return True  # FIX: C5-finding-3
+            for network_name in original_networks:  # FIX: C5-finding-3
+                network = self.docker_client.networks.get(network_name)  # FIX: C5-finding-3
+                network.disconnect(container)  # FIX: C5-finding-3
+                self.rollback_commands.append({"action": "reconnect_docker_network", "container_id": container_id, "network_name": network_name})  # FIX: C5-finding-3
+            container_labels = {'quarantine': self.incident_id}  # FIX: C5-finding-3
+            if reason:  # FIX: C5-finding-3
+                container_labels['containment_reason'] = reason  # FIX: C5-finding-3
+            container.update(labels=container_labels)  # FIX: C5-finding-3
+            self.log_action("isolate_container", container_id, "success", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
+            logger.info(f"✓ Container {container_id} isolated successfully")  # FIX: C5-finding-3
+            return True  # FIX: C5-finding-3
+        except Exception as e:  # FIX: C5-finding-3
+            logger.error(f"Failed to isolate container: {e}")  # FIX: C5-finding-3
+            self.log_action("isolate_container", container_id, "failed", {"error": str(e), "reason": reason})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
+
+    def update_rate_limits(self, mode: str, limits: Dict, reason: str = None) -> bool:  # FIX: C5-finding-3
+        """Write an emergency rate-limit override profile for the requested mode."""  # FIX: C5-finding-3
+        logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
+        try:  # FIX: C5-finding-3
+            rate_limit_profile_path = Path(RATE_LIMIT_CONFIG_PATH) if RATE_LIMIT_CONFIG_PATH else CONTAINMENT_LOG_DIR / f"{self.incident_id}-rate-limits.json"  # FIX: C5-finding-3
+            rate_limit_payload = {"incident_id": self.incident_id, "mode": mode, "updated_at": datetime.now(timezone.utc).isoformat(), "limits": limits, "reason": reason}  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C5-finding-3
+                logger.info("[DRY-RUN] Would write the emergency rate-limit override profile")  # FIX: C5-finding-3
+                self.log_action("update_rate_limits", mode, "dry_run", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
+                return True  # FIX: C5-finding-3
+            rate_limit_profile_path.parent.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+            with open(rate_limit_profile_path, 'w', encoding='utf-8') as f:  # FIX: C5-finding-3
+                json.dump(rate_limit_payload, f, indent=2)  # FIX: C5-finding-3
+            self.rollback_commands.append({"action": "restore_rate_limits", "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
+            self.log_action("update_rate_limits", mode, "success", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
+            logger.info(f"✓ Rate limits updated successfully using mode {mode}")  # FIX: C5-finding-3
+            return True  # FIX: C5-finding-3
+        except Exception as e:  # FIX: C5-finding-3
+            logger.error(f"Failed to update rate limits: {e}")  # FIX: C5-finding-3
+            self.log_action("update_rate_limits", mode, "failed", {"error": str(e), "reason": reason, "limits": limits})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
     
     def isolate_ec2_instance(self, instance_id: str) -> bool:
         """Isolate EC2 instance by modifying security groups and creating snapshot"""
@@ -404,20 +536,27 @@ Actions:
     
     parser.add_argument(
         "--incident",
-        required=True,
+        required=False,  # FIX: C5-finding-3
         help="Incident ID (e.g., INC-2024-001)"
     )
     parser.add_argument(
         "--target",
-        required=True,
+        required=False,  # FIX: C5-finding-3
         help="Target resource (EC2 instance ID, user:username, container:id)"
     )
     parser.add_argument(
         "--action",
         required=True,
-        choices=["isolate-ec2", "revoke-credentials", "isolate-docker"],
+        choices=["isolate-ec2", "revoke-credentials", "isolate-docker", "block_ip", "block_domain", "isolate_container", "update_rate_limits"],  # FIX: C5-finding-3
         help="Containment action to perform"
     )
+    parser.add_argument("--ip-address", help="IP address to block with the block_ip action")  # FIX: C5-finding-3
+    parser.add_argument("--domain", help="Domain to block with the block_domain action")  # FIX: C5-finding-3
+    parser.add_argument("--container-id", help="Container ID to isolate with the isolate_container action")  # FIX: C5-finding-3
+    parser.add_argument("--duration", help="Duration for temporary containment actions")  # FIX: C5-finding-3
+    parser.add_argument("--reason", help="Reason recorded in the containment log")  # FIX: C5-finding-3
+    parser.add_argument("--mode", choices=["normal", "aggressive", "emergency"], help="Rate-limit mode to apply with update_rate_limits")  # FIX: C5-finding-3
+    parser.add_argument("--limits", help="JSON object describing rate-limit overrides for update_rate_limits")  # FIX: C5-finding-3
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -425,25 +564,67 @@ Actions:
     )
     
     args = parser.parse_args()
+    parsed_limits = None  # FIX: C5-finding-3
+    if args.limits:  # FIX: C5-finding-3
+        try:  # FIX: C5-finding-3
+            parsed_limits = json.loads(args.limits)  # FIX: C5-finding-3
+        except json.JSONDecodeError as e:  # FIX: C5-finding-3
+            parser.error(f"--limits must be valid JSON: {e}")  # FIX: C5-finding-3
+        if not isinstance(parsed_limits, dict):  # FIX: C5-finding-3
+            parser.error("--limits must decode to a JSON object")  # FIX: C5-finding-3
     
     # Initialize containment manager
-    manager = ContainmentManager(args.incident, args.dry_run)
+    incident_id = args.incident or f"INC-AUTO-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"  # FIX: C5-finding-3
+    manager = ContainmentManager(incident_id, args.dry_run)  # FIX: C5-finding-3
     
     # Execute containment action
     success = False
     
     if args.action == "isolate-ec2":
+        if not args.target:  # FIX: C5-finding-3
+            parser.error("--target is required for isolate-ec2")  # FIX: C5-finding-3
         success = manager.isolate_ec2_instance(args.target)
     
     elif args.action == "revoke-credentials":
+        if not args.target:  # FIX: C5-finding-3
+            parser.error("--target is required for revoke-credentials")  # FIX: C5-finding-3
         # Extract username from "user:username" format
         username = args.target.split(":", 1)[1] if ":" in args.target else args.target
         success = manager.revoke_iam_credentials(username)
     
     elif args.action == "isolate-docker":
+        if not args.target and not args.container_id:  # FIX: C5-finding-3
+            parser.error("--target or --container-id is required for isolate-docker")  # FIX: C5-finding-3
         # Extract container ID from "container:id" format
-        container_id = args.target.split(":", 1)[1] if ":" in args.target else args.target
+        raw_container_target = args.container_id or args.target  # FIX: C5-finding-3
+        container_id = raw_container_target.split(":", 1)[1] if raw_container_target and ":" in raw_container_target else raw_container_target  # FIX: C5-finding-3
         success = manager.isolate_docker_container(container_id)
+
+    elif args.action == "block_ip":  # FIX: C5-finding-3
+        ip_address = args.ip_address or args.target  # FIX: C5-finding-3
+        if not ip_address:  # FIX: C5-finding-3
+            parser.error("--ip-address or --target is required for block_ip")  # FIX: C5-finding-3
+        success = manager.block_ip_address(ip_address, duration=args.duration, reason=args.reason)  # FIX: C5-finding-3
+
+    elif args.action == "block_domain":  # FIX: C5-finding-3
+        domain = args.domain or args.target  # FIX: C5-finding-3
+        if not domain:  # FIX: C5-finding-3
+            parser.error("--domain or --target is required for block_domain")  # FIX: C5-finding-3
+        success = manager.block_domain_name(domain, duration=args.duration, reason=args.reason)  # FIX: C5-finding-3
+
+    elif args.action == "isolate_container":  # FIX: C5-finding-3
+        raw_container_target = args.container_id or args.target  # FIX: C5-finding-3
+        if not raw_container_target:  # FIX: C5-finding-3
+            parser.error("--container-id or --target is required for isolate_container")  # FIX: C5-finding-3
+        container_id = raw_container_target.split(":", 1)[1] if ":" in raw_container_target else raw_container_target  # FIX: C5-finding-3
+        success = manager.isolate_container(container_id, reason=args.reason)  # FIX: C5-finding-3
+
+    elif args.action == "update_rate_limits":  # FIX: C5-finding-3
+        if not args.mode:  # FIX: C5-finding-3
+            parser.error("--mode is required for update_rate_limits")  # FIX: C5-finding-3
+        if parsed_limits is None:  # FIX: C5-finding-3
+            parser.error("--limits is required for update_rate_limits")  # FIX: C5-finding-3
+        success = manager.update_rate_limits(args.mode, parsed_limits, reason=args.reason)  # FIX: C5-finding-3
     
     # Save report
     manager.save_containment_report()

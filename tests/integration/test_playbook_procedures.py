@@ -19,12 +19,62 @@ Usage:
   pytest tests/integration/test_playbook_procedures.py -v
 """
 
+import importlib.util  # FIX: C5-finding-3
 import sys
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime, timezone
 import json
+from pathlib import Path  # FIX: C5-finding-3
+from types import SimpleNamespace  # FIX: C5-finding-3
+
+
+AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"  # FIX: C5-finding-3
+
+
+def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
+    log_dir = tmp_path / "containment"  # FIX: C5-finding-3
+    fake_ec2 = MagicMock()  # FIX: C5-finding-3
+    fake_iam = MagicMock()  # FIX: C5-finding-3
+    fake_route53resolver = MagicMock()  # FIX: C5-finding-3
+    fake_network = MagicMock()  # FIX: C5-finding-3
+    fake_container = MagicMock()  # FIX: C5-finding-3
+    fake_container.attrs = {"NetworkSettings": {"Networks": {"openclaw-network": {}, "bridge": {}}}}  # FIX: C5-finding-3
+    fake_docker_client = MagicMock()  # FIX: C5-finding-3
+    fake_docker_client.containers.get.return_value = fake_container  # FIX: C5-finding-3
+    fake_docker_client.networks.get.return_value = fake_network  # FIX: C5-finding-3
+    fake_boto3 = SimpleNamespace()  # FIX: C5-finding-3
+    fake_boto3.client = MagicMock(  # FIX: C5-finding-3
+        side_effect=lambda service_name, region_name=None: {  # FIX: C5-finding-3
+            "ec2": fake_ec2,  # FIX: C5-finding-3
+            "iam": fake_iam,  # FIX: C5-finding-3
+            "route53resolver": fake_route53resolver,  # FIX: C5-finding-3
+        }[service_name]  # FIX: C5-finding-3
+    )  # FIX: C5-finding-3
+    fake_docker = SimpleNamespace(  # FIX: C5-finding-3
+        from_env=MagicMock(return_value=fake_docker_client),  # FIX: C5-finding-3
+        errors=SimpleNamespace(DockerException=RuntimeError),  # FIX: C5-finding-3
+    )  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location("auto_containment_issue_4_tests", AUTO_CONTAINMENT_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    with patch.dict(sys.modules, {"boto3": fake_boto3, "docker": fake_docker}):  # FIX: C5-finding-3
+        sys.modules[spec.name] = module  # FIX: C5-finding-3
+        spec.loader.exec_module(module)  # FIX: C5-finding-3
+    module.CONTAINMENT_LOG_DIR = log_dir  # FIX: C5-finding-3
+    return module, log_dir, fake_ec2, fake_route53resolver, fake_docker_client, fake_network, fake_container  # FIX: C5-finding-3
+
+
+def _run_auto_containment(module, args):  # FIX: C5-finding-3
+    with patch.object(sys, "argv", ["auto-containment.py", *args]):  # FIX: C5-finding-3
+        return module.main()  # FIX: C5-finding-3
+
+
+def _read_single_report(log_dir):  # FIX: C5-finding-3
+    report_files = sorted(log_dir.glob("*-report.json"))  # FIX: C5-finding-3
+    assert len(report_files) == 1  # FIX: C5-finding-3
+    return json.loads(report_files[0].read_text(encoding="utf-8"))  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -127,6 +177,77 @@ class TestContainmentPhase:
         assert mock_ec2.modify_instance_attribute.called
         call_kwargs = mock_ec2.modify_instance_attribute.call_args
         assert call_kwargs is not None
+
+
+class TestAutoContainmentCliParity:
+    """Test the documented auto-containment CLI actions."""
+
+    def test_auto_containment_help_lists_all_documented_actions(self, tmp_path, capsys):  # FIX: C5-finding-3
+        module, _log_dir, *_mocks = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        with patch.object(sys, "argv", ["auto-containment.py", "--help"]):  # FIX: C5-finding-3
+            with pytest.raises(SystemExit) as exc_info:  # FIX: C5-finding-3
+                module.main()  # FIX: C5-finding-3
+        assert exc_info.value.code == 0  # FIX: C5-finding-3
+        help_output = capsys.readouterr().out  # FIX: C5-finding-3
+        assert "isolate-ec2" in help_output  # FIX: C5-finding-3
+        assert "revoke-credentials" in help_output  # FIX: C5-finding-3
+        assert "isolate-docker" in help_output  # FIX: C5-finding-3
+        assert "block_ip" in help_output  # FIX: C5-finding-3
+        assert "block_domain" in help_output  # FIX: C5-finding-3
+        assert "isolate_container" in help_output  # FIX: C5-finding-3
+        assert "update_rate_limits" in help_output  # FIX: C5-finding-3
+
+    @pytest.mark.parametrize(  # FIX: C5-finding-3
+        ("args", "expected_action", "expected_target", "expected_reason", "expected_mode"),  # FIX: C5-finding-3
+        [  # FIX: C5-finding-3
+            (  # FIX: C5-finding-3
+                ["--action", "block_ip", "--ip-address", "198.51.100.42", "--duration", "7d", "--reason", "Credential exfiltration attempt - IRP-001"],  # FIX: C5-finding-3
+                "block_ip",  # FIX: C5-finding-3
+                "198.51.100.42",  # FIX: C5-finding-3
+                "Credential exfiltration attempt - IRP-001",  # FIX: C5-finding-3
+                None,  # FIX: C5-finding-3
+            ),  # FIX: C5-finding-3
+            (  # FIX: C5-finding-3
+                ["--action", "block_domain", "--domain", "attacker.com", "--duration", "permanent", "--reason", "Data exfiltration destination - IRP-004"],  # FIX: C5-finding-3
+                "block_domain",  # FIX: C5-finding-3
+                "attacker.com",  # FIX: C5-finding-3
+                "Data exfiltration destination - IRP-004",  # FIX: C5-finding-3
+                None,  # FIX: C5-finding-3
+            ),  # FIX: C5-finding-3
+            (  # FIX: C5-finding-3
+                ["--action", "isolate_container", "--container-id", "agent-prod-42", "--reason", "Potential compromise - IRP-001"],  # FIX: C5-finding-3
+                "isolate_container",  # FIX: C5-finding-3
+                "agent-prod-42",  # FIX: C5-finding-3
+                "Potential compromise - IRP-001",  # FIX: C5-finding-3
+                None,  # FIX: C5-finding-3
+            ),  # FIX: C5-finding-3
+            (  # FIX: C5-finding-3
+                ["--action", "update_rate_limits", "--mode", "aggressive", "--limits", '{"per_ip_per_minute": 10, "per_user_per_minute": 20, "global_per_second": 500}'],  # FIX: C5-finding-3
+                "update_rate_limits",  # FIX: C5-finding-3
+                "aggressive",  # FIX: C5-finding-3
+                None,  # FIX: C5-finding-3
+                "aggressive",  # FIX: C5-finding-3
+            ),  # FIX: C5-finding-3
+        ],  # FIX: C5-finding-3
+        ids=["block_ip", "block_domain", "isolate_container", "update_rate_limits"],  # FIX: C5-finding-3
+    )  # FIX: C5-finding-3
+    def test_auto_containment_accepts_documented_playbook_commands(  # FIX: C5-finding-3
+        self, tmp_path, args, expected_action, expected_target, expected_reason, expected_mode  # FIX: C5-finding-3
+    ):  # FIX: C5-finding-3
+        module, log_dir, _fake_ec2, _fake_route53resolver, fake_docker_client, fake_network, fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        assert _run_auto_containment(module, args) == 0  # FIX: C5-finding-3
+        report = _read_single_report(log_dir)  # FIX: C5-finding-3
+        assert report["actions_taken"][0]["action"] == expected_action  # FIX: C5-finding-3
+        assert report["actions_taken"][0]["target"] == expected_target  # FIX: C5-finding-3
+        if expected_reason is not None:  # FIX: C5-finding-3
+            assert report["actions_taken"][0]["details"]["reason"] == expected_reason  # FIX: C5-finding-3
+        if expected_mode is not None:  # FIX: C5-finding-3
+            assert report["actions_taken"][0]["details"]["mode"] == expected_mode  # FIX: C5-finding-3
+            assert report["actions_taken"][0]["details"]["limits"]["global_per_second"] == 500  # FIX: C5-finding-3
+        if expected_action == "isolate_container":  # FIX: C5-finding-3
+            fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
+            fake_network.disconnect.assert_called()  # FIX: C5-finding-3
+            fake_container.update.assert_called_once()  # FIX: C5-finding-3
     
     @patch("requests.post")
     def test_notification_manager_sends_pagerduty(self, mock_post, incident_simulator):
