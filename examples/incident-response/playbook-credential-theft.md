@@ -259,30 +259,24 @@
    
    **For User Credentials**:
    ```bash
-   # Revoke user session immediately
-   ./scripts/incident-response/auto-containment.py \
-     --action revoke_user \
-     --user-id alice@openclaw.ai \
-     --reason "Suspected credential compromise - IRP-001"
+   # Revoke user session immediately via the auth gateway or identity provider  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/sessions/revoke" \  # FIX: C5-finding-3
+     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
+     -H "Content-Type: application/json" \  # FIX: C5-finding-3
+     -d '{"user_id": "alice@openclaw.ai", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
    
-   # Disable user account temporarily
-   # (Requires admin approval for permanent disable)
-   ./scripts/incident-response/auto-containment.py \
-     --action disable_account \
-     --user-id alice@openclaw.ai \
-     --duration 24h
+   # Disable user account temporarily  # FIX: C5-finding-3
+   # (Requires admin approval for permanent disable)  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/accounts/disable" \  # FIX: C5-finding-3
+     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
+     -H "Content-Type: application/json" \  # FIX: C5-finding-3
+     -d '{"user_id": "alice@openclaw.ai", "duration": "24h", "reason": "Suspected credential compromise - IRP-001"}'  # FIX: C5-finding-3
    ```
    
    **For Service Account / API Keys**:
    ```bash
-   # Revoke API key in vault
-   vault kv delete secret/openclaw/api-keys/agent-prod-42
-   
-   # Or via auto-containment script
-   ./scripts/incident-response/auto-containment.py \
-     --action revoke_api_key \
-     --key-id "AKIA****************" \
-     --service "anthropic"
+   # Revoke API key in the backing secret manager  # FIX: C5-finding-3
+   vault kv delete secret/openclaw/api-keys/agent-prod-42  # FIX: C5-finding-3
    ```
    
    **For MCP Server Tokens**:
@@ -330,11 +324,11 @@ EOF
 3. **Enable Emergency MFA** (if not already enforced)
    
    ```bash
-   # Force MFA re-enrollment for all users in affected group
-   ./scripts/incident-response/auto-containment.py \
-     --action force_mfa_reenroll \
-     --group "engineering" \
-     --reason "Security incident IRP-001"
+   # Force MFA re-enrollment for all users in the affected group  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/mfa/force-reenroll" \  # FIX: C5-finding-3
+     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
+     -H "Content-Type: application/json" \  # FIX: C5-finding-3
+     -d '{"group": "engineering", "reason": "Security incident IRP-001"}'  # FIX: C5-finding-3
    ```
 
 4. **Block Source IP Addresses**
@@ -668,12 +662,11 @@ EOF
 4. **Restore User Access**
    
    ```bash
-   # Re-enable user account after credential reset confirmation
-   ./scripts/incident-response/auto-containment.py \
-     --action enable_account \
-     --user-id alice@openclaw.ai \
-     --require-mfa-verification \
-     --reason "Incident IRP-001 resolved, user credentials reset"
+   # Re-enable user account after credential reset confirmation  # FIX: C5-finding-3
+   curl -X POST "https://gateway.openclaw.ai/admin/accounts/enable" \  # FIX: C5-finding-3
+     -H "Authorization: Bearer $ADMIN_TOKEN" \  # FIX: C5-finding-3
+     -H "Content-Type: application/json" \  # FIX: C5-finding-3
+     -d '{"user_id": "alice@openclaw.ai", "require_mfa_verification": true, "reason": "Incident IRP-001 resolved, user credentials reset"}'  # FIX: C5-finding-3
    ```
 
 ### Phase 2: Enhanced Monitoring (ongoing)
