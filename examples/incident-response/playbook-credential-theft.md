@@ -216,12 +216,8 @@
    - **What data was accessed?**
      - Query audit logs for data access events within suspected compromise window
      ```bash
-     # Check for data access by compromised user
-     ./scripts/incident-response/impact-analyzer.py \
-       --user-id alice@openclaw.ai \
-       --start-time "2026-02-14T03:00:00Z" \
-       --end-time "2026-02-14T04:00:00Z" \
-       --output impact-report.json
+     # Generate a baseline impact report for the credential exposure scope under review  # FIX: C5-finding-3
+     ./scripts/incident-response/impact-analyzer.py --incident IRP-001-20260214 --data-types Credentials --users 1 --downtime 1 --output impact-report.json  # FIX: C5-finding-3
      ```
 
 3. **Classify Incident Severity** (SEC-004)
@@ -378,13 +374,8 @@ EOF
 6. **Collect Evidence**
    
    ```bash
-   # Run forensics collector (preserves chain of custody)
-   ./scripts/incident-response/forensics-collector.py \
-     --incident-id "IRP-001-20260214" \
-     --scope comprehensive \
-     --targets "alice@openclaw.ai,agent-prod-42" \
-     --output-dir /secure/forensics/IRP-001/ \
-     --encrypt-with-key $FORENSICS_PGP_KEY
+   # Run the repo-native quick collector first, then escalate to a privileged full capture if required  # FIX: C5-finding-3
+   ./scripts/incident-response/forensics-collector.py --incident IRP-001-20260214 --level quick --no-memory --no-network  # FIX: C5-finding-3
    ```
    
    **Evidence to Collect**:

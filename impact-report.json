@@ -1,0 +1,26 @@
+{
+  "incident_id": "IRP-001-20260214",
+  "analyzed_at": "2026-04-24T19:40:48.021752+00:00",
+  "blast_radius": {},
+  "data_impact": {
+    "affected_data_types": [
+      "Credentials"
+    ],
+    "highest_severity": "CRITICAL",
+    "gdpr_breach": false,
+    "notification_required": false,
+    "notification_deadline_hours": null
+  },
+  "user_impact": {},
+  "financial_impact": {
+    "revenue_loss_usd": 5.0,
+    "response_cost_usd": 500.0,
+    "compliance_risk_usd": 0,
+    "total_estimated_impact_usd": 505.0,
+    "assumptions": {
+      "downtime_hours": 1.0,
+      "affected_users": 1,
+      "revenue_per_user_hour": 5.0
+    }
+  }
+}

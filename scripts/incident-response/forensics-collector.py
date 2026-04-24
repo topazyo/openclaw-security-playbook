@@ -225,27 +225,35 @@ class ForensicsCollector:
         
         output_file = self.evidence_dir / "processes.json"
         
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'username', 'cmdline', 'create_time', 'connections']):
-            try:
-                pinfo = proc.info
-                pinfo['create_time_iso'] = datetime.fromtimestamp(pinfo['create_time'], tz=timezone.utc).isoformat()
+        processes = []  # FIX: C5-finding-3
+        for proc in psutil.process_iter(['pid', 'name', 'username', 'cmdline', 'create_time']):  # FIX: C5-finding-3
+            try:  # FIX: C5-finding-3
+                pinfo = proc.info  # FIX: C5-finding-3
+                pinfo['create_time_iso'] = datetime.fromtimestamp(pinfo['create_time'], tz=timezone.utc).isoformat()  # FIX: C5-finding-3
                 
-                # Get open connections
-                connections = []
-                for conn in pinfo.get('connections', []):
-                    connections.append({
-                        'family': str(conn.family),
-                        'type': str(conn.type),
-                        'laddr': f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else None,
-                        'raddr': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
-                        'status': conn.status
-                    })
+                # Fetch per-process connections through the process object instead of an unsupported attrs entry.  # FIX: C5-finding-3
+                connections = []  # FIX: C5-finding-3
+                connection_getter = getattr(proc, 'net_connections', None) or getattr(proc, 'connections', None)  # FIX: C5-finding-3
+                if connection_getter is not None:  # FIX: C5-finding-3
+                    try:  # FIX: C5-finding-3
+                        raw_connections = connection_getter()  # FIX: C5-finding-3
+                    except (psutil.Error, OSError, NotImplementedError):  # FIX: C5-finding-3
+                        raw_connections = []  # FIX: C5-finding-3
+                else:  # FIX: C5-finding-3
+                    raw_connections = []  # FIX: C5-finding-3
+                for conn in raw_connections:  # FIX: C5-finding-3
+                    connections.append({  # FIX: C5-finding-3
+                        'family': str(conn.family),  # FIX: C5-finding-3
+                        'type': str(conn.type),  # FIX: C5-finding-3
+                        'laddr': f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else None,  # FIX: C5-finding-3
+                        'raddr': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,  # FIX: C5-finding-3
+                        'status': conn.status  # FIX: C5-finding-3
+                    })  # FIX: C5-finding-3
                 
-                pinfo['connections_detail'] = connections
-                processes.append(pinfo)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
+                pinfo['connections_detail'] = connections  # FIX: C5-finding-3
+                processes.append(pinfo)  # FIX: C5-finding-3
+            except (psutil.NoSuchProcess, psutil.AccessDenied):  # FIX: C5-finding-3
+                continue  # FIX: C5-finding-3
         
         with open(output_file, 'w') as f:
             json.dump(processes, f, indent=2)

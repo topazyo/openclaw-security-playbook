@@ -31,6 +31,7 @@ from types import SimpleNamespace  # FIX: C5-finding-3
 
 
 AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"  # FIX: C5-finding-3
+FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"  # FIX: C5-finding-3
 
 
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
@@ -75,6 +76,15 @@ def _read_single_report(log_dir):  # FIX: C5-finding-3
     report_files = sorted(log_dir.glob("*-report.json"))  # FIX: C5-finding-3
     assert len(report_files) == 1  # FIX: C5-finding-3
     return json.loads(report_files[0].read_text(encoding="utf-8"))  # FIX: C5-finding-3
+
+
+def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, FORENSICS_COLLECTOR_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    sys.modules[spec.name] = module  # FIX: C5-finding-3
+    spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -248,6 +258,49 @@ class TestAutoContainmentCliParity:
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
             fake_container.update.assert_called_once()  # FIX: C5-finding-3
+
+
+class TestForensicsCollectorRuntimeParity:
+    """Regression tests for forensics collector runtime behavior."""
+
+    def test_collect_process_list_avoids_unsupported_connections_attr(self, tmp_path):  # FIX: C5-finding-3
+        module = _load_forensics_collector_module("forensics_collector_issue_4_tests")  # FIX: C5-finding-3
+        collector = module.ForensicsCollector("IRP-004-20260214", "quick")  # FIX: C5-finding-3
+        collector.evidence_dir = tmp_path / "forensics"  # FIX: C5-finding-3
+        collector.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        collector.manifest["evidence_items"] = []  # FIX: C5-finding-3
+
+        fake_connection = SimpleNamespace(  # FIX: C5-finding-3
+            family="AF_INET",  # FIX: C5-finding-3
+            type="SOCK_STREAM",  # FIX: C5-finding-3
+            laddr=SimpleNamespace(ip="127.0.0.1", port=8443),  # FIX: C5-finding-3
+            raddr=SimpleNamespace(ip="198.51.100.10", port=443),  # FIX: C5-finding-3
+            status="ESTABLISHED",  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+
+        class FakeProcess:  # FIX: C5-finding-3
+            info = {  # FIX: C5-finding-3
+                "pid": 1234,  # FIX: C5-finding-3
+                "name": "python",  # FIX: C5-finding-3
+                "username": "tester",  # FIX: C5-finding-3
+                "cmdline": ["python", "collector.py"],  # FIX: C5-finding-3
+                "create_time": 1_700_000_000.0,  # FIX: C5-finding-3
+            }  # FIX: C5-finding-3
+
+            def connections(self):  # FIX: C5-finding-3
+                return [fake_connection]  # FIX: C5-finding-3
+
+        def fake_process_iter(attrs):  # FIX: C5-finding-3
+            assert "connections" not in attrs  # FIX: C5-finding-3
+            return [FakeProcess()]  # FIX: C5-finding-3
+
+        with patch.object(module.psutil, "process_iter", side_effect=fake_process_iter):  # FIX: C5-finding-3
+            assert collector.collect_process_list() is True  # FIX: C5-finding-3
+
+        processes_file = collector.evidence_dir / "processes.json"  # FIX: C5-finding-3
+        assert processes_file.exists()  # FIX: C5-finding-3
+        processes = json.loads(processes_file.read_text(encoding="utf-8"))  # FIX: C5-finding-3
+        assert processes[0]["connections_detail"][0]["raddr"] == "198.51.100.10:443"  # FIX: C5-finding-3
     
     @patch("requests.post")
     def test_notification_manager_sends_pagerduty(self, mock_post, incident_simulator):
