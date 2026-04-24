@@ -40,11 +40,14 @@ from pathlib import Path
 from typing import Dict, List
 
 try:
-    import boto3
-    import docker
+    import boto3  # FIX: C5-finding-3
 except ImportError:
-    print("ERROR: Missing dependencies. Install with: pip install boto3 docker")
-    sys.exit(1)
+    boto3 = None  # FIX: C5-finding-3
+
+try:
+    import docker  # FIX: C5-finding-3
+except ImportError:
+    docker = None  # FIX: C5-finding-3
 
 # Configuration
 QUARANTINE_SUBNET_ID = os.getenv("QUARANTINE_SUBNET_ID")
@@ -73,16 +76,25 @@ class ContainmentManager:
         self.rollback_commands = []
         
         # Initialize AWS clients
-        self.ec2 = boto3.client('ec2', region_name=AWS_REGION)
-        self.iam = boto3.client('iam')
-        self.route53resolver = boto3.client('route53resolver', region_name=AWS_REGION)  # FIX: C5-finding-3
+        self.ec2 = None  # FIX: C5-finding-3
+        self.iam = None  # FIX: C5-finding-3
+        self.route53resolver = None  # FIX: C5-finding-3
+        if boto3 is not None:  # FIX: C5-finding-3
+            self.ec2 = boto3.client('ec2', region_name=AWS_REGION)  # FIX: C5-finding-3
+            self.iam = boto3.client('iam')  # FIX: C5-finding-3
+            self.route53resolver = boto3.client('route53resolver', region_name=AWS_REGION)  # FIX: C5-finding-3
+        else:
+            logger.warning("boto3 not available")  # FIX: C5-finding-3
         
         # Initialize Docker client
-        try:
-            self.docker_client = docker.from_env()
-        except docker.errors.DockerException:
-            logger.warning("Docker not available")
-            self.docker_client = None
+        self.docker_client = None  # FIX: C5-finding-3
+        if docker is not None:  # FIX: C5-finding-3
+            try:
+                self.docker_client = docker.from_env()  # FIX: C5-finding-3
+            except docker.errors.DockerException:
+                logger.warning("Docker not available")
+        else:
+            logger.warning("docker SDK not available")  # FIX: C5-finding-3
         
         # Create log directory
         CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -112,6 +124,8 @@ class ContainmentManager:
 
     def _resolve_network_acl_id(self) -> str:  # FIX: C5-finding-3
         """Resolve the network ACL used for IP blocking."""  # FIX: C5-finding-3
+        if self.ec2 is None:  # FIX: C5-finding-3
+            raise RuntimeError("boto3 is required for network ACL management")  # FIX: C5-finding-3
         if BLOCK_NETWORK_ACL_ID:  # FIX: C5-finding-3
             return BLOCK_NETWORK_ACL_ID  # FIX: C5-finding-3
         response = self.ec2.describe_network_acls(Filters=[{"Name": "default", "Values": ["true"]}])  # FIX: C5-finding-3
@@ -122,6 +136,8 @@ class ContainmentManager:
 
     def _resolve_firewall_domain_list_id(self) -> str:  # FIX: C5-finding-3
         """Resolve the DNS firewall domain list used for domain blocking."""  # FIX: C5-finding-3
+        if self.route53resolver is None:  # FIX: C5-finding-3
+            raise RuntimeError("boto3 is required for Route53 Resolver management")  # FIX: C5-finding-3
         if DNS_FIREWALL_DOMAIN_LIST_ID:  # FIX: C5-finding-3
             return DNS_FIREWALL_DOMAIN_LIST_ID  # FIX: C5-finding-3
         response = self.route53resolver.list_firewall_domain_lists(MaxResults=100)  # FIX: C5-finding-3
@@ -240,6 +256,10 @@ class ContainmentManager:
     def isolate_ec2_instance(self, instance_id: str) -> bool:
         """Isolate EC2 instance by modifying security groups and creating snapshot"""
         logger.info(f"Isolating EC2 instance: {instance_id}")
+        if self.ec2 is None:  # FIX: C5-finding-3
+            logger.error("boto3 is required for EC2 isolation")  # FIX: C5-finding-3
+            self.log_action("isolate_ec2", instance_id, "failed", {"error": "boto3 is required for EC2 isolation"})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
         
         try:
             # Get instance details
@@ -344,6 +364,10 @@ class ContainmentManager:
     def revoke_iam_credentials(self, username: str) -> bool:
         """Revoke IAM user access keys"""
         logger.info(f"Revoking IAM credentials for user: {username}")
+        if self.iam is None:  # FIX: C5-finding-3
+            logger.error("boto3 is required for IAM credential revocation")  # FIX: C5-finding-3
+            self.log_action("revoke_iam_credentials", username, "failed", {"error": "boto3 is required for IAM credential revocation"})  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
         
         try:
             # List access keys
