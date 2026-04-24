@@ -29,8 +29,10 @@ Installation:
 """
 
 import click
+import ipaddress
 import json
 import os
+import socket
 import sys
 import subprocess  # nosec B404
 import importlib.util
@@ -222,34 +224,116 @@ def _build_incident_artifact_paths(incident_slug: str, incident_id: str, create:
     }  # FIX: C5-finding-2
 
 
-def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False) -> list[dict]:  # FIX: C5-finding-2
+def _required_notification_channels(notification_severity: str) -> list[str]:  # FIX: C5-finding-2
+    channels = ["slack", "jira"]  # FIX: C5-finding-2
+    if notification_severity in {"CRITICAL", "HIGH"}:  # FIX: C5-finding-2
+        channels.insert(1, "pagerduty")  # FIX: C5-finding-2
+    return channels  # FIX: C5-finding-2
+
+
+def _select_detection_target(incident_data: dict | None, require_real: bool) -> tuple[str, str] | None:  # FIX: C5-finding-2
+    if not incident_data:  # FIX: C5-finding-2
+        if require_real:  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase requires real incident data; no incident context was provided")  # FIX: C5-finding-2
+        return None  # FIX: C5-finding-2
+
+    for resource in incident_data.get("affected_resources", []):  # FIX: C5-finding-2
+        try:  # FIX: C5-finding-2
+            ipaddress.ip_address(resource)  # FIX: C5-finding-2
+            if not os.getenv("ABUSEIPDB_API_KEY"):  # FIX: C5-finding-2
+                raise click.ClickException("Detection phase requires ABUSEIPDB_API_KEY for real IP reputation checks")  # FIX: C5-finding-2
+            return ("ip", resource)  # FIX: C5-finding-2
+        except ValueError:  # FIX: C5-finding-2
+            pass  # FIX: C5-finding-2
+
+        if "." not in resource:  # FIX: C5-finding-2
+            continue  # FIX: C5-finding-2
+
+        try:  # FIX: C5-finding-2
+            socket.gethostbyname(resource)  # FIX: C5-finding-2
+        except socket.gaierror as exc:  # FIX: C5-finding-2
+            if require_real:  # FIX: C5-finding-2
+                raise click.ClickException(f"Detection phase requires a resolvable incident target; DNS failed for {resource}: {exc}")  # FIX: C5-finding-2
+            return None  # FIX: C5-finding-2
+
+        if not os.getenv("ABUSEIPDB_API_KEY"):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase requires ABUSEIPDB_API_KEY for real domain reputation checks")  # FIX: C5-finding-2
+        return ("domain", resource)  # FIX: C5-finding-2
+
+    if require_real:  # FIX: C5-finding-2
+        raise click.ClickException("Detection phase requires a real IOC target from incident data; none of the affected resources are scannable")  # FIX: C5-finding-2
+    return None  # FIX: C5-finding-2
+
+
+def _select_blast_radius_resource(incident_data: dict | None, require_real: bool) -> str | None:  # FIX: C5-finding-2
+    if not incident_data:  # FIX: C5-finding-2
+        if require_real:  # FIX: C5-finding-2
+            raise click.ClickException("Eradication phase requires real incident data; no incident context was provided")  # FIX: C5-finding-2
+        return None  # FIX: C5-finding-2
+
+    affected_resources = list(incident_data.get("affected_resources", []))  # FIX: C5-finding-2
+    ec2_resource = next((resource for resource in affected_resources if resource.startswith("i-")), None)  # FIX: C5-finding-2
+    if ec2_resource is not None:  # FIX: C5-finding-2
+        return ec2_resource  # FIX: C5-finding-2
+
+    if affected_resources and require_real:  # FIX: C5-finding-2
+        raise click.ClickException("Eradication phase requires a blast-radius resource supported by impact-analyzer; current incident resources are unsupported")  # FIX: C5-finding-2
+    return None  # FIX: C5-finding-2
+
+
+def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False, incident_data: dict | None = None, require_real_inputs: bool = False) -> list[dict]:  # FIX: C5-finding-2
     profile = _build_execution_profile(playbook_stem, incident_slug=incident_slug, overrides=overrides)  # FIX: C5-finding-2
     artifact_paths = _build_incident_artifact_paths(profile["incident_slug"], incident_id, create=create_artifacts)  # FIX: C5-finding-2
     notification_severity = profile["notification_severity"]  # FIX: C5-finding-2
+    detection_target = _select_detection_target(incident_data, require_real=require_real_inputs)  # FIX: C5-finding-2
+    impact_resource = _select_blast_radius_resource(incident_data, require_real=require_real_inputs)  # FIX: C5-finding-2
+
+    if detection_target is None:  # FIX: C5-finding-2
+        detection_args = ["--domain", "<real-incident-target-required>", "--output", str(artifact_paths["ioc_report"])]  # FIX: C5-finding-2
+    else:  # FIX: C5-finding-2
+        detection_args = [f"--{detection_target[0]}", detection_target[1], "--output", str(artifact_paths["ioc_report"])]  # FIX: C5-finding-2
+
+    impact_args = ["--incident", incident_id, *profile["impact_args"], "--output", str(artifact_paths["impact_report"])]  # FIX: C5-finding-2
+    if impact_resource is not None:  # FIX: C5-finding-2
+        impact_args[2:2] = ["--resource", impact_resource]  # FIX: C5-finding-2
+
+    recovery_commands = [  # FIX: C5-finding-2
+        {
+            "kind": "python",  # FIX: C5-finding-2
+            "script": "scripts/incident-response/notification-manager.py",  # FIX: C5-finding-2
+            "args": ["--incident", incident_id, "--severity", notification_severity, "--channel", channel, "--message", profile["notification_message"]],  # FIX: C5-finding-2
+            "channel": channel,  # FIX: C5-finding-2
+        }
+        for channel in _required_notification_channels(notification_severity)  # FIX: C5-finding-2
+    ]  # FIX: C5-finding-2
+
     command_specs = [  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "Detection",  # FIX: C5-finding-2
             "kind": "python",  # FIX: C5-finding-2
             "script": "scripts/incident-response/ioc-scanner.py",  # FIX: C5-finding-2
-            "args": ["--domain", profile["ioc_domain"], "--output", str(artifact_paths["ioc_report"])],  # FIX: C5-finding-2
+            "args": detection_args,  # FIX: C5-finding-2
         },  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "Containment",  # FIX: C5-finding-2
             "kind": "python",  # FIX: C5-finding-2
             "script": "scripts/incident-response/auto-containment.py",  # FIX: C5-finding-2
             "args": ["--incident", incident_id, *profile["containment_args"]],  # FIX: C5-finding-2
+            "failure_markers": ["Failed to apply deny policy"] if profile["containment_args"][:2] == ["--action", "revoke-credentials"] else [],  # FIX: C5-finding-2
+            "failure_message": "Containment phase did not complete the deny policy step for revoke-credentials",  # FIX: C5-finding-2
         },  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "Eradication",  # FIX: C5-finding-2
             "kind": "python",  # FIX: C5-finding-2
             "script": "scripts/incident-response/impact-analyzer.py",  # FIX: C5-finding-2
-            "args": ["--incident", incident_id, *profile["impact_args"], "--output", str(artifact_paths["impact_report"])],  # FIX: C5-finding-2
+            "args": impact_args,  # FIX: C5-finding-2
+            "validation": "impact_blast_radius",  # FIX: C5-finding-2
+            "output_path": str(artifact_paths["impact_report"]),  # FIX: C5-finding-2
+            "require_non_empty_blast_radius": bool(incident_data and incident_data.get("affected_resources")),  # FIX: C5-finding-2
         },  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "Recovery",  # FIX: C5-finding-2
-            "kind": "python",  # FIX: C5-finding-2
-            "script": "scripts/incident-response/notification-manager.py",  # FIX: C5-finding-2
-            "args": ["--incident", incident_id, "--severity", notification_severity, "--channel", "all", "--message", profile["notification_message"]],  # FIX: C5-finding-2
+            "commands": recovery_commands,  # FIX: C5-finding-2
         },  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "PIR",  # FIX: C5-finding-2
@@ -285,6 +369,24 @@ def _run_command_spec(command_spec: dict) -> subprocess.CompletedProcess[str]:  
                 os.environ[key] = value  # FIX: C5-finding-2
 
 
+def _validate_command_result(command_spec: dict, result: subprocess.CompletedProcess[str]):  # FIX: C5-finding-2
+    combined_output = "\n".join(part for part in [result.stdout, result.stderr] if part)  # FIX: C5-finding-2
+    for failure_marker in command_spec.get("failure_markers", []):  # FIX: C5-finding-2
+        if failure_marker in combined_output:  # FIX: C5-finding-2
+            raise click.ClickException(command_spec.get("failure_message", f"Command validation failed for {command_spec['script']}"))  # FIX: C5-finding-2
+
+    if command_spec.get("validation") == "impact_blast_radius":  # FIX: C5-finding-2
+        report_path = Path(command_spec["output_path"])  # FIX: C5-finding-2
+        if not report_path.exists():  # FIX: C5-finding-2
+            raise click.ClickException(f"Eradication phase did not produce the expected impact report: {report_path}")  # FIX: C5-finding-2
+        with open(report_path, encoding="utf-8") as impact_report_file:  # FIX: C5-finding-2
+            impact_report = json.load(impact_report_file)  # FIX: C5-finding-2
+        blast_radius = impact_report.get("blast_radius", {}) if isinstance(impact_report, dict) else {}  # FIX: C5-finding-2
+        total_resources = blast_radius.get("total_resources", 0) if isinstance(blast_radius, dict) else 0  # FIX: C5-finding-2
+        if command_spec.get("require_non_empty_blast_radius") and total_resources < 1:  # FIX: C5-finding-2
+            raise click.ClickException("Eradication phase produced an empty blast radius for an incident with affected resources")  # FIX: C5-finding-2
+
+
 def _build_evidence_command_spec() -> dict:  # FIX: C5-finding-2
     return {  # FIX: C5-finding-2
         "phase": "Evidence",  # FIX: C5-finding-2
@@ -294,7 +396,7 @@ def _build_evidence_command_spec() -> dict:  # FIX: C5-finding-2
     }  # FIX: C5-finding-2
 
 
-def _execute_playbook_orchestration(ctx, playbook_id: str, severity: str, dry_run: bool, execute_flag: bool = False, incident_slug: str | None = None, overrides: dict | None = None, incident_id: str | None = None) -> dict:  # FIX: C5-finding-2
+def _execute_playbook_orchestration(ctx, playbook_id: str, severity: str, dry_run: bool, execute_flag: bool = False, incident_slug: str | None = None, overrides: dict | None = None, incident_id: str | None = None, incident_data: dict | None = None) -> dict:  # FIX: C5-finding-2
     playbook_path = _resolve_playbook(playbook_id)  # FIX: C5-finding-2
     if playbook_path is None:  # FIX: C5-finding-2
         click.secho(  # FIX: C5-finding-2
@@ -321,21 +423,28 @@ def _execute_playbook_orchestration(ctx, playbook_id: str, severity: str, dry_ru
         incident_slug=execution_profile["incident_slug"],  # FIX: C5-finding-2
         overrides=execution_profile,  # FIX: C5-finding-2
         create_artifacts=effective_execute,  # FIX: C5-finding-2
+        incident_data=incident_data,  # FIX: C5-finding-2
+        require_real_inputs=effective_execute,  # FIX: C5-finding-2
     )  # FIX: C5-finding-2
     for phase_name in PLAYBOOK_PHASES:  # FIX: C5-finding-2
         phase_command = next(spec for spec in command_specs if spec["phase"] == phase_name)  # FIX: C5-finding-2
         click.echo(f"\n[*] Phase: {phase_name}")  # FIX: C5-finding-2
-        click.echo(f"    Command: {_format_command_spec(phase_command)}")  # FIX: C5-finding-2
-        if not effective_execute:  # FIX: C5-finding-2
-            click.echo(f"    [DRY RUN] Would execute {phase_command['script']}")  # FIX: C5-finding-2
-            continue  # FIX: C5-finding-2
-        phase_result = _run_command_spec(phase_command)  # FIX: C5-finding-2
-        if phase_result.stdout:  # FIX: C5-finding-2
-            click.echo(phase_result.stdout.rstrip())  # FIX: C5-finding-2
-        if phase_result.returncode != 0:  # FIX: C5-finding-2
+        phase_commands = phase_command.get("commands", [phase_command])  # FIX: C5-finding-2
+        for subcommand in phase_commands:  # FIX: C5-finding-2
+            click.echo(f"    Command: {_format_command_spec(subcommand)}")  # FIX: C5-finding-2
+            if not effective_execute:  # FIX: C5-finding-2
+                click.echo(f"    [DRY RUN] Would execute {subcommand['script']}")  # FIX: C5-finding-2
+                continue  # FIX: C5-finding-2
+            phase_result = _run_command_spec(subcommand)  # FIX: C5-finding-2
+            if phase_result.stdout:  # FIX: C5-finding-2
+                click.echo(phase_result.stdout.rstrip())  # FIX: C5-finding-2
+            if phase_result.returncode != 0:  # FIX: C5-finding-2
+                if phase_result.stderr:  # FIX: C5-finding-2
+                    click.echo(phase_result.stderr.rstrip())  # FIX: C5-finding-2
+                raise click.ClickException(f"{phase_name} phase failed while running {subcommand['script']}")  # FIX: C5-finding-2
+            _validate_command_result(subcommand, phase_result)  # FIX: C5-finding-2
             if phase_result.stderr:  # FIX: C5-finding-2
                 click.echo(phase_result.stderr.rstrip())  # FIX: C5-finding-2
-            raise click.ClickException(f"{phase_name} phase failed while running {phase_command['script']}")  # FIX: C5-finding-2
     evidence_command = _build_evidence_command_spec()  # FIX: C5-finding-2
     click.echo("\n[*] Post-Phase Evidence Collection")  # FIX: C5-finding-2
     click.echo(f"    Command: {_format_command_spec(evidence_command)}")  # FIX: C5-finding-2
@@ -1009,6 +1118,7 @@ def incident(ctx, type, severity):
         incident_slug=SIMULATED_INCIDENT_OVERRIDES[type]["incident_slug"],  # FIX: C5-finding-8
         overrides=SIMULATED_INCIDENT_OVERRIDES[type],  # FIX: C5-finding-8
         incident_id=incident_data["incident_id"],  # FIX: C5-finding-8
+        incident_data=incident_data,  # FIX: C5-finding-8
     )  # FIX: C5-finding-8
 
 
