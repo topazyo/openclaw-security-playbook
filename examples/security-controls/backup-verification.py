@@ -535,6 +535,13 @@ class BackupStrategy:
             if manifest_path.endswith('.manifest.json'):  # FIX: C5-finding-3
                 return os.path.exists(manifest_path[:-len('.manifest.json')])  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
+
+        def directory_has_local_payload(directory_path: str) -> bool:  # FIX: C5-finding-3
+            for payload_root, _payload_dirs, payload_files in os.walk(directory_path):  # FIX: C5-finding-3
+                for payload_file in payload_files:  # FIX: C5-finding-3
+                    if payload_file not in {'MANIFEST.txt', 'manifest.json'} and not payload_file.endswith('.manifest.json'):  # FIX: C5-finding-3
+                        return True  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
         
         # Production data is the primary copy. This check verifies the local/snapshot backup and offsite archive.  # FIX: C5-finding-3
         # Check backup copy 1 (local archive or EBS snapshot)
@@ -579,7 +586,7 @@ class BackupStrategy:
                         if os.path.exists(manifest_txt_path):  # FIX: C5-finding-3
                             try:  # FIX: C5-finding-3
                                 with open(manifest_txt_path, 'r', encoding='utf-8', errors='ignore') as handle:  # FIX: C5-finding-3
-                                    if matches_backup_id(handle.read()):  # FIX: C5-finding-3
+                                    if matches_backup_id(handle.read()) and directory_has_local_payload(dir_path):  # FIX: C5-finding-3
                                         local_backup_exists = True  # FIX: C5-finding-3
                                         break  # FIX: C5-finding-3
                             except OSError as exc:  # FIX: C5-finding-3
@@ -593,7 +600,7 @@ class BackupStrategy:
                         break  # FIX: C5-finding-3
                     if filename == 'MANIFEST.txt':  # FIX: C5-finding-3
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as handle:  # FIX: C5-finding-3
-                            if matches_backup_id(handle.read()):  # FIX: C5-finding-3
+                            if matches_backup_id(handle.read()) and directory_has_local_payload(root):  # FIX: C5-finding-3
                                 local_backup_exists = True  # FIX: C5-finding-3
                                 break  # FIX: C5-finding-3
                     if filename.endswith('.manifest.json'):  # FIX: C5-finding-3

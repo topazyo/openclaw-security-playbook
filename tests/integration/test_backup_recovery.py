@@ -332,6 +332,26 @@ class Test321Strategy:
         assert compliance["2_media_types"] is False  # FIX: C5-finding-3
         assert compliance["3_copies"] is False  # FIX: C5-finding-3
 
+    def test_manifest_text_without_directory_payload_does_not_count_as_local_copy(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check ignores a matching MANIFEST.txt directory when no backup payload exists under that directory."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_manifest_text_without_payload_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        strategy.local_backup_dir = str(tmp_path / "local-backups")  # FIX: C5-finding-3
+        matching_dir = Path(strategy.local_backup_dir) / "backup-2024-01-15"  # FIX: C5-finding-3
+        matching_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        (matching_dir / "MANIFEST.txt").write_text("backup-2024-01-15", encoding="utf-8")  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages(  # FIX: C5-finding-3
+            [{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}]  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is False  # FIX: C5-finding-3
+        assert compliance["3_copies"] is False  # FIX: C5-finding-3
+
 
 class TestIntegrityChecks:
     """Test backup integrity validation."""
