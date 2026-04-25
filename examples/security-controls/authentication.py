@@ -82,6 +82,8 @@ class RBACManager:
 
     @classmethod
     def has_permission(cls, roles: Iterable[str], permission: Permission) -> bool:
+        if isinstance(roles, str):  # FIX: C5-finding-4
+            roles = (roles,)  # FIX: C5-finding-4
         return any(permission in cls.ROLE_PERMISSIONS.get(role, set()) for role in roles)
 
 

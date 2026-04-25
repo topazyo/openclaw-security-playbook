@@ -33,7 +33,7 @@ import logging
 import os
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone  # FIX: C5-finding-3
 from pathlib import Path
 from typing import Dict, List
 
@@ -115,6 +115,10 @@ class TimelineGenerator:
         self.es = Elasticsearch([ES_URL])
         self.cloudwatch = boto3.client('logs', region_name=AWS_REGION)
         self.cloudtrail = boto3.client('cloudtrail', region_name=AWS_REGION)
+
+    def _ensure_output_parent(self, output_path: Path):  # FIX: C5-finding-3
+        """Ensure the destination directory exists before writing reports."""  # FIX: C5-finding-3
+        output_path.parent.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
     
     def fetch_elasticsearch_events(self) -> List[Dict]:
         """Fetch events from Elasticsearch"""
@@ -225,8 +229,9 @@ class TimelineGenerator:
     def generate_markdown(self, output_path: Path):
         """Generate Markdown timeline"""
         logger.info(f"Generating Markdown timeline: {output_path}")
+        self._ensure_output_parent(output_path)  # FIX: C5-finding-3
         
-        with open(output_path, 'w') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:  # FIX: C5-finding-3
             f.write(f"# Incident Timeline: {self.incident_id}\n\n")
             f.write(f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n")
             f.write(f"**Period:** Last {self.lookback_hours} hours\n\n")
@@ -269,6 +274,7 @@ class TimelineGenerator:
     def generate_json(self, output_path: Path):
         """Generate JSON timeline"""
         logger.info(f"Generating JSON timeline: {output_path}")
+        self._ensure_output_parent(output_path)  # FIX: C5-finding-3
         
         timeline_data = {
             "incident_id": self.incident_id,
@@ -286,6 +292,7 @@ class TimelineGenerator:
     def generate_csv(self, output_path: Path):
         """Generate CSV timeline"""
         logger.info(f"Generating CSV timeline: {output_path}")
+        self._ensure_output_parent(output_path)  # FIX: C5-finding-3
         
         # Flatten events for CSV
         flattened = []
@@ -310,6 +317,7 @@ class TimelineGenerator:
     def generate_html(self, output_path: Path):
         """Generate interactive HTML timeline"""
         logger.info(f"Generating HTML timeline: {output_path}")
+        self._ensure_output_parent(output_path)  # FIX: C5-finding-3
         
         # Prepare data for vis.js
         timeline_items = []
@@ -337,7 +345,7 @@ class TimelineGenerator:
         
         logger.info(f"✓ HTML timeline saved: {output_path}")
     
-    def generate(self, output_path: Path, output_format: str = "markdown"):
+    def generate(self, output_path: Path, output_format: str = "markdown") -> bool:  # FIX: C5-finding-3
         """Generate timeline in specified format"""
         logger.info(f"Generating timeline for incident: {self.incident_id}")
         
@@ -347,7 +355,7 @@ class TimelineGenerator:
         
         if not self.events:
             logger.warning("No events found for timeline")
-            return
+            return False  # FIX: C5-finding-3
         
         # Correlate events
         self.events = self.correlate_events()
@@ -363,9 +371,10 @@ class TimelineGenerator:
             self.generate_html(output_path)
         else:
             logger.error(f"Unsupported format: {output_format}")
-            return
+            return False  # FIX: C5-finding-3
         
         logger.info(f"✓ Timeline generation complete ({len(self.events)} events)")
+        return True  # FIX: C5-finding-3
 
 
 def main():
@@ -428,7 +437,10 @@ Output Formats:
     
     # Generate timeline
     generator = TimelineGenerator(args.incident, args.hours)
-    generator.generate(args.output, args.format)
+    success = generator.generate(args.output, args.format)  # FIX: C5-finding-3
+    if not success:  # FIX: C5-finding-3
+        logger.error("✗ Timeline generation failed")  # FIX: C5-finding-3
+        return 1  # FIX: C5-finding-3
     
     logger.info("✓ Timeline generation completed")
     return 0
