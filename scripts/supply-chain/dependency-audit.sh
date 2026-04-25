@@ -49,6 +49,13 @@ while [[ $# -gt 0 ]]; do
             ;;
         --format)
             FORMAT="$2"
+            case "$FORMAT" in
+                json|cyclonedx|text) ;;  # FIX: C5-11 — validate early so bad format exits before tool check
+                *)
+                    echo "ERROR: unknown format: $FORMAT (valid: text, json, cyclonedx)" >&2  # FIX: C5-11
+                    exit 2  # FIX: C5-11
+                    ;;
+            esac
             shift 2
             ;;
         --output)

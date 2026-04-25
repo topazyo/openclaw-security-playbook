@@ -101,7 +101,9 @@ class PromptSanitizer:
         # Base64 blob detection: decode each candidate and re-check           # FIX: C5-7
         for match in self._B64_RE.finditer(normalized):  # FIX: C5-7
             try:  # FIX: C5-7
-                decoded = base64.b64decode(match.group() + "==", validate=False).decode(  # FIX: C5-7
+                # Normalise URL-safe chars (-_) to standard (+/) before decode  # FIX: C5-7
+                blob = match.group().translate(str.maketrans("-_", "+/"))     # FIX: C5-7
+                decoded = base64.b64decode(blob + "==", validate=False).decode(  # FIX: C5-7
                     "utf-8", errors="replace"
                 )  # FIX: C5-7
                 decoded_norm = self._normalize(decoded)  # FIX: C5-7
