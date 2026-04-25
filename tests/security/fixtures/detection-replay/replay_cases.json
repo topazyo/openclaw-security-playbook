@@ -196,10 +196,26 @@
     "expected_rules": ["OpenClaw_SOUL_Injection_Persistence"]
   },
   {
-    "name": "yara-gateway-config-positive",
+    "name": "yara-malicious-skill-evasion-whitespace-split",
     "kind": "yara",
     "rule": "detections/ioc/ioc-openclaw.yar",
-    "fixture": "tests/security/fixtures/detection-replay/yara-gateway-config.yml",
-    "expected_rules": ["OpenClaw_Gateway_Exposed_Config"]
+    "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-evasion-whitespace.md",
+    "expected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+  },
+  {
+    "name": "yara-malicious-skill-negative-ssh-backup",
+    "kind": "yara",
+    "rule": "detections/ioc/ioc-openclaw.yar",
+    "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-benign-ssh.md",
+    "expected_rules": [],
+    "unexpected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+  },
+  {
+    "name": "yara-malicious-skill-negative-totp-enrollment",
+    "kind": "yara",
+    "rule": "detections/ioc/ioc-openclaw.yar",
+    "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-benign-totp.md",
+    "expected_rules": [],
+    "unexpected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
   }
 ]

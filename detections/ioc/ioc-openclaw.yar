@@ -49,6 +49,8 @@ rule OpenClaw_Skill_Dangerous_Patterns
         $inner_html  = "innerHTML"     ascii
         $exec_call   = "exec("         ascii
         $child_proc  = "child_process" ascii
+        $eval_ws     = /e\s+val\s*\(/  ascii                      // whitespace-split eval evasion  // FIX: C5-10
+        $ihtml_ws    = /inner\s+html/  ascii nocase               // whitespace-split innerHTML evasion  // FIX: C5-10
         $base64_exec = /[A-Za-z0-9+\/]{40,}={0,2}/ ascii
         $fetch_url   = /https?:\/\/[A-Za-z0-9.-]+/ ascii
         $trusted1    = "openclaw.ai" ascii nocase
@@ -58,7 +60,7 @@ rule OpenClaw_Skill_Dangerous_Patterns
         $trusted5    = "openai.com" ascii nocase
 
     condition:
-        ((any of ($eval, $inner_html, $exec_call, $child_proc)) and $fetch_url and not any of ($trusted*)) or $base64_exec
+        ((any of ($eval, $inner_html, $exec_call, $child_proc, $eval_ws, $ihtml_ws)) and $fetch_url and not any of ($trusted*)) or $base64_exec  // FIX: C5-10
 }
 
 rule OpenClaw_SOUL_Injection_Persistence
