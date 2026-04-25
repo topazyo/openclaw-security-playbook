@@ -87,6 +87,10 @@
         "Nessus or Qualys",
         "Custom security tests"
       ],
+      "validation": {
+        "critical_patch_sla_days": 1,
+        "dependency_audit_cadence_days": 7
+      },
       "compliance_mapping": {
         "SOC2": ["CC7.1", "CC7.2"],
         "ISO27001": ["A.12.6.1", "A.18.2.3"],
@@ -157,6 +161,36 @@
         "5. Post-Incident Review",
         "6. Lessons Learned Documentation"
       ],
+      "validation": {
+        "required_playbooks": [
+          "examples/incident-response/playbook-credential-theft.md",
+          "examples/incident-response/playbook-data-breach.md",
+          "examples/incident-response/playbook-denial-of-service.md",
+          "examples/incident-response/playbook-prompt-injection.md",
+          "examples/incident-response/playbook-skill-compromise.md"
+        ],
+        "checklist": {
+          "path": "configs/organization-policies/incident-response-checklist.json",
+          "required_fields": [
+            "incident_type",
+            "severity_level",
+            "detection_summary",
+            "containment_actions",
+            "eradication_steps",
+            "recovery_validation",
+            "internal_communication",
+            "lessons_learned"
+          ],
+          "forbidden_placeholders": [
+            "TBD",
+            "TODO",
+            "__REQUIRED__",
+            "[Your Name]",
+            "YYYY-MM-DD",
+            "INC-YYYY-NNNN"
+          ]
+        }
+      },
       "compliance_mapping": {
         "SOC2": ["CC7.3", "CC7.4", "CC7.5"],
         "ISO27001": ["A.16.1.1", "A.16.1.4", "A.16.1.5"],
