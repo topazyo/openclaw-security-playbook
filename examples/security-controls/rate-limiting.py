@@ -35,6 +35,8 @@ class TokenBucket:
         self.last_refill = now
 
     def consume(self, tokens: int = 1) -> RateLimitResult:
+        if tokens <= 0:  # FIX: C5-finding-4
+            raise ValueError("tokens must be positive")  # FIX: C5-finding-4
         with self.lock:
             self._refill()
             if self.tokens >= tokens:
@@ -76,6 +78,8 @@ class CostBasedRateLimiter:
         self.spent_by_user: dict[str, float] = defaultdict(float)
 
     def check_budget(self, user_id: str, model_name: str, input_tokens: int, output_tokens: int) -> dict[str, float | bool]:
+        if input_tokens < 0 or output_tokens < 0:  # FIX: C5-finding-4
+            raise ValueError("token counts must be non-negative")  # FIX: C5-finding-4
         unit_cost = self.MODEL_COSTS.get(model_name, self.MODEL_COSTS["gpt-4o-mini"])
         request_cost = unit_cost * (input_tokens + output_tokens)
         projected_total = self.spent_by_user[user_id] + request_cost
