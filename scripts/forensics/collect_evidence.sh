@@ -47,9 +47,10 @@ run_capture() {
 
     if "$@" > "${output_path}" 2>/dev/null; then
         return 0
+    else
+        local exit_code=$? # FIX: C5-finding-2
     fi
 
-    local exit_code=$?
     : > "${output_path}"
     record_warning "Failed to ${description} (exit ${exit_code})"
 }
@@ -61,9 +62,10 @@ run_append_capture() {
 
     if "$@" >> "${output_path}" 2>/dev/null; then
         return 0
+    else
+        local exit_code=$? # FIX: C5-finding-2
     fi
 
-    local exit_code=$?
     record_warning "Failed to ${description} (exit ${exit_code})"
 }
 
