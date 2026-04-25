@@ -104,7 +104,7 @@ class Test321Strategy:
     """Test 3-2-1 backup strategy."""
 
     def test_three_copies_exist(self, backup_config):  # FIX: C5-finding-3
-        """Test the real 3-2-1 compliance check reports three copies when offsite evidence exists."""  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check does not overclaim three copies from offsite evidence alone."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_copies_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
@@ -113,10 +113,10 @@ class Test321Strategy:
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
-        assert compliance["3_copies"] is True  # FIX: C5-finding-3
+        assert compliance["3_copies"] is False  # FIX: C5-finding-3
 
     def test_two_media_types(self, backup_config):  # FIX: C5-finding-3
-        """Test the real 3-2-1 compliance check reports two media types when offsite evidence exists."""  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check does not overclaim two media types from offsite evidence alone."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_media_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
@@ -125,7 +125,7 @@ class Test321Strategy:
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
-        assert compliance["2_media_types"] is True  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is False  # FIX: C5-finding-3
 
     def test_one_offsite_copy(self, backup_config):  # FIX: C5-finding-3
         """Test the real 3-2-1 compliance check reports the offsite copy when S3 contains the backup."""  # FIX: C5-finding-3
@@ -139,6 +139,30 @@ class Test321Strategy:
 
         assert compliance["1_offsite"] is True  # FIX: C5-finding-3
         fake_paginator.paginate.assert_called_once()  # FIX: C5-finding-3
+
+    def test_scans_past_first_object_in_page(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check searches all objects in a page before concluding the backup is absent."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_scan_page_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/other-backup.sql.gz"}, {"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+
+    def test_missing_account_id_does_not_crash(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check works without an injected account_id."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_account_id_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        assert fake_paginator.paginate.call_args.kwargs == {"Bucket": strategy.s3_backup_bucket, "Prefix": "database/"}  # FIX: C5-finding-3
 
 
 class TestIntegrityChecks:

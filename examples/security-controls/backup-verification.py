@@ -515,20 +515,22 @@ class BackupStrategy:
         
         # List objects in S3 bucket using paginator to retrieve all results
         paginator = s3_client.get_paginator('list_objects_v2')
-        pages = paginator.paginate(
-            Bucket=self.s3_backup_bucket,
-            Prefix=f"database/",
-            ExpectedBucketOwner=self.account_id  # Verify bucket ownership
-        )
+        paginate_kwargs = {  # FIX: C5-finding-3
+            'Bucket': self.s3_backup_bucket,  # FIX: C5-finding-3
+            'Prefix': 'database/',  # FIX: C5-finding-3
+        }  # FIX: C5-finding-3
+        account_id = getattr(self, 'account_id', None)  # FIX: C5-finding-3
+        if account_id:  # FIX: C5-finding-3
+            paginate_kwargs['ExpectedBucketOwner'] = account_id  # FIX: C5-finding-3
+        pages = paginator.paginate(**paginate_kwargs)  # FIX: C5-finding-3
         
         # Check if backup exists in offsite
-        for page in pages:
-            for obj in page.get('Contents', []):
-                if backup_id in obj['Key']:
-                    compliance['1_offsite'] = True
-                    compliance['3_copies'] = True  # At least 3 copies exist
-                    compliance['2_media_types'] = True  # EBS + S3
-                break
+        for page in pages:  # FIX: C5-finding-3
+            for obj in page.get('Contents', []):  # FIX: C5-finding-3
+                key = obj.get('Key')  # FIX: C5-finding-3
+                if isinstance(key, str) and backup_id in key:  # FIX: C5-finding-3
+                    compliance['1_offsite'] = True  # FIX: C5-finding-3
+                    return compliance  # FIX: C5-finding-3
         
         return compliance
 
