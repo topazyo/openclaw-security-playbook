@@ -269,7 +269,7 @@ This document specifies what events to log, where to store logs, retention requi
 - Firewall blocks (inbound/outbound connections denied)
 - IDS/IPS alerts (intrusion detection, malware, anomalies)
 - Anti-malware detections (malware found, quarantined)
-- DLP blocks (openclaw-shield blocks credential exfiltration, PII leakage)
+- DLP blocks (runtime or gateway controls block credential exfiltration, PII leakage; optional external DLP tooling may be integrated) <!-- FIX: C5-9 -->
 - Vulnerability scan results (findings, risk scores)
 - Security policy violations (failed compliance checks)
 
@@ -539,7 +539,7 @@ output.elasticsearch:
 - System logs (syslog, Windows Event Log)
 - Container logs (Docker, Kubernetes)
 - Cloud provider logs (AWS CloudTrail, Azure Activity Log)
-- Security tools (openclaw-shield, openclaw-telemetry, openclaw-detect)
+- Security tools (optional external enforcement and telemetry tooling, if integrated) <!-- FIX: C5-9 -->
 - Network devices (firewall, VPN)
 
 **Log Shippers**:
@@ -722,7 +722,7 @@ output {
    - Access denials (spikes in 403 Forbidden errors)
    
 3. **Security alerts**:
-   - DLP blocks (openclaw-shield)
+   - DLP blocks (runtime/gateway controls or external DLP tooling, if integrated) <!-- FIX: C5-9 -->
    - IDS/IPS alerts (AWS GuardDuty)
    - Anti-malware detections
    
@@ -863,7 +863,7 @@ output {
 | ISO 27001 Control | Audit Requirement | Implementation |
 |-------------------|-------------------|----------------|
 | **A.8.15** (Logging) | Logs record activities, exceptions, faults | All event types logged (authentication, authorization, data access, config changes, privileged actions, security events, application events, system events) |
-| **A.8.16** (Monitoring Activities) | Networks, systems, applications monitored for anomalous behavior | SIEM with behavioral analytics, openclaw-telemetry anomaly detection |
+| **A.8.16** (Monitoring Activities) | Networks, systems, applications monitored for anomalous behavior | SIEM with behavioral analytics; external anomaly-detection tooling may be integrated <!-- FIX: C5-9 --> |
 | **A.5.28** (Collection of Evidence) | Evidence identified, collected, preserved | Audit logs immutable (WORM), retained 7 years, chain of custody maintained |
 | **A.5.33** (Protection of Records) | Records protected from loss, destruction, falsification, unauthorized access | Immutable storage (S3 Object Lock), encrypted (AES-256), access restricted (RBAC), backed up (3-2-1 strategy) |
 | **A.8.2** (Privileged Access Rights) | Privileged access logged | Sudo commands, admin actions, secret access logged with full command line |
@@ -880,7 +880,7 @@ output {
 | **Article 32** (Security of Processing) | Implement measures to ensure security, including ability to restore availability | Logs support incident detection, backup/recovery procedures (see [Backup and Recovery](../procedures/backup-recovery.md)) |
 | **Article 33** (Breach Notification to DPA) | Document facts of breach, effects, remedial action | Audit logs provide breach timeline (when detected, what data, containment actions) |
 | **Article 30** (Records of Processing) | Maintain records of processing activities | Logs document data access (who accessed what personal data, when) for accountability |
-| **Article 5(2)** (Accountability) | Demonstrate compliance | Logs provide evidence of security controls (MFA usage, access controls, PII redaction by openclaw-shield) |
+| **Article 5(2)** (Accountability) | Demonstrate compliance | Logs provide evidence of security controls (MFA usage, access controls, PII redaction via runtime/gateway or external DLP tooling if integrated) <!-- FIX: C5-9 --> |
 
 **Evidence**: [GDPR Compliance Guide](./gdpr-compliance.md)
 
