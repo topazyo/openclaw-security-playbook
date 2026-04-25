@@ -559,7 +559,7 @@ class BackupStrategy:
                     break  # FIX: C5-finding-3
                 for filename in files:  # FIX: C5-finding-3
                     file_path = os.path.join(root, filename)  # FIX: C5-finding-3
-                    if matches_backup_id(filename) and filename.endswith(('.tar.gz', '.sql.gz', '.manifest.json')):  # FIX: C5-finding-3
+                    if matches_backup_id(filename) and filename.endswith(('.tar.gz', '.sql.gz')):  # FIX: C5-finding-3
                         local_backup_exists = True  # FIX: C5-finding-3
                         break  # FIX: C5-finding-3
                     if filename == 'MANIFEST.txt':  # FIX: C5-finding-3
@@ -597,7 +597,6 @@ class BackupStrategy:
             candidate_values = [snapshot.get('Description')]  # FIX: C5-finding-3
             for tag in snapshot.get('Tags', []):  # FIX: C5-finding-3
                 if isinstance(tag, dict):  # FIX: C5-finding-3
-                    candidate_values.append(tag.get('Key'))  # FIX: C5-finding-3
                     candidate_values.append(tag.get('Value'))  # FIX: C5-finding-3
             if any(matches_backup_id(value) for value in candidate_values):  # FIX: C5-finding-3
                 snapshot_exists = True  # FIX: C5-finding-3
