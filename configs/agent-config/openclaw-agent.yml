@@ -1,5 +1,5 @@
 ﻿# OpenClaw Agent Configuration
-# Reference configuration template for openclaw-shield agent deployment
+# Reference configuration template for OpenClaw agent deployment  # FIX: C5-9
 #
 # Usage: openclaw-agent --config openclaw-agent.yml --env production
 #        (loads environment-specific overrides from environment-overrides.yml)

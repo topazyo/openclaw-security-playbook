@@ -34,7 +34,7 @@ jobs:
           import sys
 
           repo_root = Path.cwd()
-          pattern = re.compile(r"openclaw-shield|openclaw-detect|openclaw-telemetry|clawguard", re.IGNORECASE)
+          pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
 
           allowed_paths = {
             Path("README.md"),
@@ -50,6 +50,7 @@ jobs:
             Path(".github/agents/openclaw-audit.chatmode.md"),
             Path("scripts/supply-chain/skill_manifest.py"),
             Path("scripts/forensics/verify_hash_chain.py"),
+            Path("scripts/verification/verify_openclaw_security.sh"),
           }
 
           scan_roots = [
@@ -57,6 +58,9 @@ jobs:
             Path("docs"),
             Path("detections/README.md"),
             Path("training/security-training.md"),
+            Path("examples"),
+            Path("configs"),
+            Path("scripts"),
           ]
 
           candidate_files = []
@@ -68,7 +72,7 @@ jobs:
               candidate_files.extend(
                 p.relative_to(repo_root)
                 for p in path.rglob("*")
-                if p.is_file() and p.suffix.lower() in {".md", ".yml", ".yaml", ".txt"}
+                if p.is_file() and p.suffix.lower() in {'.md', '.yml', '.yaml', '.txt', '.sh'}
               )
 
           violations = []
