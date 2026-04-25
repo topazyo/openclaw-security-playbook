@@ -456,7 +456,88 @@ class TestForensicsCollectorRuntimeParity:
 class TestEradicationPhase:
     """Test threat eradication procedures."""
 
-    def test_timeline_generator_creates_html(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+    def test__ensure_output_parent_claim_creates_missing_parent_directory(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test TimelineGenerator._ensure_output_parent() creates nested output directories on demand."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_ensure_parent_issue_7_tests")  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        output_path = tmp_path / "nested" / "reports" / f"{incident_simulator['incident_id']}.md"  # FIX: C5-finding-3
+        assert output_path.parent.exists() is False  # FIX: C5-finding-3
+        generator._ensure_output_parent(output_path)  # FIX: C5-finding-3
+        assert output_path.parent.is_dir() is True  # FIX: C5-finding-3
+
+    def test_generate_markdown_claim_writes_markdown_timeline_and_creates_parent(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test TimelineGenerator.generate_markdown() writes a markdown report into a missing parent directory."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_markdown_issue_7_tests")  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        generator.events = [{  # FIX: C5-finding-3
+            "timestamp": "2024-01-15T10:00:00Z",  # FIX: C5-finding-3
+            "source": "elasticsearch",  # FIX: C5-finding-3
+            "event_type": "AUTHENTICATION_FAILURE",  # FIX: C5-finding-3
+            "severity": "HIGH",  # FIX: C5-finding-3
+            "user": "attacker@example.com",  # FIX: C5-finding-3
+            "source_ip": "198.51.100.23",  # FIX: C5-finding-3
+            "message": "Initial detection",  # FIX: C5-finding-3
+            "correlation": {"suspicious_user": True, "suspicious_ip": False},  # FIX: C5-finding-3
+        }]  # FIX: C5-finding-3
+        output_path = tmp_path / "markdown" / f"{incident_simulator['incident_id']}.md"  # FIX: C5-finding-3
+        generator.generate_markdown(output_path)  # FIX: C5-finding-3
+        assert output_path.exists() is True  # FIX: C5-finding-3
+        markdown_output = output_path.read_text(encoding="utf-8")  # FIX: C5-finding-3
+        assert incident_simulator["incident_id"] in markdown_output  # FIX: C5-finding-3
+        assert "AUTHENTICATION_FAILURE" in markdown_output  # FIX: C5-finding-3
+        assert "Suspicious Activity Detected" in markdown_output  # FIX: C5-finding-3
+
+    def test_generate_json_claim_writes_machine_readable_timeline_and_creates_parent(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test TimelineGenerator.generate_json() writes a JSON report into a missing parent directory."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_json_issue_7_tests")  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        generator.events = [{  # FIX: C5-finding-3
+            "timestamp": "2024-01-15T10:00:00Z",  # FIX: C5-finding-3
+            "source": "cloudtrail",  # FIX: C5-finding-3
+            "event_type": "CONSOLE_LOGIN",  # FIX: C5-finding-3
+            "severity": "INFO",  # FIX: C5-finding-3
+            "user": "alice@example.com",  # FIX: C5-finding-3
+            "source_ip": "203.0.113.10",  # FIX: C5-finding-3
+            "message": "Console login",  # FIX: C5-finding-3
+            "correlation": {"suspicious_user": False, "suspicious_ip": False},  # FIX: C5-finding-3
+        }]  # FIX: C5-finding-3
+        output_path = tmp_path / "json" / f"{incident_simulator['incident_id']}.json"  # FIX: C5-finding-3
+        generator.generate_json(output_path)  # FIX: C5-finding-3
+        payload = json.loads(output_path.read_text(encoding="utf-8"))  # FIX: C5-finding-3
+        assert payload["incident_id"] == incident_simulator["incident_id"]  # FIX: C5-finding-3
+        assert payload["total_events"] == 1  # FIX: C5-finding-3
+        assert payload["events"][0]["event_type"] == "CONSOLE_LOGIN"  # FIX: C5-finding-3
+
+    def test_generate_csv_claim_writes_flattened_timeline_and_creates_parent(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test TimelineGenerator.generate_csv() flattens timeline events into CSV output in a missing parent directory."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_csv_issue_7_tests")  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        generator.events = [{  # FIX: C5-finding-3
+            "timestamp": "2024-01-15T10:00:00Z",  # FIX: C5-finding-3
+            "source": "elasticsearch",  # FIX: C5-finding-3
+            "event_type": "AUTHENTICATION_FAILURE",  # FIX: C5-finding-3
+            "severity": "HIGH",  # FIX: C5-finding-3
+            "user": "attacker@example.com",  # FIX: C5-finding-3
+            "source_ip": "198.51.100.23",  # FIX: C5-finding-3
+            "message": "Initial detection",  # FIX: C5-finding-3
+            "correlation": {"suspicious_user": True, "suspicious_ip": False},  # FIX: C5-finding-3
+        }]  # FIX: C5-finding-3
+        output_path = tmp_path / "csv" / f"{incident_simulator['incident_id']}.csv"  # FIX: C5-finding-3
+        fake_frame = Mock()  # FIX: C5-finding-3
+
+        def write_csv(path, index=False):  # FIX: C5-finding-3
+            assert index is False  # FIX: C5-finding-3
+            Path(path).write_text("timestamp,event_type\n2024-01-15T10:00:00Z,AUTHENTICATION_FAILURE\n", encoding="utf-8")  # FIX: C5-finding-3
+
+        fake_frame.to_csv.side_effect = write_csv  # FIX: C5-finding-3
+        with patch.object(module.pd, "DataFrame", return_value=fake_frame) as dataframe_cls:  # FIX: C5-finding-3
+            generator.generate_csv(output_path)  # FIX: C5-finding-3
+        dataframe_cls.assert_called_once()  # FIX: C5-finding-3
+        fake_frame.to_csv.assert_called_once_with(output_path, index=False)  # FIX: C5-finding-3
+        assert output_path.exists() is True  # FIX: C5-finding-3
+        assert "AUTHENTICATION_FAILURE" in output_path.read_text(encoding="utf-8")  # FIX: C5-finding-3
+
+    def test_generate_html_claim_writes_html_timeline_and_creates_parent(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
         """Test timeline-generator.py creates incident timeline."""  # FIX: C5-finding-3
         module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_issue_7_tests")  # FIX: C5-finding-3
         generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
@@ -486,7 +567,7 @@ class TestEradicationPhase:
         assert "AUTHENTICATION_FAILURE" in html_output  # FIX: C5-finding-3
         assert "Initial detection" in html_output  # FIX: C5-finding-3
 
-    def test_timeline_generator_returns_false_when_no_events_found(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+    def test_generate_claim_returns_false_when_no_events_found(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
         """Test timeline-generator.py reports failure when no events are available."""  # FIX: C5-finding-3
         module, fake_es_client, _fake_logs_client, fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_no_events_issue_7_tests")  # FIX: C5-finding-3
         fake_es_client.search.return_value = {"hits": {"hits": []}}  # FIX: C5-finding-3
@@ -495,6 +576,22 @@ class TestEradicationPhase:
         output_path = tmp_path / "empty" / f"{incident_simulator['incident_id']}.html"  # FIX: C5-finding-3
         assert generator.generate(output_path, output_format="html") is False  # FIX: C5-finding-3
         assert not output_path.exists()  # FIX: C5-finding-3
+
+    def test_main_claim_returns_nonzero_when_timeline_generation_fails(self, tmp_path):  # FIX: C5-finding-3
+        """Test timeline-generator.py exits nonzero when generate() reports failure."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_main_issue_7_tests")  # FIX: C5-finding-3
+        output_path = tmp_path / "main" / "timeline.html"  # FIX: C5-finding-3
+        with patch.object(module.TimelineGenerator, "generate", return_value=False):  # FIX: C5-finding-3
+            with patch.object(sys, "argv", ["timeline-generator.py", "--incident", "INC-MAIN-001", "--output", str(output_path), "--format", "html"]):  # FIX: C5-finding-3
+                assert module.main() == 1  # FIX: C5-finding-3
+
+    def test___init___claim_initializes_empty_ec2_tracking_set(self, incident_simulator):  # FIX: C5-finding-3
+        """Test ImpactAnalyzer.__init__() starts with an empty EC2 tracking set and report shell."""  # FIX: C5-finding-3
+        module, _fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_init_issue_7_tests")  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(f"{incident_simulator['incident_id']}-init")  # FIX: C5-finding-3
+        assert analyzer.analyzed_ec2_instances == set()  # FIX: C5-finding-3
+        assert analyzer.impact_report["incident_id"] == f"{incident_simulator['incident_id']}-init"  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"] == {}  # FIX: C5-finding-3
     
     def test_impact_analyzer_calculates_blast_radius(self, incident_simulator):  # FIX: C5-finding-3
         """Test impact-analyzer.py calculates affected resources."""  # FIX: C5-finding-3
@@ -518,7 +615,7 @@ class TestEradicationPhase:
         assert analyzer.impact_report["blast_radius"]["ec2_instances"] == 1  # FIX: C5-finding-3
         assert analyzer.impact_report["blast_radius"]["total_resources"] == 4  # FIX: C5-finding-3
 
-    def test_impact_analyzer_returns_false_on_malformed_instance_data(self, incident_simulator):  # FIX: C5-finding-3
+    def test_analyze_ec2_blast_radius_claim_rejects_malformed_instance_data(self, incident_simulator):  # FIX: C5-finding-3
         """Test impact-analyzer.py reports failure when EC2 metadata is incomplete."""  # FIX: C5-finding-3
         module, fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_malformed_issue_7_tests")  # FIX: C5-finding-3
         fake_ec2.describe_instances.return_value = {"Reservations": [{"Instances": [{"SecurityGroups": [{"GroupId": "sg-app-123"}]}]}]}  # FIX: C5-finding-3
@@ -527,7 +624,7 @@ class TestEradicationPhase:
         assert analyzer.affected_resources == set()  # FIX: C5-finding-3
         assert analyzer.impact_report["blast_radius"] == {}  # FIX: C5-finding-3
 
-    def test_impact_analyzer_tracks_multiple_ec2_instances(self, incident_simulator):  # FIX: C5-finding-3
+    def test_analyze_ec2_blast_radius_claim_counts_all_analyzed_instances(self, incident_simulator):  # FIX: C5-finding-3
         """Test impact-analyzer.py counts all analyzed EC2 instances."""  # FIX: C5-finding-3
         module, fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_multiple_issue_7_tests")  # FIX: C5-finding-3
         fake_ec2.describe_instances.side_effect = [  # FIX: C5-finding-3

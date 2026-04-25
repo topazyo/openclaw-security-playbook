@@ -95,10 +95,14 @@ EMAIL_TEMPLATE = """
 
 class NotificationManager:
     """Manage incident notifications across multiple channels"""
+    VALID_SEVERITIES = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}  # FIX: C5-finding-3
     
     def __init__(self, incident_id: str, severity: str):
         self.incident_id = incident_id
-        self.severity = severity.strip().upper()  # FIX: C5-finding-3
+        normalized_severity = severity.strip().upper()  # FIX: C5-finding-3
+        if normalized_severity not in self.VALID_SEVERITIES:  # FIX: C5-finding-3
+            raise ValueError(f"Invalid severity: {severity!r}. Expected one of {sorted(self.VALID_SEVERITIES)}")  # FIX: C5-finding-3
+        self.severity = normalized_severity  # FIX: C5-finding-3
         self.notifications_sent = []
     
     def send_slack_notification(self, message: str, thread_ts: str = None) -> bool:

@@ -231,7 +231,7 @@ class TimelineGenerator:
         logger.info(f"Generating Markdown timeline: {output_path}")
         self._ensure_output_parent(output_path)  # FIX: C5-finding-3
         
-        with open(output_path, 'w') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:  # FIX: C5-finding-3
             f.write(f"# Incident Timeline: {self.incident_id}\n\n")
             f.write(f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n")
             f.write(f"**Period:** Last {self.lookback_hours} hours\n\n")

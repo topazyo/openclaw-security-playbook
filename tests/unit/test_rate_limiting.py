@@ -22,7 +22,7 @@ def rate_limiting_module():  # FIX: C5-finding-4
     return module  # FIX: C5-finding-4
 
 
-def test_token_bucket_blocks_after_capacity_is_exhausted(rate_limiting_module):  # FIX: C5-finding-4
+def test_consume_claim_blocks_after_capacity_and_reports_retry_after(rate_limiting_module):  # FIX: C5-finding-4
     bucket = rate_limiting_module.TokenBucket(capacity=3, refill_rate=1.0)  # FIX: C5-finding-4
     assert bucket.consume(1).allowed is True  # FIX: C5-finding-4
     assert bucket.consume(1).allowed is True  # FIX: C5-finding-4
@@ -44,8 +44,10 @@ def test_token_bucket_refills_after_elapsed_time(rate_limiting_module):  # FIX: 
     assert refilled.tokens_remaining == 1  # FIX: C5-finding-4
 
 
-def test_token_bucket_rejects_negative_token_requests(rate_limiting_module):  # FIX: C5-finding-4
+def test_consume_claim_rejects_non_positive_token_requests(rate_limiting_module):  # FIX: C5-finding-4
     bucket = rate_limiting_module.TokenBucket(capacity=5, refill_rate=1.0)  # FIX: C5-finding-4
+    with pytest.raises(ValueError, match="positive"):  # FIX: C5-finding-4
+        bucket.consume(0)  # FIX: C5-finding-4
     with pytest.raises(ValueError, match="positive"):  # FIX: C5-finding-4
         bucket.consume(-1)  # FIX: C5-finding-4
 
@@ -71,7 +73,7 @@ def test_cost_based_rate_limiter_rejects_expensive_request_without_spending_budg
     assert limiter.spent_by_user["test-user"] == 0.0  # FIX: C5-finding-4
 
 
-def test_cost_based_rate_limiter_uses_default_cost_for_unknown_model(rate_limiting_module):  # FIX: C5-finding-4
+def test_check_budget_claim_uses_default_cost_for_unknown_model(rate_limiting_module):  # FIX: C5-finding-4
     limiter = rate_limiting_module.CostBasedRateLimiter(daily_budget_usd=0.01)  # FIX: C5-finding-4
     result = limiter.check_budget("test-user", "unknown-model", input_tokens=1000, output_tokens=500)  # FIX: C5-finding-4
     assert result["allowed"] is True  # FIX: C5-finding-4
@@ -79,7 +81,7 @@ def test_cost_based_rate_limiter_uses_default_cost_for_unknown_model(rate_limiti
     assert pytest.approx(limiter.spent_by_user["test-user"], rel=1e-9) == 0.0015  # FIX: C5-finding-4
 
 
-def test_cost_based_rate_limiter_rejects_negative_token_counts(rate_limiting_module):  # FIX: C5-finding-4
+def test_check_budget_claim_rejects_negative_token_counts(rate_limiting_module):  # FIX: C5-finding-4
     limiter = rate_limiting_module.CostBasedRateLimiter(daily_budget_usd=1.0)  # FIX: C5-finding-4
     with pytest.raises(ValueError, match="non-negative"):  # FIX: C5-finding-4
         limiter.check_budget("test-user", "gpt-4o-mini", input_tokens=-1000, output_tokens=500)  # FIX: C5-finding-4

@@ -52,7 +52,7 @@ def test_data_encryptor_detects_tampering(encryption_module):  # FIX: C5-finding
         encryptor.decrypt_data(bytes(encrypted))  # FIX: C5-finding-4
 
 
-def test_derive_key_from_password_is_deterministic_for_same_salt(encryption_module):  # FIX: C5-finding-4
+def test_derive_key_from_password_claim_derives_consistent_key_for_valid_inputs(encryption_module):  # FIX: C5-finding-4
     salt = b"static-salt-value"  # FIX: C5-finding-4
     key_one = encryption_module.derive_key_from_password("user-password-123", salt, iterations=100000)  # FIX: C5-finding-4
     key_two = encryption_module.derive_key_from_password("user-password-123", salt, iterations=100000)  # FIX: C5-finding-4
@@ -62,12 +62,12 @@ def test_derive_key_from_password_is_deterministic_for_same_salt(encryption_modu
     assert key_one != key_three  # FIX: C5-finding-4
 
 
-def test_derive_key_from_password_rejects_short_salt(encryption_module):  # FIX: C5-finding-4
+def test_derive_key_from_password_claim_rejects_short_salt(encryption_module):  # FIX: C5-finding-4
     with pytest.raises(ValueError, match="at least 16 bytes"):  # FIX: C5-finding-4
         encryption_module.derive_key_from_password("user-password-123", b"short", iterations=100000)  # FIX: C5-finding-4
 
 
-def test_derive_key_from_password_rejects_low_iteration_count(encryption_module):  # FIX: C5-finding-4
+def test_derive_key_from_password_claim_rejects_insecure_iteration_count(encryption_module):  # FIX: C5-finding-4
     with pytest.raises(ValueError, match="at least 100000"):  # FIX: C5-finding-4
         encryption_module.derive_key_from_password("user-password-123", b"0123456789abcdef", iterations=1)  # FIX: C5-finding-4
 

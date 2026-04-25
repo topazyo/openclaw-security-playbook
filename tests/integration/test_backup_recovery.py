@@ -211,7 +211,7 @@ class Test321Strategy:
         assert fake_paginator.paginate.call_args.kwargs == {"Bucket": strategy.s3_backup_bucket, "Prefix": "database/"}  # FIX: C5-finding-3
         fake_ec2_client.describe_snapshots.assert_called_once_with(OwnerIds=["self"])  # FIX: C5-finding-3
 
-    def test_local_backup_and_offsite_satisfy_full_compliance(self, tmp_path, backup_config):  # FIX: C5-finding-3
+    def test_verify_3_2_1_compliance_claim_reports_full_compliance_with_real_local_and_offsite_evidence(self, tmp_path, backup_config):  # FIX: C5-finding-3
         """Test the real 3-2-1 compliance check accepts a local backup archive plus offsite storage without a snapshot."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_local_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
@@ -296,7 +296,7 @@ class Test321Strategy:
             with pytest.raises(RuntimeError, match="local backup manifest"):  # FIX: C5-finding-3
                 strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
-    def test_offsite_manifest_object_does_not_count_as_offsite_copy(self, backup_config):  # FIX: C5-finding-3
+    def test_verify_3_2_1_compliance_claim_rejects_manifest_only_offsite_evidence(self, backup_config):  # FIX: C5-finding-3
         """Test the real 3-2-1 compliance check ignores offsite manifest objects when the backup archive itself is absent."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_offsite_manifest_only_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3

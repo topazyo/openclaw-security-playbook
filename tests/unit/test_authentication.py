@@ -66,8 +66,9 @@ def test_rbac_manager_enforces_role_permissions(authentication_module):  # FIX: 
     assert rbac_manager.has_permission(["user"], permission.AGENTS_DELETE) is False  # FIX: C5-finding-4
 
 
-def test_rbac_manager_accepts_single_role_string(authentication_module):  # FIX: C5-finding-4
+def test_has_permission_claim_accepts_single_role_string_and_denies_unrecognized_role_payload(authentication_module):  # FIX: C5-finding-4
     permission = authentication_module.Permission  # FIX: C5-finding-4
     rbac_manager = authentication_module.RBACManager  # FIX: C5-finding-4
     assert rbac_manager.has_permission("admin", permission.AGENTS_DELETE) is True  # FIX: C5-finding-4
     assert rbac_manager.has_permission("user", permission.AGENTS_DELETE) is False  # FIX: C5-finding-4
+    assert rbac_manager.has_permission("admin;DROP TABLE audit_logs", permission.AGENTS_DELETE) is False  # FIX: C5-finding-4

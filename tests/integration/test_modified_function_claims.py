@@ -416,6 +416,17 @@ def test_collect_process_list_claim_collects_running_process_details(tmp_path):
     assert processes[1]["connections_detail"] == []
 
 
+def test___init___claim_normalizes_valid_severity_and_rejects_invalid_values():
+    module = _load_notification_manager_module("notification_manager_claim_init")
+
+    manager = module.NotificationManager("INC-NOTIFY-INIT", " high ")
+    assert manager.severity == "HIGH"
+    assert manager.notifications_sent == []
+
+    with pytest.raises(ValueError, match="Invalid severity"):
+        module.NotificationManager("INC-NOTIFY-INVALID", "high; drop table incidents")
+
+
 def test_notify_all_claim_reports_overall_delivery_status():
     module = _load_notification_manager_module("notification_manager_claim_notify_all")
 
