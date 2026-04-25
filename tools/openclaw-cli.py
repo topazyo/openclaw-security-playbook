@@ -243,6 +243,7 @@ def _select_detection_target(incident_data: dict | None, require_real: bool) -> 
             raise click.ClickException("Detection phase requires real incident data; no incident context was provided")  # FIX: C5-finding-2
         return None  # FIX: C5-finding-2
 
+    dns_failures = []  # FIX: C5-finding-2
     for resource in incident_data.get("affected_resources", []):  # FIX: C5-finding-2
         try:  # FIX: C5-finding-2
             ipaddress.ip_address(resource)  # FIX: C5-finding-2
@@ -258,15 +259,17 @@ def _select_detection_target(incident_data: dict | None, require_real: bool) -> 
         try:  # FIX: C5-finding-2
             socket.gethostbyname(resource)  # FIX: C5-finding-2
         except socket.gaierror as exc:  # FIX: C5-finding-2
-            if require_real:  # FIX: C5-finding-2
-                raise click.ClickException(f"Detection phase requires a resolvable incident target; DNS failed for {resource}: {exc}")  # FIX: C5-finding-2
-            return None  # FIX: C5-finding-2
+            dns_failures.append((resource, exc))  # FIX: C5-finding-2
+            continue  # FIX: C5-finding-2
 
         if not os.getenv("ABUSEIPDB_API_KEY"):  # FIX: C5-finding-2
             raise click.ClickException("Detection phase requires ABUSEIPDB_API_KEY for real domain reputation checks")  # FIX: C5-finding-2
         return ("domain", resource)  # FIX: C5-finding-2
 
     if require_real:  # FIX: C5-finding-2
+        if dns_failures:  # FIX: C5-finding-2
+            failed_resource, failed_error = dns_failures[0]  # FIX: C5-finding-2
+            raise click.ClickException(f"Detection phase requires a resolvable incident target; DNS failed for {failed_resource}: {failed_error}")  # FIX: C5-finding-2
         raise click.ClickException("Detection phase requires a real IOC target from incident data; none of the affected resources are scannable")  # FIX: C5-finding-2
     return None  # FIX: C5-finding-2
 

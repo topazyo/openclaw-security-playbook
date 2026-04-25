@@ -57,8 +57,20 @@ class IOCScanner:
         self.results = {
             "scan_timestamp": datetime.now(timezone.utc).isoformat(),
             "iocs_found": [],
-            "threat_score": 0
+            "threat_score": 0,
+            "scan_results": [],
+            "status": "success",
         }
+
+    def _record_scan_result(self, scan_type: str, target: str, result: Dict):
+        normalized_result = {"scan_type": scan_type, "target": target, **result}
+        status = normalized_result.get("status", "success")
+        normalized_result["status"] = status
+        self.results["scan_results"].append(normalized_result)
+        if status == "error":
+            self.results["status"] = "error"
+        elif status == "skipped" and self.results["status"] != "error":
+            self.results["status"] = "skipped"
     
     def check_ip_reputation(self, ip_address: str) -> Dict:
         """Check IP reputation using AbuseIPDB"""
@@ -66,7 +78,9 @@ class IOCScanner:
         
         if not ABUSEIPDB_API_KEY:
             logger.warning("ABUSEIPDB_API_KEY not set")
-            return {"status": "skipped", "reason": "API key not configured"}
+            result = {"status": "skipped", "reason": "API key not configured"}
+            self._record_scan_result("ip", ip_address, result)
+            return result
         
         headers = {
             "Key": ABUSEIPDB_API_KEY,
@@ -111,11 +125,14 @@ class IOCScanner:
                 self.results["threat_score"] += abuse_score
             
             logger.info(f"✓ IP reputation: {abuse_score}/100 (malicious: {is_malicious})")
+            self._record_scan_result("ip", ip_address, result)
             return result
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to check IP reputation: {e}")
-            return {"status": "error", "error": str(e)}
+            result = {"status": "error", "error": str(e)}
+            self._record_scan_result("ip", ip_address, result)
+            return result
     
     def check_file_hash(self, file_hash: str) -> Dict:
         """Check file hash using VirusTotal"""
@@ -123,7 +140,9 @@ class IOCScanner:
         
         if not VIRUSTOTAL_API_KEY:
             logger.warning("VIRUSTOTAL_API_KEY not set")
-            return {"status": "skipped", "reason": "API key not configured"}
+            result = {"status": "skipped", "reason": "API key not configured"}
+            self._record_scan_result("hash", file_hash, result)
+            return result
         
         headers = {
             "x-apikey": VIRUSTOTAL_API_KEY
@@ -138,7 +157,9 @@ class IOCScanner:
             
             if response.status_code == 404:
                 logger.info("Hash not found in VirusTotal (likely clean or unknown)")
-                return {"status": "not_found", "is_malicious": False}
+                result = {"status": "not_found", "is_malicious": False}
+                self._record_scan_result("hash", file_hash, result)
+                return result
             
             response.raise_for_status()
             
@@ -171,11 +192,14 @@ class IOCScanner:
                 self.results["threat_score"] += detection_rate
             
             logger.info(f"✓ File hash: {malicious_count}/{total_scans} detections (malicious: {is_malicious})")
+            self._record_scan_result("hash", file_hash, result)
             return result
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to check file hash: {e}")
-            return {"status": "error", "error": str(e)}
+            result = {"status": "error", "error": str(e)}
+            self._record_scan_result("hash", file_hash, result)
+            return result
     
     def analyze_domain(self, domain: str) -> Dict:
         """Analyze domain for malicious indicators"""
@@ -184,7 +208,8 @@ class IOCScanner:
         result = {
             "domain": domain,
             "is_malicious": False,
-            "indicators": []
+            "indicators": [],
+            "status": "success",
         }
         
         # DNS resolution
@@ -194,10 +219,14 @@ class IOCScanner:
             
             # Check resolved IP reputation
             ip_result = self.check_ip_reputation(ip_address)
+            if ip_result.get("status") in {"error", "skipped"}:
+                result["status"] = ip_result["status"]
+                result["reputation_error"] = ip_result.get("error") or ip_result.get("reason")
             if ip_result.get("is_malicious"):
                 result["is_malicious"] = True
                 result["indicators"].append("Resolves to malicious IP")
         except socket.gaierror:
+            result["status"] = "error"
             result["dns_status"] = "No DNS record found"
             result["indicators"].append("DNS lookup failed")
         
@@ -219,6 +248,7 @@ class IOCScanner:
             self.results["threat_score"] += 30
         
         logger.info(f"✓ Domain analysis: malicious={result['is_malicious']}")
+        self._record_scan_result("domain", domain, result)
         return result
     
     def scan_file(self, file_path: Path) -> Dict:
@@ -227,7 +257,9 @@ class IOCScanner:
         
         if not file_path.exists():
             logger.error(f"File not found: {file_path}")
-            return {"status": "error", "error": "File not found"}
+            result = {"status": "error", "error": "File not found"}
+            self._record_scan_result("file", str(file_path), result)
+            return result
         
         # Calculate SHA-256 hash
         sha256_hash = hashlib.sha256()
@@ -247,12 +279,15 @@ class IOCScanner:
                 "file_path": str(file_path),
                 "sha256": file_hash,
                 "size_bytes": file_path.stat().st_size,
-                "virustotal_result": vt_result
+                "virustotal_result": vt_result,
+                "status": vt_result.get("status", "success") if isinstance(vt_result, dict) else "success",
             }
             
         except Exception as e:
             logger.error(f"Failed to scan file: {e}")
-            return {"status": "error", "error": str(e)}
+            result = {"status": "error", "error": str(e)}
+            self._record_scan_result("file", str(file_path), result)
+            return result
     
     def generate_report(self, output_path: str = None):
         """Generate IOC scan report"""
@@ -336,14 +371,16 @@ Environment Variables:
         scanner.check_file_hash(file_hash)
     
     if args.file:
-        scanner.scan_file(args.file)
+        file_result = scanner.scan_file(args.file)
+        if isinstance(file_result, dict) and file_result.get("status") != "error":
+            scanner._record_scan_result("file", str(args.file), file_result)
     
     if args.domain:
         scanner.analyze_domain(args.domain)
     
     scanner.generate_report(args.output)
     
-    return 0
+    return 1 if scanner.results.get("status") in {"error", "skipped"} else 0
 
 
 if __name__ == "__main__":

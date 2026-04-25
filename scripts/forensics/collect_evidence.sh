@@ -35,6 +35,38 @@ Run this before stopping the agent process to preserve volatile state.
 EOF
 }
 
+record_warning() {
+    echo -e "${YELLOW}[WARN] $1${NC}"
+    WARNINGS=$((WARNINGS + 1))
+}
+
+run_capture() {
+    local description="$1"
+    local output_path="$2"
+    shift 2
+
+    if "$@" > "${output_path}" 2>/dev/null; then
+        return 0
+    fi
+
+    local exit_code=$?
+    : > "${output_path}"
+    record_warning "Failed to ${description} (exit ${exit_code})"
+}
+
+run_append_capture() {
+    local description="$1"
+    local output_path="$2"
+    shift 2
+
+    if "$@" >> "${output_path}" 2>/dev/null; then
+        return 0
+    fi
+
+    local exit_code=$?
+    record_warning "Failed to ${description} (exit ${exit_code})"
+}
+
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 INCIDENT_DIR="${HOME}/openclaw-incident-${TIMESTAMP}"
 CONTAINMENT=false
@@ -70,21 +102,29 @@ mkdir -p "${INCIDENT_DIR}"/{logs,config,network,process,filesystem,hashes}
 
 echo "[+] Phase 0: Capturing volatile state before containment..."
 
-ss -tnap > "${INCIDENT_DIR}/network/connections.txt" 2>/dev/null || true
-ss -lntp > "${INCIDENT_DIR}/network/listeners.txt" 2>/dev/null || true
-lsof -nP -iTCP -sTCP:ESTABLISHED >> "${INCIDENT_DIR}/network/connections.txt" 2>/dev/null || true
-netstat -rn > "${INCIDENT_DIR}/network/routes.txt" 2>/dev/null || true
+run_capture "capture active network connections" "${INCIDENT_DIR}/network/connections.txt" ss -tnap
+run_capture "capture network listeners" "${INCIDENT_DIR}/network/listeners.txt" ss -lntp
+run_append_capture "capture established TCP connections via lsof" "${INCIDENT_DIR}/network/connections.txt" lsof -nP -iTCP -sTCP:ESTABLISHED
+run_capture "capture network routes" "${INCIDENT_DIR}/network/routes.txt" netstat -rn
 
-ps auxf > "${INCIDENT_DIR}/process/process-tree.txt" 2>/dev/null || true
-ps aux | grep -E "(openclaw|moltbot|clawdbot|node)"     > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null || true
+run_capture "capture process tree" "${INCIDENT_DIR}/process/process-tree.txt" ps auxf
+ps aux | grep -E "(openclaw|moltbot|clawdbot|node)" > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null
+agent_process_capture_rc=$?
+if [ "${agent_process_capture_rc}" -gt 1 ]; then
+    : > "${INCIDENT_DIR}/process/agent-processes.txt"
+    record_warning "Failed to capture filtered agent process list (exit ${agent_process_capture_rc})"
+fi
 
 echo "[+] Phase 1: Copying agent logs..."
 for dir in ~/.openclaw ~/.moltbot ~/.clawdbot; do
     if [ -d "${dir}/logs" ]; then
         dirname=$(basename "$dir")
         mkdir -p "${INCIDENT_DIR}/logs/${dirname}"
-        cp -r "${dir}/logs/." "${INCIDENT_DIR}/logs/${dirname}/" 2>/dev/null || true
-        echo "    Copied: ${dir}/logs/"
+        if cp -r "${dir}/logs/." "${INCIDENT_DIR}/logs/${dirname}/" 2>/dev/null; then
+            echo "    Copied: ${dir}/logs/"
+        else
+            record_warning "Failed to copy logs from ${dir}/logs"
+        fi
     fi
 done
 
@@ -93,8 +133,12 @@ for dir in ~/.openclaw ~/.moltbot ~/.clawdbot; do
     if [ -d "${dir}" ]; then
         dirname=$(basename "$dir")
         mkdir -p "${INCIDENT_DIR}/config/${dirname}"
-        cp "${dir}/config.yml"  "${INCIDENT_DIR}/config/${dirname}/" 2>/dev/null || true
-        cp "${dir}/config.json" "${INCIDENT_DIR}/config/${dirname}/" 2>/dev/null || true
+        if [ -f "${dir}/config.yml" ] && ! cp "${dir}/config.yml"  "${INCIDENT_DIR}/config/${dirname}/" 2>/dev/null; then
+            record_warning "Failed to copy ${dir}/config.yml"
+        fi
+        if [ -f "${dir}/config.json" ] && ! cp "${dir}/config.json" "${INCIDENT_DIR}/config/${dirname}/" 2>/dev/null; then
+            record_warning "Failed to copy ${dir}/config.json"
+        fi
     fi
 done
 
@@ -144,13 +188,29 @@ echo "[+] Phase 6: Capturing skill manifests..."
 for dir in ~/.openclaw/skills ~/.moltbot/skills ~/.clawdbot/skills; do
     if [ -d "${dir}" ]; then
         dirname=$(basename "$(dirname "$dir")")
-        find "${dir}" -name "*.md" -type f 2>/dev/null             | sort > "${INCIDENT_DIR}/filesystem/skills-present-${dirname}.txt"
+        if ! find "${dir}" -name "*.md" -type f 2>/dev/null | sort > "${INCIDENT_DIR}/filesystem/skills-present-${dirname}.txt"; then
+            : > "${INCIDENT_DIR}/filesystem/skills-present-${dirname}.txt"
+            record_warning "Failed to capture skill manifests from ${dir}"
+        fi
     fi
 done
 
 echo "[+] Phase 7: Capturing crontab and systemd units..."
-crontab -l > "${INCIDENT_DIR}/filesystem/crontab.txt" 2>/dev/null || echo "(no crontab)"
-systemctl list-units --type=service | grep -iE "(openclaw|moltbot|clawdbot)"     > "${INCIDENT_DIR}/filesystem/systemd-services.txt" 2>/dev/null || true
+if command -v crontab >/dev/null 2>&1; then
+    if ! crontab -l > "${INCIDENT_DIR}/filesystem/crontab.txt" 2>/dev/null; then
+        echo "(no crontab)" > "${INCIDENT_DIR}/filesystem/crontab.txt"
+    fi
+else
+    : > "${INCIDENT_DIR}/filesystem/crontab.txt"
+    record_warning "Failed to capture crontab entries (crontab command unavailable)"
+fi
+
+systemctl list-units --type=service | grep -iE "(openclaw|moltbot|clawdbot)" > "${INCIDENT_DIR}/filesystem/systemd-services.txt" 2>/dev/null
+systemd_services_rc=$?
+if [ "${systemd_services_rc}" -gt 1 ]; then
+    : > "${INCIDENT_DIR}/filesystem/systemd-services.txt"
+    record_warning "Failed to capture systemd service inventory (exit ${systemd_services_rc})"
+fi
 
 echo ""
 echo "============================================================"
@@ -167,9 +227,15 @@ echo ""
 
 if [ "${CONTAINMENT}" = true ]; then
     echo "[+] Running containment (--containment flag set)..."
-    systemctl stop moltbot 2>/dev/null || true
-    systemctl stop openclaw 2>/dev/null || true
-    docker stop clawdbot 2>/dev/null || true
+    if ! systemctl stop moltbot 2>/dev/null; then
+        record_warning "Failed to stop moltbot during containment"
+    fi
+    if ! systemctl stop openclaw 2>/dev/null; then
+        record_warning "Failed to stop openclaw during containment"
+    fi
+    if ! docker stop clawdbot 2>/dev/null; then
+        record_warning "Failed to stop clawdbot during containment"
+    fi
     echo "    Agent stopped."
 fi
 

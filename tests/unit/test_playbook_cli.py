@@ -294,6 +294,36 @@ def test_requested_cli_severity_drives_notification_policy(monkeypatch):
     } == {"LOW"}
 
 
+def test_detection_uses_later_scannable_target_when_earlier_domain_fails_dns(monkeypatch):
+    recorded_commands: list[dict] = []
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "test-token")
+
+    def _create_incident(incident_type: str, severity: str = "P1") -> dict:
+        return {
+            "incident_id": "INC-DNS-001",
+            "type": "Credential Exfiltration",
+            "severity": severity,
+            "affected_resources": ["broken.invalid", "203.0.113.10", "i-0abc123"],
+            "description": "DNS failure fallback simulation",
+            "detected_at": "2026-04-24T00:00:00+00:00",
+            "status": "active",
+        }
+
+    monkeypatch.setattr(_CLI_MOD, "_load_tool_module", lambda _filename, _module_name: SimpleNamespace(create_incident=_create_incident))
+    monkeypatch.setattr(
+        _CLI_MOD.socket,
+        "gethostbyname",
+        lambda resource: (_ for _ in ()).throw(_CLI_MOD.socket.gaierror("dns failed")) if resource == "broken.invalid" else "203.0.113.10",
+    )
+    monkeypatch.setattr(_CLI_MOD, "_run_command_spec", _recording_runner(recorded_commands))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["simulate", "incident", "--type", "credential-theft", "--severity", "P1"])
+
+    assert result.exit_code == 0
+    assert recorded_commands[0]["args"][:2] == ["--ip", "203.0.113.10"]
+
+
 @pytest.mark.parametrize("incident_type", ["credential-theft", "mcp-compromise", "dos-attack"])
 def test_shipped_simulator_payloads_satisfy_hardened_orchestration(monkeypatch, incident_type):
     recorded_commands: list[dict] = []
