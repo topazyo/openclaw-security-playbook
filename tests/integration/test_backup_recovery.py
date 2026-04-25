@@ -42,14 +42,16 @@ def _load_backup_verification_module(module_name: str):  # FIX: C5-finding-3
     return module  # FIX: C5-finding-3
 
 
-def _fake_boto3_with_backup_pages(pages):  # FIX: C5-finding-3
+def _fake_boto3_with_backup_pages(pages, snapshots=None):  # FIX: C5-finding-3
     fake_s3_client = MagicMock()  # FIX: C5-finding-3
     fake_paginator = MagicMock()  # FIX: C5-finding-3
     fake_paginator.paginate.return_value = pages  # FIX: C5-finding-3
     fake_s3_client.get_paginator.return_value = fake_paginator  # FIX: C5-finding-3
+    fake_ec2_client = MagicMock()  # FIX: C5-finding-3
+    fake_ec2_client.describe_snapshots.return_value = {"Snapshots": snapshots or []}  # FIX: C5-finding-3
     fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
-    fake_boto3.client = Mock(return_value=fake_s3_client)  # FIX: C5-finding-3
-    return fake_boto3, fake_s3_client, fake_paginator  # FIX: C5-finding-3
+    fake_boto3.client = Mock(side_effect=lambda service_name, region_name=None: {"s3": fake_s3_client, "ec2": fake_ec2_client}[service_name])  # FIX: C5-finding-3
+    return fake_boto3, fake_s3_client, fake_paginator, fake_ec2_client  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -103,41 +105,85 @@ class TestRPOVerification:
 class Test321Strategy:
     """Test 3-2-1 backup strategy."""
 
+    def test_does_not_match_hyphen_suffixed_backup_ids(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check does not treat hyphen-suffixed backup ids as matches."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_substring_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages(  # FIX: C5-finding-3
+            [{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15-extra.sql.gz"}]}],  # FIX: C5-finding-3
+            [{"Description": "backup-2024-01-15-extra hourly snapshot", "Tags": [{"Key": "BackupId", "Value": "backup-2024-01-15-extra"}]}],  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance == {"3_copies": False, "2_media_types": False, "1_offsite": False}  # FIX: C5-finding-3
+
+    def test_module_generated_backup_id_matches_uploaded_offsite_backup(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check maps create_database_backup() ids to upload_to_offsite() filenames."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_generated_id_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        strategy.local_backup_dir = str(tmp_path / "local-backups")  # FIX: C5-finding-3
+        Path(strategy.local_backup_dir).mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        timestamp = "2026-04-25_06-30-00"  # FIX: C5-finding-3
+        backup_id = f"db-{timestamp}"  # FIX: C5-finding-3
+        backup_file = Path(strategy.local_backup_dir) / f"openclaw_backup_{timestamp}.sql.gz"  # FIX: C5-finding-3
+        backup_file.write_bytes(b"backup")  # FIX: C5-finding-3
+        (Path(f"{backup_file}.manifest.json")).write_text(module.BackupManifest(backup_id=backup_id, backup_type=module.BackupType.DATABASE.value, created_at=datetime.now(timezone.utc).isoformat(), source_system="openclaw-db-us-west-2", files={backup_file.name: "checksum"}, size_bytes=backup_file.stat().st_size, compression="gzip", encryption="none", retention_days=30).to_json(), encoding="utf-8")  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([{"Contents": [{"Key": f"database/2026/04/25/{backup_file.name}"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance(backup_id)  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is True  # FIX: C5-finding-3
+        assert compliance["3_copies"] is True  # FIX: C5-finding-3
+
     def test_three_copies_exist(self, backup_config):  # FIX: C5-finding-3
-        """Test the real 3-2-1 compliance check does not overclaim three copies from offsite evidence alone."""  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check reports three copies when both snapshot and offsite evidence exist."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_copies_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
-        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages(  # FIX: C5-finding-3
+            [{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}],  # FIX: C5-finding-3
+            [{"Description": "backup-2024-01-15 hourly snapshot", "Tags": [{"Key": "BackupId", "Value": "backup-2024-01-15"}]}],  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
-        assert compliance["3_copies"] is False  # FIX: C5-finding-3
+        assert compliance["3_copies"] is True  # FIX: C5-finding-3
 
     def test_two_media_types(self, backup_config):  # FIX: C5-finding-3
-        """Test the real 3-2-1 compliance check does not overclaim two media types from offsite evidence alone."""  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check reports two media types when both snapshot and offsite evidence exist."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_media_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
-        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages(  # FIX: C5-finding-3
+            [{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}],  # FIX: C5-finding-3
+            [{"Description": "backup-2024-01-15 hourly snapshot", "Tags": [{"Key": "Name", "Value": "backup-2024-01-15"}]}],  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
-        assert compliance["2_media_types"] is False  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is True  # FIX: C5-finding-3
 
     def test_one_offsite_copy(self, backup_config):  # FIX: C5-finding-3
         """Test the real 3-2-1 compliance check reports the offsite copy when S3 contains the backup."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_offsite_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
-        fake_boto3, _fake_s3_client, fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
         assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        assert compliance["3_copies"] is False  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is False  # FIX: C5-finding-3
         fake_paginator.paginate.assert_called_once()  # FIX: C5-finding-3
 
     def test_scans_past_first_object_in_page(self, backup_config):  # FIX: C5-finding-3
@@ -145,7 +191,7 @@ class Test321Strategy:
         module = _load_backup_verification_module("backup_verification_321_scan_page_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
         strategy.account_id = "123456789012"  # FIX: C5-finding-3
-        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/other-backup.sql.gz"}, {"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/other-backup.sql.gz"}, {"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
@@ -156,13 +202,46 @@ class Test321Strategy:
         """Test the real 3-2-1 compliance check works without an injected account_id."""  # FIX: C5-finding-3
         module = _load_backup_verification_module("backup_verification_321_account_id_issue_7_tests")  # FIX: C5-finding-3
         strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
-        fake_boto3, _fake_s3_client, fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, fake_paginator, fake_ec2_client = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
         assert compliance["1_offsite"] is True  # FIX: C5-finding-3
         assert fake_paginator.paginate.call_args.kwargs == {"Bucket": strategy.s3_backup_bucket, "Prefix": "database/"}  # FIX: C5-finding-3
+        fake_ec2_client.describe_snapshots.assert_called_once_with(OwnerIds=["self"])  # FIX: C5-finding-3
+
+    def test_local_backup_and_offsite_satisfy_full_compliance(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check accepts a local backup archive plus offsite storage without a snapshot."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_local_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        strategy.local_backup_dir = str(tmp_path / "local-backups")  # FIX: C5-finding-3
+        Path(strategy.local_backup_dir).mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        (Path(strategy.local_backup_dir) / "openclaw-backup-2024-01-15.tar.gz").write_bytes(b"backup")  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        assert compliance["2_media_types"] is True  # FIX: C5-finding-3
+        assert compliance["3_copies"] is True  # FIX: C5-finding-3
+
+    def test_invalid_backup_specific_manifest_raises_instead_of_silently_skipping(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check raises when backup-specific local manifest evidence cannot be parsed."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_manifest_error_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        strategy.local_backup_dir = str(tmp_path / "local-backups")  # FIX: C5-finding-3
+        manifest_dir = Path(strategy.local_backup_dir) / "backup-2024-01-15"  # FIX: C5-finding-3
+        manifest_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        (manifest_dir / "metadata.manifest.json").write_text("{not-json", encoding="utf-8")  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            with pytest.raises(RuntimeError, match="local backup manifest"):  # FIX: C5-finding-3
+                strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
 
 
 class TestIntegrityChecks:
@@ -199,7 +278,7 @@ class TestIntegrityChecks:
         backup_path = tmp_path / "backup-2024-01-15.sql.gz"  # FIX: C5-finding-3
         backup_path.write_bytes(b"backup-payload")  # FIX: C5-finding-3
         (tmp_path / "backup-2024-01-15.sql.gz.manifest.json").write_text("{}", encoding="utf-8")  # FIX: C5-finding-3
-        fake_boto3, fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([])  # FIX: C5-finding-3
+        fake_boto3, fake_s3_client, _fake_paginator, _fake_ec2_client = _fake_boto3_with_backup_pages([])  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
             s3_uri = strategy.upload_to_offsite(str(backup_path))  # FIX: C5-finding-3

@@ -37,6 +37,7 @@ References:
 import os
 import json
 import hashlib
+import re  # FIX: C5-finding-3
 import subprocess  # nosec B404
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone
@@ -491,7 +492,7 @@ class BackupStrategy:
         backup_id: str
     ) -> Dict[str, bool]:
         """
-        Verify backup exists in all 3 locations with 2 media types.
+        Verify 3-2-1 compliance using the wired backup evidence sources.
         
         Args:
             backup_id: Backup identifier
@@ -506,12 +507,28 @@ class BackupStrategy:
             '2_media_types': False,
             '1_offsite': False
         }
+
+        backup_id_aliases = {backup_id}  # FIX: C5-finding-3
+        if backup_id.startswith('db-'):  # FIX: C5-finding-3
+            backup_timestamp = backup_id[3:]  # FIX: C5-finding-3
+            backup_id_aliases.add(f'openclaw_backup_{backup_timestamp}')  # FIX: C5-finding-3
+        if backup_id.startswith('backup-'):  # FIX: C5-finding-3
+            backup_id_aliases.add(f'openclaw-{backup_id}')  # FIX: C5-finding-3
+            backup_id_aliases.add(f'openclaw_{backup_id}')  # FIX: C5-finding-3
+
+        backup_id_pattern = re.compile(  # FIX: C5-finding-3
+            rf"(?<![A-Za-z0-9_])(?:{'|'.join(re.escape(alias) for alias in sorted(backup_id_aliases, key=len, reverse=True))})(?![A-Za-z0-9_-])"  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+
+        def matches_backup_id(value: Any) -> bool:  # FIX: C5-finding-3
+            return isinstance(value, str) and backup_id_pattern.search(value) is not None  # FIX: C5-finding-3
         
-        # Check Copy 1 (local EBS)
-        # Check Copy 2 (EBS snapshot)
-        # Check Copy 3 (S3 Glacier)
+        # Production data is the primary copy. This check verifies the local/snapshot backup and offsite archive.  # FIX: C5-finding-3
+        # Check backup copy 1 (local archive or EBS snapshot)
+        # Check backup copy 2 (S3 Glacier)
         
         s3_client = boto3.client('s3', region_name=self.backup_region)
+        ec2_client = boto3.client('ec2', region_name=self.primary_region)  # FIX: C5-finding-3
         
         # List objects in S3 bucket using paginator to retrieve all results
         paginator = s3_client.get_paginator('list_objects_v2')
@@ -523,14 +540,72 @@ class BackupStrategy:
         if account_id:  # FIX: C5-finding-3
             paginate_kwargs['ExpectedBucketOwner'] = account_id  # FIX: C5-finding-3
         pages = paginator.paginate(**paginate_kwargs)  # FIX: C5-finding-3
+
+        local_backup_dir = getattr(  # FIX: C5-finding-3
+            self,  # FIX: C5-finding-3
+            'local_backup_dir',  # FIX: C5-finding-3
+            os.getenv('BACKUP_DIR', os.path.expanduser('~/openclaw-backups'))  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        local_backup_exists = False  # FIX: C5-finding-3
+        if isinstance(local_backup_dir, str) and os.path.isdir(local_backup_dir):  # FIX: C5-finding-3
+            for root, dirs, files in os.walk(local_backup_dir):  # FIX: C5-finding-3
+                for dirname in dirs:  # FIX: C5-finding-3
+                    if matches_backup_id(dirname):  # FIX: C5-finding-3
+                        dir_path = os.path.join(root, dirname)  # FIX: C5-finding-3
+                        if os.path.exists(os.path.join(dir_path, 'MANIFEST.txt')) or os.path.exists(os.path.join(dir_path, 'manifest.json')):  # FIX: C5-finding-3
+                            local_backup_exists = True  # FIX: C5-finding-3
+                            break  # FIX: C5-finding-3
+                if local_backup_exists:  # FIX: C5-finding-3
+                    break  # FIX: C5-finding-3
+                for filename in files:  # FIX: C5-finding-3
+                    file_path = os.path.join(root, filename)  # FIX: C5-finding-3
+                    if matches_backup_id(filename) and filename.endswith(('.tar.gz', '.sql.gz', '.manifest.json')):  # FIX: C5-finding-3
+                        local_backup_exists = True  # FIX: C5-finding-3
+                        break  # FIX: C5-finding-3
+                    if filename == 'MANIFEST.txt':  # FIX: C5-finding-3
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as handle:  # FIX: C5-finding-3
+                            if matches_backup_id(handle.read()):  # FIX: C5-finding-3
+                                local_backup_exists = True  # FIX: C5-finding-3
+                                break  # FIX: C5-finding-3
+                    if filename.endswith('.manifest.json'):  # FIX: C5-finding-3
+                        try:  # FIX: C5-finding-3
+                            with open(file_path, 'r', encoding='utf-8') as handle:  # FIX: C5-finding-3
+                                manifest_data = json.load(handle)  # FIX: C5-finding-3
+                            if manifest_data.get('backup_id') == backup_id:  # FIX: C5-finding-3
+                                local_backup_exists = True  # FIX: C5-finding-3
+                                break  # FIX: C5-finding-3
+                        except (OSError, json.JSONDecodeError) as exc:  # FIX: C5-finding-3
+                            if matches_backup_id(file_path) or matches_backup_id(root):  # FIX: C5-finding-3
+                                raise RuntimeError(f'local backup manifest could not be read: {file_path}') from exc  # FIX: C5-finding-3
+                if local_backup_exists:  # FIX: C5-finding-3
+                    break  # FIX: C5-finding-3
         
         # Check if backup exists in offsite
         for page in pages:  # FIX: C5-finding-3
             for obj in page.get('Contents', []):  # FIX: C5-finding-3
                 key = obj.get('Key')  # FIX: C5-finding-3
-                if isinstance(key, str) and backup_id in key:  # FIX: C5-finding-3
+                if matches_backup_id(key):  # FIX: C5-finding-3
                     compliance['1_offsite'] = True  # FIX: C5-finding-3
-                    return compliance  # FIX: C5-finding-3
+                    break  # FIX: C5-finding-3
+            if compliance['1_offsite']:  # FIX: C5-finding-3
+                break  # FIX: C5-finding-3
+
+        snapshot_owner = [account_id] if account_id else ['self']  # FIX: C5-finding-3
+        snapshot_response = ec2_client.describe_snapshots(OwnerIds=snapshot_owner)  # FIX: C5-finding-3
+        snapshot_exists = False  # FIX: C5-finding-3
+        for snapshot in snapshot_response.get('Snapshots', []):  # FIX: C5-finding-3
+            candidate_values = [snapshot.get('Description')]  # FIX: C5-finding-3
+            for tag in snapshot.get('Tags', []):  # FIX: C5-finding-3
+                if isinstance(tag, dict):  # FIX: C5-finding-3
+                    candidate_values.append(tag.get('Key'))  # FIX: C5-finding-3
+                    candidate_values.append(tag.get('Value'))  # FIX: C5-finding-3
+            if any(matches_backup_id(value) for value in candidate_values):  # FIX: C5-finding-3
+                snapshot_exists = True  # FIX: C5-finding-3
+                break  # FIX: C5-finding-3
+
+        if compliance['1_offsite'] and (snapshot_exists or local_backup_exists):  # FIX: C5-finding-3
+            compliance['2_media_types'] = True  # FIX: C5-finding-3
+            compliance['3_copies'] = True  # FIX: C5-finding-3
         
         return compliance
 
