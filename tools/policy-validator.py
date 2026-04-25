@@ -136,14 +136,44 @@ class PolicyValidator:
         if not checklist_file.exists():  # FIX: C5-finding-1
             return [f"SEC-005.2: Incident checklist file not found: {checklist_path}"]  # FIX: C5-finding-1
         checklist_text = checklist_file.read_text(encoding="utf-8")  # FIX: C5-finding-1
+        checklist_data = self._load_checklist_data(checklist_file, checklist_text)  # FIX: C5-finding-1
         violations = []  # FIX: C5-finding-1
-        missing_fields = [field for field in required_fields if field not in checklist_text]  # FIX: C5-finding-1
+        if not isinstance(checklist_data, dict):  # FIX: C5-finding-1
+            return [f"SEC-005.2: Incident checklist file must contain a top-level object: {checklist_path}"]  # FIX: C5-finding-1
+        missing_fields = [field for field in required_fields if field not in checklist_data]  # FIX: C5-finding-1
         if missing_fields:  # FIX: C5-finding-1
             violations.append(f"SEC-005.2: Incident checklist missing required fields: {', '.join(missing_fields)}")  # FIX: C5-finding-1
+        unpopulated_fields = [  # FIX: C5-finding-1
+            field for field in required_fields if field in checklist_data and not self._is_populated_checklist_value(checklist_data[field])  # FIX: C5-finding-1
+        ]  # FIX: C5-finding-1
+        if unpopulated_fields:  # FIX: C5-finding-1
+            violations.append(f"SEC-005.2: Incident checklist fields must be populated: {', '.join(unpopulated_fields)}")  # FIX: C5-finding-1
         placeholder_hits = [placeholder for placeholder in forbidden_placeholders if placeholder in checklist_text]  # FIX: C5-finding-1
         if placeholder_hits:  # FIX: C5-finding-1
             violations.append(f"SEC-005.2: Incident checklist contains unpopulated placeholders: {', '.join(placeholder_hits)}")  # FIX: C5-finding-1
         return violations  # FIX: C5-finding-1
+
+    def _load_checklist_data(self, checklist_file, checklist_text):  # FIX: C5-finding-1
+        suffix = checklist_file.suffix.lower()  # FIX: C5-finding-1
+        try:  # FIX: C5-finding-1
+            if suffix == ".json":  # FIX: C5-finding-1
+                return json.loads(checklist_text)  # FIX: C5-finding-1
+            if suffix in {".yml", ".yaml"} and yaml is not None:  # FIX: C5-finding-1
+                return yaml.safe_load(checklist_text)  # FIX: C5-finding-1
+        except Exception:  # FIX: C5-finding-1
+            return None  # FIX: C5-finding-1
+        return None  # FIX: C5-finding-1
+
+    def _is_populated_checklist_value(self, value):  # FIX: C5-finding-1
+        if value is None:  # FIX: C5-finding-1
+            return False  # FIX: C5-finding-1
+        if isinstance(value, str):  # FIX: C5-finding-1
+            return bool(value.strip())  # FIX: C5-finding-1
+        if isinstance(value, list):  # FIX: C5-finding-1
+            return bool(value) and any(self._is_populated_checklist_value(item) for item in value)  # FIX: C5-finding-1
+        if isinstance(value, dict):  # FIX: C5-finding-1
+            return bool(value) and any(self._is_populated_checklist_value(item) for item in value.values())  # FIX: C5-finding-1
+        return True  # FIX: C5-finding-1
 
     def _extract_critical_patch_sla(self, requirements):  # FIX: C5-finding-1
         for requirement in requirements if isinstance(requirements, list) else []:  # FIX: C5-finding-1
