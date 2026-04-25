@@ -743,6 +743,8 @@ def derive_key_from_password(password: str, salt: bytes, iterations: int = 10000
     """
     if len(salt) < 16:  # FIX: C5-finding-4
         raise ValueError("salt must be at least 16 bytes")  # FIX: C5-finding-4
+    if iterations < 100000:  # FIX: C5-finding-4
+        raise ValueError("iterations must be at least 100000")  # FIX: C5-finding-4
     kdf = PBKDF2HMAC(  # FIX: C5-finding-4
         algorithm=hashes.SHA256(),
         length=32,  # 256 bits

@@ -54,9 +54,9 @@ def test_data_encryptor_detects_tampering(encryption_module):  # FIX: C5-finding
 
 def test_derive_key_from_password_is_deterministic_for_same_salt(encryption_module):  # FIX: C5-finding-4
     salt = b"static-salt-value"  # FIX: C5-finding-4
-    key_one = encryption_module.derive_key_from_password("user-password-123", salt, iterations=1000)  # FIX: C5-finding-4
-    key_two = encryption_module.derive_key_from_password("user-password-123", salt, iterations=1000)  # FIX: C5-finding-4
-    key_three = encryption_module.derive_key_from_password("user-password-123", b"other-salt-value", iterations=1000)  # FIX: C5-finding-4
+    key_one = encryption_module.derive_key_from_password("user-password-123", salt, iterations=100000)  # FIX: C5-finding-4
+    key_two = encryption_module.derive_key_from_password("user-password-123", salt, iterations=100000)  # FIX: C5-finding-4
+    key_three = encryption_module.derive_key_from_password("user-password-123", b"other-salt-value", iterations=100000)  # FIX: C5-finding-4
     assert len(key_one) == 32  # FIX: C5-finding-4
     assert key_one == key_two  # FIX: C5-finding-4
     assert key_one != key_three  # FIX: C5-finding-4
@@ -64,7 +64,12 @@ def test_derive_key_from_password_is_deterministic_for_same_salt(encryption_modu
 
 def test_derive_key_from_password_rejects_short_salt(encryption_module):  # FIX: C5-finding-4
     with pytest.raises(ValueError, match="at least 16 bytes"):  # FIX: C5-finding-4
-        encryption_module.derive_key_from_password("user-password-123", b"short", iterations=1000)  # FIX: C5-finding-4
+        encryption_module.derive_key_from_password("user-password-123", b"short", iterations=100000)  # FIX: C5-finding-4
+
+
+def test_derive_key_from_password_rejects_low_iteration_count(encryption_module):  # FIX: C5-finding-4
+    with pytest.raises(ValueError, match="at least 100000"):  # FIX: C5-finding-4
+        encryption_module.derive_key_from_password("user-password-123", b"0123456789abcdef", iterations=1)  # FIX: C5-finding-4
 
 
 def test_vault_key_manager_creates_keys_and_rotates_versions(encryption_module):  # FIX: C5-finding-4
