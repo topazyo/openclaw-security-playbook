@@ -14,6 +14,7 @@ from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
 
 
@@ -73,7 +74,15 @@ def _mock_incident_simulator_module():
     return SimpleNamespace(create_incident=_create_incident)
 
 
-def _recording_runner(recorded_commands: list[dict], *, impact_total_resources: int = 1, containment_stderr: str = "", failing_channel: str | None = None):
+def _recording_runner(
+    recorded_commands: list[dict],
+    *,
+    impact_total_resources: int = 1,
+    containment_stderr: str = "",
+    failing_channel: str | None = None,
+    ioc_report_payload: object | None = None,
+    write_ioc_report: bool = True,
+):
     def _run(command_spec: dict) -> subprocess.CompletedProcess[str]:
         recorded_commands.append(
             {
@@ -83,6 +92,20 @@ def _recording_runner(recorded_commands: list[dict], *, impact_total_resources: 
                 "channel": command_spec.get("channel"),
             }
         )
+
+        if command_spec.get("script") == "scripts/incident-response/ioc-scanner.py" and write_ioc_report:
+            output_args = list(command_spec.get("args", []))
+            output_path = Path(output_args[output_args.index("--output") + 1])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            report_payload = ioc_report_payload
+            if report_payload is None:
+                report_payload = {
+                    "scan_timestamp": "2026-04-24T00:00:00+00:00",
+                    "iocs_found": [],
+                    "threat_score": 0,
+                    "overall_threat_level": "LOW",
+                }
+            output_path.write_text(json.dumps(report_payload), encoding="utf-8")
 
         if command_spec.get("validation") == "impact_blast_radius":
             output_path = Path(command_spec["output_path"])
@@ -213,3 +236,73 @@ def test_revoke_credentials_deny_policy_warning_fails_orchestration(monkeypatch)
 
     assert result.exit_code != 0
     assert "Containment phase did not complete the deny policy step for revoke-credentials" in result.output
+
+
+def test_detection_fails_when_ioc_report_contains_error_status(monkeypatch):
+    recorded_commands: list[dict] = []
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "test-token")
+    monkeypatch.setattr(_CLI_MOD, "_load_tool_module", lambda _filename, _module_name: _mock_incident_simulator_module())
+    monkeypatch.setattr(
+        _CLI_MOD,
+        "_run_command_spec",
+        _recording_runner(
+            recorded_commands,
+            ioc_report_payload={"status": "error", "error": "upstream timeout"},
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["simulate", "incident", "--type", "credential-theft", "--severity", "P1"])
+
+    assert result.exit_code != 0
+    assert "Detection phase IOC report indicates scanner failure" in result.output
+
+
+def test_detection_fails_when_ioc_report_is_missing(monkeypatch):
+    recorded_commands: list[dict] = []
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "test-token")
+    monkeypatch.setattr(_CLI_MOD, "_load_tool_module", lambda _filename, _module_name: _mock_incident_simulator_module())
+    monkeypatch.setattr(
+        _CLI_MOD,
+        "_run_command_spec",
+        _recording_runner(recorded_commands, write_ioc_report=False),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["simulate", "incident", "--type", "credential-theft", "--severity", "P1"])
+
+    assert result.exit_code != 0
+    assert "Detection phase did not produce the expected IOC report" in result.output
+
+
+def test_requested_cli_severity_drives_notification_policy(monkeypatch):
+    recorded_commands: list[dict] = []
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "test-token")
+    monkeypatch.setattr(_CLI_MOD, "_load_tool_module", lambda _filename, _module_name: _mock_incident_simulator_module())
+    monkeypatch.setattr(_CLI_MOD, "_run_command_spec", _recording_runner(recorded_commands))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["simulate", "incident", "--type", "credential-theft", "--severity", "P3"])
+
+    assert result.exit_code == 0
+    recovery_commands = [
+        command for command in recorded_commands if command["script"] == "scripts/incident-response/notification-manager.py"
+    ]
+    assert [command["channel"] for command in recovery_commands] == ["slack", "jira"]
+    assert {
+        command["args"][command["args"].index("--severity") + 1] for command in recovery_commands
+    } == {"LOW"}
+
+
+@pytest.mark.parametrize("incident_type", ["credential-theft", "mcp-compromise", "dos-attack"])
+def test_shipped_simulator_payloads_satisfy_hardened_orchestration(monkeypatch, incident_type):
+    recorded_commands: list[dict] = []
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "test-token")
+    monkeypatch.setattr(_CLI_MOD.socket, "gethostbyname", lambda _resource: "203.0.113.10")
+    monkeypatch.setattr(_CLI_MOD, "_run_command_spec", _recording_runner(recorded_commands))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["simulate", "incident", "--type", incident_type, "--severity", "P1"])
+
+    assert result.exit_code == 0
+    assert recorded_commands
