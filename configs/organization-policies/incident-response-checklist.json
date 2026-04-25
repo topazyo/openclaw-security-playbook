@@ -1,0 +1,35 @@
+{
+  "incident_type": "Credential compromise with suspected data access",
+  "severity_level": "P0",
+  "detection_summary": "Security operations confirmed a high-confidence credential misuse alert from the SIEM and escalated the incident to the on-call responder.",
+  "containment_actions": [
+    "Revoked the exposed credentials.",
+    "Isolated the affected workload from external network access.",
+    "Enabled additional monitoring for related accounts and services."
+  ],
+  "eradication_steps": [
+    "Removed the malicious access path and rotated dependent secrets.",
+    "Patched the affected service and verified the vulnerable configuration was removed.",
+    "Reviewed access logs to confirm no remaining unauthorized sessions."
+  ],
+  "recovery_validation": [
+    "Validated that monitoring remained operational after service restoration.",
+    "Completed a follow-up vulnerability scan with no blocking findings.",
+    "Confirmed the restored service met security configuration requirements."
+  ],
+  "internal_communication": {
+    "incident_commander": "Security On-Call Lead",
+    "stakeholders_notified": [
+      "CISO",
+      "Engineering VP",
+      "Legal",
+      "Executive Team"
+    ],
+    "summary": "Stakeholders received containment status, customer impact assessment, and next-response milestones through the approved escalation channels."
+  },
+  "lessons_learned": [
+    "Credential rotation automation reduced containment time.",
+    "The incident report template now has a fully populated example artifact for responder training.",
+    "Additional validation should continue to verify that required evidence files remain present in the repository."
+  ]
+}
