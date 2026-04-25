@@ -26,3 +26,66 @@ jobs:
       - name: Validate Detection Rules
         run: |
           python scripts/verification/validate_detection_rules.py
+      - name: Guard Phantom Integration References
+        env: # FIX: C5-finding-1
+          PHANTOM_INTEGRATION_ALLOWLIST: | # FIX: C5-finding-1
+            README.md # FIX: C5-finding-1
+            docs/guides/08-community-tools-integration.md # FIX: C5-finding-1
+            examples/incident-response/playbook-credential-theft.md # FIX: C5-finding-1
+            examples/incident-response/playbook-data-breach.md # FIX: C5-finding-1
+            examples/incident-response/playbook-denial-of-service.md # FIX: C5-finding-1
+            examples/incident-response/playbook-prompt-injection.md # FIX: C5-finding-1
+            examples/incident-response/playbook-skill-compromise.md # FIX: C5-finding-1
+            configs/examples/with-community-tools.yml # FIX: C5-finding-1
+            .github/copilot-instructions.md # FIX: C5-finding-1
+            .github/audit/findings-2026-04-24.md # FIX: C5-finding-1
+            .github/agents/openclaw-audit.chatmode.md # FIX: C5-finding-1
+            scripts/supply-chain/skill_manifest.py # FIX: C5-finding-1
+            scripts/forensics/verify_hash_chain.py # FIX: C5-finding-1
+            scripts/verification/verify_openclaw_security.sh # FIX: C5-finding-1
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os # FIX: C5-finding-1
+          import re
+          import sys
+
+          repo_root = Path.cwd()
+          pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
+
+          allowed_paths = { # FIX: C5-finding-1
+            Path(line.strip()) # FIX: C5-finding-1
+            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-finding-1
+            if line.strip() # FIX: C5-finding-1
+
+          } # FIX: C5-finding-1
+          file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-finding-1
+          scan_roots = (".github", "configs", "docs", "examples", "scripts")  # FIX: C5-finding-1
+          candidate_files = set()  # FIX: C5-finding-1
+          for root in scan_roots:  # FIX: C5-finding-1
+            path = repo_root / root  # FIX: C5-finding-1
+            if path.is_file():  # FIX: C5-finding-1
+              candidate_files.add(root)  # FIX: C5-finding-1
+            elif path.is_dir():  # FIX: C5-finding-1
+              for file_pattern in file_patterns:  # FIX: C5-finding-1
+                candidate_files.update(  # FIX: C5-finding-1
+                  p.relative_to(repo_root)  # FIX: C5-finding-1
+                  for p in path.rglob(file_pattern)  # FIX: C5-finding-1
+                  if p.is_file()  # FIX: C5-finding-1
+                )  # FIX: C5-finding-1
+
+          violations = []  # FIX: C5-finding-1
+          for rel_path in sorted(candidate_files):  # FIX: C5-finding-1
+            text = (repo_root / rel_path).read_text(encoding="utf-8")
+            for line_number, line in enumerate(text.splitlines(), start=1):
+              if pattern.search(line):
+                violations.append(f"{rel_path}:{line_number}: {line.strip()}")
+
+          if violations:
+            print("Phantom integration reference guard failed:")
+            for violation in violations:
+              print(violation)
+            sys.exit(1)
+
+          print("Phantom integration reference guard passed.")
+          PY

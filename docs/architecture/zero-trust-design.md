@@ -541,13 +541,13 @@ Identity and authorization decisions are point-in-time. Continuous monitoring en
 
 ### Real-Time Threat Detection
 
-**Key Metrics Monitored (using openclaw-telemetry):**
+**Key Metrics Monitored (using an external telemetry pipeline if your environment provides one):** <!-- FIX: C5-9 -->
 
 ```yaml
-# configs/examples/with-community-tools.yml (excerpt)
+# External example shape only; this repository does not bundle a telemetry service. # FIX: C5-9
 services:
-  openclaw-telemetry:
-    image: knostic/openclaw-telemetry:latest
+  telemetry-pipeline: # FIX: C5-9
+    image: your-approved/telemetry-pipeline:stable # FIX: C5-9
     environment:
       # Behavioral monitoring
       BASELINE_PERIOD: "7d"
@@ -743,9 +743,9 @@ docker exec clawdbot ping 10.0.0.1
 
 **Objective**: Gain visibility and detect anomalies
 
-1. **Deploy openclaw-telemetry**:
+1. **Deploy your telemetry pipeline** (external, not bundled): <!-- FIX: C5-9 -->
    ```bash
-   docker compose -f configs/examples/with-community-tools.yml up -d openclaw-telemetry
+  docker compose -f configs/examples/with-community-tools.yml up -d telemetry-pipeline # FIX: C5-9
    ```
 
 2. **Configure alerts**:

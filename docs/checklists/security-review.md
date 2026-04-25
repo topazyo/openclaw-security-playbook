@@ -207,7 +207,7 @@ tail /var/log/openclaw/audit.log
 ### 6.2 Monitoring
 - [ ] **Health checks configured** (HTTP /health endpoint returns 200)
 - [ ] **Resource monitoring** (CPU, memory, disk usage tracked)
-- [ ] **Security monitoring** (openclaw-telemetry or SIEM alerts)
+- [ ] **Security monitoring** (telemetry pipeline or SIEM alerts) <!-- FIX: C5-9 -->
 - [ ] **Anomaly detection** (behavioral baseline established)
 
 **Reference**: [Community Tools Integration](../guides/08-community-tools-integration.md)

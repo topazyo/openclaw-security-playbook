@@ -18,7 +18,7 @@ Coverage follows the three-tier model described in [`docs/guides/07-detection-an
 Deploy these as scheduled rules regardless of whether you suspect compromise.
 
 **Tier 2 — Behavioral Hunting:** Detect anomalous agent behavior indicating compromise in progress.
-Requires `openclaw-telemetry` deployed and forwarding to SIEM.
+Requires a telemetry pipeline deployed and forwarding to SIEM. <!-- FIX: C5-9 -->
 Setup: see [`docs/guides/08-community-tools-integration.md`](../docs/guides/08-community-tools-integration.md).
 
 **Tier 3 — Kill Chain Detection:** Map observed activity to specific MITRE ATLAS attack chains.
@@ -44,7 +44,7 @@ See `docs/threat-model/ATLAS-mapping.md` for the full kill chain taxonomy.
 ## Prerequisites
 
 - Tier 1 queries: EDR agent deployed on target endpoints, no additional tooling required
-- Tier 2/3 queries: openclaw-telemetry installed and configured with SIEM CEF/syslog forwarding
+- Tier 2/3 queries: telemetry pipeline installed and configured with SIEM CEF/syslog forwarding <!-- FIX: C5-9 -->
 - Sigma rules: `sigma-cli` plus the backend package for your target platform
 
 ## Validation
@@ -64,7 +64,7 @@ The GitHub Actions lint workflow installs both toolchains on Ubuntu runners and 
 
 ## Telemetry Schema
 
-Tier 2 and 3 queries assume the openclaw-telemetry JSONL schema:
+Tier 2 and 3 queries assume a telemetry JSONL schema such as the example below: <!-- FIX: C5-9 -->
 
 ```json
 {

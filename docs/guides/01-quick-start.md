@@ -276,9 +276,9 @@ curl -s http://127.0.0.1:18789/ready
 
 ### Short-Term (This Week)
 
-1. **Deploy openclaw-telemetry** (Community Tool)
-   - Enterprise-grade behavioral monitoring
-   - Follow: [08-community-tools-integration.md](08-community-tools-integration.md#openclaw-telemetry)
+1. **Decide Whether You Need External Telemetry Tooling** <!-- FIX: C5-9 -->
+  - This repository does not bundle a telemetry product; use repo-native validation first. <!-- FIX: C5-9 -->
+  - If your environment requires a separate telemetry pipeline, review [08-community-tools-integration.md](08-community-tools-integration.md) before adoption. <!-- FIX: C5-9 -->
 
 2. **Implement Skill Integrity Monitoring**
    - Follow: [05-supply-chain-security.md](05-supply-chain-security.md)
@@ -296,20 +296,18 @@ curl -s http://127.0.0.1:18789/ready
    - Layer 1: OS-Level Credential Isolation ✓ (Done in this guide)
    - Layer 2: Network Segmentation (See guide 03)
    - Layer 3: Runtime Sandboxing (See guide 04)
-   - Layer 4: Runtime Security Enforcement (openclaw-shield)
+   - Layer 4: Runtime Security Enforcement (repo-native controls plus optional external enforcement) <!-- FIX: C5-9 -->
    - Layer 5: Supply Chain Integrity (See guide 05)
-   - Layer 6: Behavioral Monitoring (openclaw-telemetry)
+   - Layer 6: Behavioral Monitoring (repo-native validation plus your telemetry pipeline) <!-- FIX: C5-9 -->
    - Layer 7: Organizational Controls (See your org policies)
 
-2. **Deploy openclaw-shield** (Community Tool)
-   - 5-layer runtime security enforcement
-   - Prompt injection guards
-   - PII/secret redaction
+2. **Evaluate External Runtime Enforcement Tooling** <!-- FIX: C5-9 -->
+   - This repo ships policy, hardening, and validation guidance, not a bundled enforcement service. <!-- FIX: C5-9 -->
+   - Use [04-runtime-sandboxing.md](04-runtime-sandboxing.md) and [08-community-tools-integration.md](08-community-tools-integration.md) to decide whether external enforcement is warranted. <!-- FIX: C5-9 -->
 
-3. **Shadow AI Discovery** (If Enterprise)
-   - Deploy openclaw-detect via MDM
-   - Inventory all AI agent installations
-   - Enforce security policies
+3. **Shadow AI Discovery** (If Enterprise) <!-- FIX: C5-9 -->
+   - Use MDM, EDR, or other approved enterprise inventory controls to locate AI agent installations. <!-- FIX: C5-9 -->
+   - Enforce security policies through your existing organization tooling. <!-- FIX: C5-9 -->
 
 ---
 
