@@ -21,17 +21,17 @@ class IncidentSimulator:
         scenarios = {
             "credential-theft": {
                 "type": "Credential Exfiltration",
-                "affected_resources": ["i-0abc123", "rds-prod-db"],
+                "affected_resources": ["203.0.113.10", "i-0abc123"],
                 "description": "Simulated credential exfiltration via backup file",
             },
             "mcp-compromise": {
                 "type": "MCP Server Compromise",
-                "affected_resources": ["mcp-01.openclaw.ai"],
+                "affected_resources": ["example.com", "i-0abc123"],
                 "description": "Simulated MCP server exploitation",
             },
             "dos-attack": {
                 "type": "Denial of Service",
-                "affected_resources": ["api-gateway"],
+                "affected_resources": ["198.51.100.10", "i-0abc123"],
                 "description": "Simulated resource exhaustion attack",
             },
         }

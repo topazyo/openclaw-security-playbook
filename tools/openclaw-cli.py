@@ -29,6 +29,7 @@ Installation:
 """
 
 import click
+import builtins  # FIX: C5-finding-2
 import ipaddress
 import json
 import os
@@ -224,6 +225,11 @@ def _build_incident_artifact_paths(incident_slug: str, incident_id: str, create:
     }  # FIX: C5-finding-2
 
 
+def _notification_severity_for_cli_severity(cli_severity: str, fallback_severity: str) -> str:  # FIX: C5-finding-2
+    severity_map = {"P0": "CRITICAL", "P1": "HIGH", "P2": "MEDIUM", "P3": "LOW"}  # FIX: C5-finding-2
+    return severity_map.get(cli_severity, fallback_severity)  # FIX: C5-finding-2
+
+
 def _required_notification_channels(notification_severity: str) -> list[str]:  # FIX: C5-finding-2
     channels = ["slack", "jira"]  # FIX: C5-finding-2
     if notification_severity in {"CRITICAL", "HIGH"}:  # FIX: C5-finding-2
@@ -284,7 +290,7 @@ def _select_blast_radius_resource(incident_data: dict | None, require_real: bool
 def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False, incident_data: dict | None = None, require_real_inputs: bool = False) -> list[dict]:  # FIX: C5-finding-2
     profile = _build_execution_profile(playbook_stem, incident_slug=incident_slug, overrides=overrides)  # FIX: C5-finding-2
     artifact_paths = _build_incident_artifact_paths(profile["incident_slug"], incident_id, create=create_artifacts)  # FIX: C5-finding-2
-    notification_severity = profile["notification_severity"]  # FIX: C5-finding-2
+    notification_severity = _notification_severity_for_cli_severity(severity, profile["notification_severity"])  # FIX: C5-finding-2
     detection_target = _select_detection_target(incident_data, require_real=require_real_inputs)  # FIX: C5-finding-2
     impact_resource = _select_blast_radius_resource(incident_data, require_real=require_real_inputs)  # FIX: C5-finding-2
 
@@ -313,6 +319,9 @@ def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: s
             "kind": "python",  # FIX: C5-finding-2
             "script": "scripts/incident-response/ioc-scanner.py",  # FIX: C5-finding-2
             "args": detection_args,  # FIX: C5-finding-2
+            "validation": "ioc_report",  # FIX: C5-finding-2
+            "output_path": str(artifact_paths["ioc_report"]),  # FIX: C5-finding-2
+            "expected_output_fields": ["scan_timestamp", "iocs_found", "threat_score", "overall_threat_level"],  # FIX: C5-finding-2
         },  # FIX: C5-finding-2
         {  # FIX: C5-finding-2
             "phase": "Containment",  # FIX: C5-finding-2
@@ -375,6 +384,40 @@ def _validate_command_result(command_spec: dict, result: subprocess.CompletedPro
         if failure_marker in combined_output:  # FIX: C5-finding-2
             raise click.ClickException(command_spec.get("failure_message", f"Command validation failed for {command_spec['script']}"))  # FIX: C5-finding-2
 
+    if command_spec.get("validation") == "ioc_report":  # FIX: C5-finding-2
+        report_path = Path(command_spec["output_path"])  # FIX: C5-finding-2
+        if not report_path.exists():  # FIX: C5-finding-2
+            raise click.ClickException(f"Detection phase did not produce the expected IOC report: {report_path}")  # FIX: C5-finding-2
+        try:  # FIX: C5-finding-2
+            with open(report_path, encoding="utf-8") as ioc_report_file:  # FIX: C5-finding-2
+                ioc_report = json.load(ioc_report_file)  # FIX: C5-finding-2
+        except json.JSONDecodeError as exc:  # FIX: C5-finding-2
+            raise click.ClickException(f"Detection phase produced an invalid IOC report: {report_path}: {exc}") from exc  # FIX: C5-finding-2
+        if not isinstance(ioc_report, dict):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase IOC report must be a JSON object")  # FIX: C5-finding-2
+        status_values = []  # FIX: C5-finding-2
+        pending_values = [ioc_report]  # FIX: C5-finding-2
+        while pending_values:  # FIX: C5-finding-2
+            current_value = pending_values.pop()  # FIX: C5-finding-2
+            if isinstance(current_value, dict):  # FIX: C5-finding-2
+                current_status = current_value.get("status")  # FIX: C5-finding-2
+                if isinstance(current_status, str):  # FIX: C5-finding-2
+                    status_values.append(current_status.lower())  # FIX: C5-finding-2
+                pending_values.extend(current_value.values())  # FIX: C5-finding-2
+            elif isinstance(current_value, builtins.list):  # FIX: C5-finding-2
+                pending_values.extend(current_value)  # FIX: C5-finding-2
+        if any(status in {"error", "skipped"} for status in status_values):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase IOC report indicates scanner failure")  # FIX: C5-finding-2
+        missing_fields = [field for field in command_spec.get("expected_output_fields", []) if field not in ioc_report]  # FIX: C5-finding-2
+        if missing_fields:  # FIX: C5-finding-2
+            raise click.ClickException(f"Detection phase IOC report is missing expected output fields: {', '.join(missing_fields)}")  # FIX: C5-finding-2
+        if not ioc_report.get("scan_timestamp") or not ioc_report.get("overall_threat_level"):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase IOC report contains empty expected output")  # FIX: C5-finding-2
+        if not isinstance(ioc_report.get("iocs_found"), builtins.list):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase IOC report must include an iocs_found list")  # FIX: C5-finding-2
+        if not isinstance(ioc_report.get("threat_score"), (int, float)):  # FIX: C5-finding-2
+            raise click.ClickException("Detection phase IOC report must include a numeric threat_score")  # FIX: C5-finding-2
+
     if command_spec.get("validation") == "impact_blast_radius":  # FIX: C5-finding-2
         report_path = Path(command_spec["output_path"])  # FIX: C5-finding-2
         if not report_path.exists():  # FIX: C5-finding-2
@@ -435,6 +478,8 @@ def _execute_playbook_orchestration(ctx, playbook_id: str, severity: str, dry_ru
             if not effective_execute:  # FIX: C5-finding-2
                 click.echo(f"    [DRY RUN] Would execute {subcommand['script']}")  # FIX: C5-finding-2
                 continue  # FIX: C5-finding-2
+            if subcommand.get("output_path"):  # FIX: C5-finding-2
+                Path(subcommand["output_path"]).unlink(missing_ok=True)  # FIX: C5-finding-2
             phase_result = _run_command_spec(subcommand)  # FIX: C5-finding-2
             if phase_result.stdout:  # FIX: C5-finding-2
                 click.echo(phase_result.stdout.rstrip())  # FIX: C5-finding-2
