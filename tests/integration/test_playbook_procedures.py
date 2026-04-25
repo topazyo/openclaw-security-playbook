@@ -27,12 +27,13 @@ from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime, timezone
 import json
 from pathlib import Path  # FIX: C5-finding-3
-from types import SimpleNamespace  # FIX: C5-finding-3
+from types import ModuleType, SimpleNamespace  # FIX: C5-finding-3
 
 
 AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"  # FIX: C5-finding-3
 FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"  # FIX: C5-finding-3
 NOTIFICATION_MANAGER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "notification-manager.py"  # FIX: C5-finding-3
+TIMELINE_GENERATOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "timeline-generator.py"  # FIX: C5-finding-3
 
 
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
@@ -95,6 +96,25 @@ def _load_notification_manager_module(module_name):  # FIX: C5-finding-3
     sys.modules[spec.name] = module  # FIX: C5-finding-3
     spec.loader.exec_module(module)  # FIX: C5-finding-3
     return module  # FIX: C5-finding-3
+
+
+def _load_timeline_generator_module(module_name):  # FIX: C5-finding-3
+    fake_es_client = MagicMock()  # FIX: C5-finding-3
+    fake_logs_client = MagicMock()  # FIX: C5-finding-3
+    fake_cloudtrail_client = MagicMock()  # FIX: C5-finding-3
+    fake_elasticsearch = ModuleType("elasticsearch")  # FIX: C5-finding-3
+    fake_elasticsearch.Elasticsearch = MagicMock(return_value=fake_es_client)  # FIX: C5-finding-3
+    fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
+    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"logs": fake_logs_client, "cloudtrail": fake_cloudtrail_client}[service_name])  # FIX: C5-finding-3
+    fake_pandas = ModuleType("pandas")  # FIX: C5-finding-3
+    fake_pandas.DataFrame = MagicMock()  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, TIMELINE_GENERATOR_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    with patch.dict(sys.modules, {"elasticsearch": fake_elasticsearch, "boto3": fake_boto3, "pandas": fake_pandas}):  # FIX: C5-finding-3
+        sys.modules[spec.name] = module  # FIX: C5-finding-3
+        spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module, fake_es_client, fake_logs_client, fake_cloudtrail_client  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -337,33 +357,46 @@ class TestForensicsCollectorRuntimeParity:
 
 class TestEradicationPhase:
     """Test threat eradication procedures."""
-    
-    @patch("subprocess.run")
-    def test_timeline_generator_creates_html(self, mock_subprocess, incident_simulator):
-        """Test timeline-generator.py creates incident timeline."""
-        mock_subprocess.return_value.returncode = 0
-        expected_path = f"/tmp/timelines/{incident_simulator['incident_id']}.html"
-        mock_tg = MagicMock()
-        mock_tg.generate.return_value = expected_path
-        mock_ir = MagicMock(timeline_generator=mock_tg)
 
-        events = [
-            {"timestamp": "2024-01-15T10:00:00Z", "event": "Initial detection"},
-            {"timestamp": "2024-01-15T10:05:00Z", "event": "Containment initiated"},
-        ]
+    def test_timeline_generator_creates_html(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test timeline-generator.py creates incident timeline."""  # FIX: C5-finding-3
+        module, _fake_es_client, _fake_logs_client, _fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_issue_7_tests")  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        generator.events = [  # FIX: C5-finding-3
+            {  # FIX: C5-finding-3
+                "timestamp": "2024-01-15T10:00:00Z",  # FIX: C5-finding-3
+                "event_type": "AUTHENTICATION_FAILURE",  # FIX: C5-finding-3
+                "severity": "HIGH",  # FIX: C5-finding-3
+                "user": "attacker@example.com",  # FIX: C5-finding-3
+                "source_ip": "198.51.100.23",  # FIX: C5-finding-3
+                "message": "Initial detection",  # FIX: C5-finding-3
+            },  # FIX: C5-finding-3
+            {  # FIX: C5-finding-3
+                "timestamp": "2024-01-15T10:05:00Z",  # FIX: C5-finding-3
+                "event_type": "CONTAINMENT_INITIATED",  # FIX: C5-finding-3
+                "severity": "MEDIUM",  # FIX: C5-finding-3
+                "user": "secops@example.com",  # FIX: C5-finding-3
+                "source_ip": "127.0.0.1",  # FIX: C5-finding-3
+                "message": "Containment initiated",  # FIX: C5-finding-3
+            },  # FIX: C5-finding-3
+        ]  # FIX: C5-finding-3
+        output_path = tmp_path / "html" / f"{incident_simulator['incident_id']}.html"  # FIX: C5-finding-3
+        generator.generate_html(output_path)  # FIX: C5-finding-3
+        assert output_path.exists()  # FIX: C5-finding-3
+        html_output = output_path.read_text(encoding="utf-8")  # FIX: C5-finding-3
+        assert incident_simulator["incident_id"] in html_output  # FIX: C5-finding-3
+        assert "AUTHENTICATION_FAILURE" in html_output  # FIX: C5-finding-3
+        assert "Initial detection" in html_output  # FIX: C5-finding-3
 
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.timeline_generator": mock_tg,
-        }):
-            from scripts.incident_response import timeline_generator
-            html_path = timeline_generator.generate(
-                incident_id=incident_simulator["incident_id"],
-                events=events,
-            )
-
-        assert html_path.endswith(".html")
-        assert "INC-2024-001" in html_path
+    def test_timeline_generator_returns_false_when_no_events_found(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test timeline-generator.py reports failure when no events are available."""  # FIX: C5-finding-3
+        module, fake_es_client, _fake_logs_client, fake_cloudtrail_client = _load_timeline_generator_module("timeline_generator_no_events_issue_7_tests")  # FIX: C5-finding-3
+        fake_es_client.search.return_value = {"hits": {"hits": []}}  # FIX: C5-finding-3
+        fake_cloudtrail_client.lookup_events.return_value = {"Events": []}  # FIX: C5-finding-3
+        generator = module.TimelineGenerator(incident_simulator["incident_id"], lookback_hours=24)  # FIX: C5-finding-3
+        output_path = tmp_path / "empty" / f"{incident_simulator['incident_id']}.html"  # FIX: C5-finding-3
+        assert generator.generate(output_path, output_format="html") is False  # FIX: C5-finding-3
+        assert not output_path.exists()  # FIX: C5-finding-3
     
     @patch("requests.get")
     def test_impact_analyzer_calculates_blast_radius(self, mock_get, incident_simulator):
