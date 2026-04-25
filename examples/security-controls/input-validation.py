@@ -44,9 +44,9 @@ class PromptSanitizer:
         "\u200b": "", "\u200c": "", "\u200d": "", "\ufeff": "",        # FIX: C5-7
     })  # FIX: C5-7
 
-    # Detect standard and URL-safe base64 blobs (≥20 chars covers short         # FIX: C5-7
-    # phrases such as 'reveal secrets' which encodes to 20 base64 chars).        # FIX: C5-7
-    _B64_RE = re.compile(r"[A-Za-z0-9+/_-]{20,}={0,3}")  # FIX: C5-7
+    # Detect standard and URL-safe base64 blobs (≥16 chars covers short         # FIX: C5-7
+    # phrases: 'reveal secrets' (14 bytes) encodes to 19 base64 chars).          # FIX: C5-7
+    _B64_RE = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,3}")  # FIX: C5-7
 
     HIGH_RISK_PATTERNS = (  # FIX: C5-7
         # Char-insertion-aware + synonym-aware "ignore all previous instructions"
