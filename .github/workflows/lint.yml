@@ -53,31 +53,29 @@ jobs:
           repo_root = Path.cwd()
           pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
 
-          allowed_paths = { # FIX: C5-[finding-N]
-            Path(line.strip()) # FIX: C5-[finding-N]
-            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-[finding-N]
-            if line.strip() # FIX: C5-[finding-N]
+          allowed_paths = { # FIX: C5-finding-1
+            Path(line.strip()) # FIX: C5-finding-1
+            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-finding-1
+            if line.strip() # FIX: C5-finding-1
 
-          } # FIX: C5-[finding-N]
-          file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-[finding-N]
-          scan_roots = (".github", "configs", "docs", "examples", "scripts")  # FIX: C5-[finding-N]
-          candidate_files = set()  # FIX: C5-[finding-N]
-          for root in scan_roots:  # FIX: C5-[finding-N]
-            path = repo_root / root  # FIX: C5-[finding-N]
-            if path.is_file():  # FIX: C5-[finding-N]
-              candidate_files.add(root)  # FIX: C5-[finding-N]
-            elif path.is_dir():  # FIX: C5-[finding-N]
-              for file_pattern in file_patterns:  # FIX: C5-[finding-N]
-                candidate_files.update(  # FIX: C5-[finding-N]
-                  p.relative_to(repo_root)  # FIX: C5-[finding-N]
-                  for p in path.rglob(file_pattern)  # FIX: C5-[finding-N]
-                  if p.is_file()  # FIX: C5-[finding-N]
-                )  # FIX: C5-[finding-N]
+          } # FIX: C5-finding-1
+          file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-finding-1
+          scan_roots = (".github", "configs", "docs", "examples", "scripts")  # FIX: C5-finding-1
+          candidate_files = set()  # FIX: C5-finding-1
+          for root in scan_roots:  # FIX: C5-finding-1
+            path = repo_root / root  # FIX: C5-finding-1
+            if path.is_file():  # FIX: C5-finding-1
+              candidate_files.add(root)  # FIX: C5-finding-1
+            elif path.is_dir():  # FIX: C5-finding-1
+              for file_pattern in file_patterns:  # FIX: C5-finding-1
+                candidate_files.update(  # FIX: C5-finding-1
+                  p.relative_to(repo_root)  # FIX: C5-finding-1
+                  for p in path.rglob(file_pattern)  # FIX: C5-finding-1
+                  if p.is_file()  # FIX: C5-finding-1
+                )  # FIX: C5-finding-1
 
-          violations = []  # FIX: C5-[finding-N]
-          for rel_path in sorted(candidate_files):  # FIX: C5-[finding-N]
-            if rel_path in allowed_paths:
-              continue
+          violations = []  # FIX: C5-finding-1
+          for rel_path in sorted(candidate_files):  # FIX: C5-finding-1
             text = (repo_root / rel_path).read_text(encoding="utf-8")
             for line_number, line in enumerate(text.splitlines(), start=1):
               if pattern.search(line):
