@@ -37,6 +37,9 @@ set -euo pipefail
 REQUIREMENTS="requirements.txt"
 FORMAT="text"
 OUTPUT=""
+# Allow overriding the pip-audit binary path (used by tests to supply the  # FIX: C5-11
+# .venv/Scripts/pip-audit.exe via its WSL mount path without modifying PATH)
+_PIP_AUDIT_CMD="${PIP_AUDIT_BIN:-pip-audit}"                               # FIX: C5-11
 
 # ---------------------------------------------------------------------------
 # Argument parsing                                                   # FIX: C5-11
@@ -76,7 +79,7 @@ done
 # ---------------------------------------------------------------------------
 # Dependency check                                                   # FIX: C5-11
 # ---------------------------------------------------------------------------
-if ! command -v pip-audit &>/dev/null; then
+if ! command -v "$_PIP_AUDIT_CMD" &>/dev/null; then  # FIX: C5-11
     echo "ERROR: pip-audit not found in PATH — install it with: pip install pip-audit" >&2
     exit 2
 fi
@@ -92,7 +95,7 @@ fi
 # ---------------------------------------------------------------------------
 # Build pip-audit command                                            # FIX: C5-11
 # ---------------------------------------------------------------------------
-AUDIT_CMD=(pip-audit -r "$REQUIREMENTS")
+AUDIT_CMD=("$_PIP_AUDIT_CMD" -r "$REQUIREMENTS")  # FIX: C5-11
 
 case "$FORMAT" in
     json)
@@ -120,8 +123,8 @@ fi
 echo "Auditing dependencies in: $REQUIREMENTS" >&2
 
 set +e
-"${AUDIT_CMD[@]}"
-EXIT_CODE=$?
+"${AUDIT_CMD[@]}" </dev/null  # FIX: C5-11 — redirect stdin so the child process cannot consume
+EXIT_CODE=$?                   # the bash script's own stdin pipe when run via `bash -s`
 set -e
 
 # ---------------------------------------------------------------------------

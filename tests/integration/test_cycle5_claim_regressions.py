@@ -45,6 +45,24 @@ _INPUT_VALIDATION_PATH = _REPO_ROOT / "examples" / "security-controls" / "input-
 _DEPENDENCY_AUDIT_SCRIPT = _REPO_ROOT / "scripts" / "supply-chain" / "dependency-audit.sh"
 _BASH_PATH = shutil.which("bash")
 
+
+def _to_wsl_path(win_path: Path) -> str:
+    """Convert a Windows absolute path to its WSL /mnt/<drive>/... equivalent."""
+    drive_letter = win_path.drive.rstrip(":").lower()
+    rest = win_path.as_posix()[len(win_path.drive):]
+    return f"/mnt/{drive_letter}{rest}"
+
+
+# pip-audit.exe from the Windows venv, accessed via its WSL mount path so
+# bash -s tests can invoke it without modifying the system PATH.
+_PIP_AUDIT_EXE = _REPO_ROOT / ".venv" / "Scripts" / "pip-audit.exe"
+_PIP_AUDIT_WSL_PATH = (
+    _to_wsl_path(_PIP_AUDIT_EXE)
+    if sys.platform == "win32" and _PIP_AUDIT_EXE.exists()
+    else ""
+)
+_SEEDED_CVE_FIXTURE = _REPO_ROOT / "tests" / "fixtures" / "seeded-cve-requirements.txt"
+
 # ---------------------------------------------------------------------------
 # Import scan_vulnerability so we can patch its module-level names
 # ---------------------------------------------------------------------------
@@ -560,7 +578,7 @@ class TestDependencyAuditShClaim:
         Adversarial condition: PATH restricted to an empty tmp directory — no
         executables present.  Simulates a CI runner missing the pip-audit tool.
         """
-        proc = self._run([], extra_env={"PATH": str(tmp_path)})
+        proc = self._run([], extra_env={"PATH": str(tmp_path), "PIP_AUDIT_BIN": "", "WSLENV": ""})
         assert proc.returncode == 2, (
             f"Expected exit 2 when pip-audit is absent; got {proc.returncode}. "
             f"stderr: {proc.stderr!r}"
@@ -646,3 +664,70 @@ class TestDependencyAuditShClaim:
             if ln.strip() and not ln.strip().startswith("#")
         ]
         assert len(non_comment_lines) > 10, "Script must contain substantive implementation"
+
+    # --- green run: exits 0 when no CVEs found (FAIL 1 acceptance criterion) ---
+
+    @pytest.mark.skipif(
+        not _PIP_AUDIT_WSL_PATH or not _BASH_AVAILABLE,
+        reason="pip-audit.exe not in .venv/Scripts or bash not available",
+    )
+    def test_dependency_audit_sh_claim_exits_0_on_clean_requirements(self):
+        """CLAIM: dependency-audit.sh exits 0 and prints PASS when no CVEs found.
+
+        Green-run criterion: verifies the end-to-end claim that the script exits 0
+        against the project's own requirements.txt.  Requires network access to
+        query the PyPI advisory database.
+
+        PIP_AUDIT_BIN points bash at the Windows venv pip-audit.exe via its WSL
+        mount path so no system-wide installation is required.
+
+        Pre-fix: script did not exist — FileNotFoundError on every invocation.
+        Post-fix: exits 0 and prints 'PASS: No known vulnerabilities found…'.
+        """
+        existing_wslenv = os.environ.get("WSLENV", "")
+        wslenv = f"PIP_AUDIT_BIN:{existing_wslenv}".rstrip(":")
+        proc = self._run(
+            ["--requirements", "requirements.txt"],
+            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_WSL_PATH, "WSLENV": wslenv},
+        )
+        assert proc.returncode == 0, (
+            "Script must exit 0 (PASS) on clean requirements.txt; "
+            f"got {proc.returncode}. stderr: {proc.stderr!r}\nstdout: {proc.stdout!r}"
+        )
+        assert "PASS" in proc.stderr, (
+            f"Script must print 'PASS' on a clean run; stderr: {proc.stderr!r}"
+        )
+
+    # --- red run: exits 1 when CVEs found (FAIL 2 acceptance criterion) ---
+
+    @pytest.mark.skipif(
+        not _PIP_AUDIT_WSL_PATH
+        or not _BASH_AVAILABLE
+        or not _SEEDED_CVE_FIXTURE.exists(),
+        reason="pip-audit.exe, bash, or seeded-cve-requirements.txt not available",
+    )
+    def test_dependency_audit_sh_claim_exits_1_for_seeded_cve_fixture(self):
+        """CLAIM: dependency-audit.sh exits 1 and prints FAIL when CVEs detected.
+
+        Red-run criterion: verifies the end-to-end claim that the script correctly
+        flags a known-vulnerable requirements file.  Uses
+        tests/fixtures/seeded-cve-requirements.txt which pins PyYAML==5.3.1
+        (CVE-2020-14343 and others recognised by pip-audit).  Requires network
+        access to query the PyPI advisory database.
+
+        Pre-fix: script did not exist — FileNotFoundError on every invocation.
+        Post-fix: exits 1 and prints 'FAIL: Vulnerabilities detected…'.
+        """
+        existing_wslenv = os.environ.get("WSLENV", "")
+        wslenv = f"PIP_AUDIT_BIN:{existing_wslenv}".rstrip(":")
+        proc = self._run(
+            ["--requirements", "tests/fixtures/seeded-cve-requirements.txt"],
+            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_WSL_PATH, "WSLENV": wslenv},
+        )
+        assert proc.returncode == 1, (
+            "Script must exit 1 (FAIL) on seeded CVE fixture (PyYAML==5.3.1); "
+            f"got {proc.returncode}. stderr: {proc.stderr!r}\nstdout: {proc.stdout!r}"
+        )
+        assert "FAIL" in proc.stderr, (
+            f"Script must print 'FAIL' on a red run; stderr: {proc.stderr!r}"
+        )
