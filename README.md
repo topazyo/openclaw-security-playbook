@@ -36,14 +36,14 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 │  • Shadow AI detection • Governance • Compliance            │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 6: Behavioral Monitoring                             │
-│  • Anomaly detection • Alerting • openclaw-telemetry        │
+│  • Anomaly detection • Alerting • Telemetry integrations    │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 5: Supply Chain Security                             │
 │  • Skill integrity • GPG verification • Allowlists          │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 4: Runtime Security Enforcement (Optional)           │
 │  • Prompt injection guards • PII redaction                  │
-│  • openclaw-shield (external, not vendored by this repo)    │
+│  • Optional external enforcement tooling                    │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Runtime Sandboxing                                │
 │  • Docker security • Read-only FS • Capability dropping     │
@@ -56,7 +56,14 @@ This playbook provides **7-layer defense-in-depth** security architecture:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Result:** Layers 1–3 and 5–7 are fully covered by this repo's guidance, configs, and validation tooling. Layers 4, 6, and 7 include optional integrations with external community tools (`openclaw-shield`, `openclaw-telemetry`, `openclaw-detect`) documented in `docs/guides/08-community-tools-integration.md` — these are not vendored or verified by this repo.
+**Result:** Layers 1–3 and 5 are covered directly by this repo's guidance, configs, validation tooling, and incident-response content. Layers 4, 6, and parts of 7 depend on enforcement, telemetry, or discovery systems that you must supply outside this repository. <!-- FIX: C5-9 -->
+
+## External Integrations (Not Bundled)
+
+> **EXTERNAL / NOT INCLUDED**  <!-- FIX: C5-9 -->
+> This repository does not vendor, install, or verify `openclaw-shield`, `openclaw-telemetry`, `openclaw-detect`, or `clawguard`. References to those names describe optional third-party tooling only, not capabilities shipped by this repo. A clean checkout provides guidance, validation content, and response tooling, but not those integrations themselves. <!-- FIX: C5-9 -->
+>
+> Use this repository alone for hardening guidance, detection content, verification scripts, and incident-response procedures. Use [docs/guides/08-community-tools-integration.md](docs/guides/08-community-tools-integration.md) only when evaluating separately approved external tooling for your environment. <!-- FIX: C5-9 -->
 
 ---
 
@@ -178,12 +185,12 @@ Fresh-clone note: the verifier can return warnings until a compatible OpenClaw/C
 
 **Week 1:**
 - Day 1-2: Layers 1-3 (Credentials, Network, Sandboxing)
-- Day 3: Layer 4 (Runtime Enforcement - openclaw-shield)
+- Day 3: Layer 4 (Runtime Enforcement - repo-native controls plus optional external enforcement) <!-- FIX: C5-9 -->
 - Day 4: Layer 5 (Supply Chain Security)
 - Day 5: Deploy monitoring stack
 
 **Week 2:**
-- Day 1-2: Layer 6 (Behavioral Monitoring - openclaw-telemetry)
+- Day 1-2: Layer 6 (Behavioral Monitoring - repo-native validation plus your telemetry pipeline) <!-- FIX: C5-9 -->
 - Day 3: Incident response planning
 - Day 4-5: Testing and validation
 
@@ -233,7 +240,7 @@ Fresh-clone note: the verifier can return warnings until a compatible OpenClaw/C
 1. **Start here:** [Detection & Hunting Guide](docs/guides/07-detection-and-hunting.md) (60 min)
 2. **Deploy Tier 1:** Import discovery queries from `detections/edr/` for your EDR platform
 3. **Convert Sigma rules:** `sigma convert -t <backend> detections/sigma/openclaw-*.yml`
-4. **Deploy Tier 2-3:** Import behavioral hunting and kill chain queries after openclaw-telemetry is running
+4. **Deploy Tier 2-3:** Import behavioral hunting and kill chain queries after your telemetry pipeline is running <!-- FIX: C5-9 -->
 5. **Forensics toolkit:** Review `scripts/forensics/` for evidence collection and timeline building
 6. **Threat mapping:** [ATLAS Mapping](docs/threat-model/ATLAS-mapping.md) for kill chain taxonomy
 
@@ -372,7 +379,7 @@ External Request
 - **4 Response Playbooks:** Credential exfiltration, prompt injection, unauthorized access, malicious skills
 - **Evidence Collection:** Automated forensics and chain of custody (`collect_evidence.sh`)
 - **Attack Timeline:** Chronological reconstruction with risk-scored events (`build_timeline.sh`)
-- **Hash Chain Verification:** Tamper detection for openclaw-telemetry logs (`verify_hash_chain.py`)
+- **Hash Chain Verification:** Tamper detection for structured telemetry logs (`verify_hash_chain.py`) <!-- FIX: C5-9 -->
 - **Credential Scoping:** Post-incident credential exposure assessment (`check_credential_scope.sh`)
 - **Communication Templates:** Pre-written notifications for stakeholders
 - **Post-Incident Review:** Structured PIR process with action items
