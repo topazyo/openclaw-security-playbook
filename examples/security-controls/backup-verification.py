@@ -522,6 +522,19 @@ class BackupStrategy:
 
         def matches_backup_id(value: Any) -> bool:  # FIX: C5-finding-3
             return isinstance(value, str) and backup_id_pattern.search(value) is not None  # FIX: C5-finding-3
+
+        def manifest_has_local_payload(manifest_data: Any, manifest_path: str) -> bool:  # FIX: C5-finding-3
+            if not isinstance(manifest_data, dict):  # FIX: C5-finding-3
+                return False  # FIX: C5-finding-3
+            manifest_files = manifest_data.get('files')  # FIX: C5-finding-3
+            if isinstance(manifest_files, dict):  # FIX: C5-finding-3
+                manifest_dir = os.path.dirname(manifest_path)  # FIX: C5-finding-3
+                for manifest_file in manifest_files:  # FIX: C5-finding-3
+                    if isinstance(manifest_file, str) and os.path.exists(os.path.join(manifest_dir, manifest_file)):  # FIX: C5-finding-3
+                        return True  # FIX: C5-finding-3
+            if manifest_path.endswith('.manifest.json'):  # FIX: C5-finding-3
+                return os.path.exists(manifest_path[:-len('.manifest.json')])  # FIX: C5-finding-3
+            return False  # FIX: C5-finding-3
         
         # Production data is the primary copy. This check verifies the local/snapshot backup and offsite archive.  # FIX: C5-finding-3
         # Check backup copy 1 (local archive or EBS snapshot)
@@ -552,9 +565,25 @@ class BackupStrategy:
                 for dirname in dirs:  # FIX: C5-finding-3
                     if matches_backup_id(dirname):  # FIX: C5-finding-3
                         dir_path = os.path.join(root, dirname)  # FIX: C5-finding-3
-                        if os.path.exists(os.path.join(dir_path, 'MANIFEST.txt')) or os.path.exists(os.path.join(dir_path, 'manifest.json')):  # FIX: C5-finding-3
-                            local_backup_exists = True  # FIX: C5-finding-3
-                            break  # FIX: C5-finding-3
+                        manifest_txt_path = os.path.join(dir_path, 'MANIFEST.txt')  # FIX: C5-finding-3
+                        manifest_json_path = os.path.join(dir_path, 'manifest.json')  # FIX: C5-finding-3
+                        if os.path.exists(manifest_json_path):  # FIX: C5-finding-3
+                            try:  # FIX: C5-finding-3
+                                with open(manifest_json_path, 'r', encoding='utf-8') as handle:  # FIX: C5-finding-3
+                                    manifest_data = json.load(handle)  # FIX: C5-finding-3
+                                if manifest_data.get('backup_id') == backup_id and manifest_has_local_payload(manifest_data, manifest_json_path):  # FIX: C5-finding-3
+                                    local_backup_exists = True  # FIX: C5-finding-3
+                                    break  # FIX: C5-finding-3
+                            except (OSError, json.JSONDecodeError) as exc:  # FIX: C5-finding-3
+                                raise RuntimeError(f'local backup manifest could not be read: {manifest_json_path}') from exc  # FIX: C5-finding-3
+                        if os.path.exists(manifest_txt_path):  # FIX: C5-finding-3
+                            try:  # FIX: C5-finding-3
+                                with open(manifest_txt_path, 'r', encoding='utf-8', errors='ignore') as handle:  # FIX: C5-finding-3
+                                    if matches_backup_id(handle.read()):  # FIX: C5-finding-3
+                                        local_backup_exists = True  # FIX: C5-finding-3
+                                        break  # FIX: C5-finding-3
+                            except OSError as exc:  # FIX: C5-finding-3
+                                raise RuntimeError(f'local backup manifest could not be read: {manifest_txt_path}') from exc  # FIX: C5-finding-3
                 if local_backup_exists:  # FIX: C5-finding-3
                     break  # FIX: C5-finding-3
                 for filename in files:  # FIX: C5-finding-3
@@ -571,7 +600,7 @@ class BackupStrategy:
                         try:  # FIX: C5-finding-3
                             with open(file_path, 'r', encoding='utf-8') as handle:  # FIX: C5-finding-3
                                 manifest_data = json.load(handle)  # FIX: C5-finding-3
-                            if manifest_data.get('backup_id') == backup_id:  # FIX: C5-finding-3
+                            if manifest_data.get('backup_id') == backup_id and manifest_has_local_payload(manifest_data, file_path):  # FIX: C5-finding-3
                                 local_backup_exists = True  # FIX: C5-finding-3
                                 break  # FIX: C5-finding-3
                         except (OSError, json.JSONDecodeError) as exc:  # FIX: C5-finding-3
@@ -584,7 +613,7 @@ class BackupStrategy:
         for page in pages:  # FIX: C5-finding-3
             for obj in page.get('Contents', []):  # FIX: C5-finding-3
                 key = obj.get('Key')  # FIX: C5-finding-3
-                if matches_backup_id(key):  # FIX: C5-finding-3
+                if matches_backup_id(key) and isinstance(key, str) and key.endswith(('.tar.gz', '.sql.gz')):  # FIX: C5-finding-3
                     compliance['1_offsite'] = True  # FIX: C5-finding-3
                     break  # FIX: C5-finding-3
             if compliance['1_offsite']:  # FIX: C5-finding-3
