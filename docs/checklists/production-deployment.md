@@ -209,7 +209,7 @@ This checklist MUST be completed and approved before ANY production deployment o
 
 ### 7.3 GDPR
 - [ ] **Data protection impact assessment** (if processing new PII)
-- [ ] **PII redaction enabled** (openclaw-shield configured)
+- [ ] **PII redaction enabled** (runtime or gateway redaction controls configured) <!-- FIX: C5-9 -->
 - [ ] **Breach notification process** ready (72-hour SLA)
 
 **Compliance Officer Sign-Off**: ______________________________ Date: ______
