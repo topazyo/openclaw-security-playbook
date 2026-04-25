@@ -448,31 +448,43 @@ python tools/config-migrator.py --config openclaw-agent.yml
 
 ### Testing Framework
 
-Test suite — 15 files across 3 directories:
+Test suite — 24 files across 3 directories:
 
 ```bash
-# Unit tests (6 files)
-pytest tests/unit/test_input_validation.py        # XSS/SQL/path traversal
-pytest tests/unit/test_rate_limiting.py            # Token bucket, Redis
+# Unit tests (16 files)
 pytest tests/unit/test_authentication.py           # mTLS, OAuth2, MFA
-pytest tests/unit/test_encryption.py               # AES-256-GCM, key rotation
-pytest tests/unit/test_clawdbot_runtime.py         # Runtime smoke tests
-pytest tests/unit/test_tools_help_smoke.py         # CLI help surface
+pytest tests/unit/test_input_validation.py        # XSS/SQL/path traversal
+pytest tests/unit/test_rate_limiting.py            # Token bucket, sliding window, cost-based
+pytest tests/unit/test_encryption.py               # AES-256-GCM, key rotation, vault
+pytest tests/unit/test_clawdbot_runtime.py         # Runtime configuration, environment defaults
+pytest tests/unit/test_tools_help_smoke.py         # CLI help surface for 6 tools
+pytest tests/unit/test_collect_evidence_function_claims.py      # Evidence collection function logic
+pytest tests/unit/test_collect_evidence_script.py               # Evidence collection script integration
+pytest tests/unit/test_incident_simulator_claims.py             # Incident payload generation
+pytest tests/unit/test_ioc_scanner.py                           # IOC lookup and reputation API
+pytest tests/unit/test_ioc_scanner_claims.py                    # IOC scanning claims validation
+pytest tests/unit/test_openclaw_cli_claims.py                   # CLI orchestration claims
+pytest tests/unit/test_playbook_cli.py                          # Incident playbook execution
+pytest tests/unit/test_report_weekly_cli.py                     # Weekly compliance reporting
+pytest tests/unit/test_scan_access_cli.py                       # Access review scanning
+pytest tests/unit/test_scan_vulnerability_cli.py                # Vulnerability scanning driver
 
 # Integration tests (3 files)
-pytest tests/integration/test_playbook_procedures.py  # Playbook execution
-pytest tests/integration/test_backup_recovery.py      # RTO/RPO validation
-pytest tests/integration/test_access_review.py        # Quarterly reviews
+pytest tests/integration/test_playbook_procedures.py  # Playbook execution (detection → recovery)
+pytest tests/integration/test_backup_recovery.py      # RTO/RPO validation, 3-2-1 compliance
+pytest tests/integration/test_access_review.py        # Quarterly access reviews
 
-# Security tests (6 files)
-pytest tests/security/test_policy_compliance.py              # SEC-002/003/004/005
-pytest tests/security/test_vulnerability_scanning.py         # Trivy/npm/pip audits
+# Security tests (5 files)
+pytest tests/security/test_policy_compliance.py              # Policy validation (SEC-002/003/004/005)
+pytest tests/security/test_vulnerability_scanning.py         # Trivy/npm/pip audits, reporting
 pytest tests/security/test_runtime_security_regression.py    # Runtime hardening regression
-pytest tests/security/test_detection_replay_validation.py    # Sigma/YARA replay
-pytest tests/security/test_malicious_skill_chain_exercise.py # Attack-chain exercise
-pytest tests/security/test_evidence_snapshot_cli.py          # Evidence capture
+pytest tests/security/test_policy_validator_claims.py        # Policy validator logic claims
+pytest tests/security/test_scan_access_security.py           # Read-only I/O decorator enforcement
 
-# Run all tests with coverage
+# Run all tests
+pytest
+
+# Run with coverage report (requires pytest-cov)
 pytest --cov=scripts --cov=examples --cov-report=html
 ```
 

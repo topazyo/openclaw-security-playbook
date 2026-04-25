@@ -4,7 +4,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -112,7 +112,33 @@ def _load_auto_containment_context(tmp_path, module_name: str):
 
 
 def _load_forensics_collector_module(module_name: str):
-    return _load_module_from_path(FORENSICS_COLLECTOR_PATH, module_name)
+    fake_psutil = ModuleType("psutil")
+    fake_psutil.Error = RuntimeError
+    fake_psutil.NoSuchProcess = RuntimeError
+    fake_psutil.AccessDenied = RuntimeError
+    fake_psutil.disk_partitions = MagicMock()
+    fake_psutil.disk_usage = MagicMock()
+    fake_psutil.process_iter = MagicMock()
+    fake_psutil.net_connections = MagicMock()
+    fake_cryptography = ModuleType("cryptography")
+    fake_hazmat = ModuleType("cryptography.hazmat")
+    fake_primitives = ModuleType("cryptography.hazmat.primitives")
+    fake_primitives.hashes = ModuleType("hashes")
+    fake_primitives.serialization = ModuleType("serialization")
+    fake_asymmetric = ModuleType("cryptography.hazmat.primitives.asymmetric")
+    fake_asymmetric.rsa = ModuleType("rsa")
+    fake_asymmetric.padding = ModuleType("padding")
+    return _load_module_from_path(
+        FORENSICS_COLLECTOR_PATH,
+        module_name,
+        {
+            "psutil": fake_psutil,
+            "cryptography": fake_cryptography,
+            "cryptography.hazmat": fake_hazmat,
+            "cryptography.hazmat.primitives": fake_primitives,
+            "cryptography.hazmat.primitives.asymmetric": fake_asymmetric,
+        },
+    )
 
 
 def _load_notification_manager_module(module_name: str):
@@ -388,6 +414,17 @@ def test_collect_process_list_claim_collects_running_process_details(tmp_path):
     processes = json.loads(processes_file.read_text(encoding="utf-8"))
     assert processes[0]["connections_detail"][0]["raddr"] == "198.51.100.10:443"
     assert processes[1]["connections_detail"] == []
+
+
+def test___init___claim_normalizes_valid_severity_and_rejects_invalid_values():
+    module = _load_notification_manager_module("notification_manager_claim_init")
+
+    manager = module.NotificationManager("INC-NOTIFY-INIT", " high ")
+    assert manager.severity == "HIGH"
+    assert manager.notifications_sent == []
+
+    with pytest.raises(ValueError, match="Invalid severity"):
+        module.NotificationManager("INC-NOTIFY-INVALID", "high; drop table incidents")
 
 
 def test_notify_all_claim_reports_overall_delivery_status():

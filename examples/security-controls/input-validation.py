@@ -125,11 +125,13 @@ class SafePathValidator:
         self.workspace_root = Path(workspace_root).resolve()
 
     def validate_path(self, candidate: str) -> tuple[bool, Optional[Path]]:
+        if not candidate or candidate.strip() == "":  # FIX: C5-finding-4
+            return False, None  # FIX: C5-finding-4
         try:
             resolved = (self.workspace_root / candidate).resolve()
         except OSError:
             return False, None
-        if resolved == self.workspace_root or self.workspace_root in resolved.parents:
+        if resolved == self.workspace_root or self.workspace_root in resolved.parents:  # FIX: C5-finding-4
             return True, resolved
         return False, None
 
