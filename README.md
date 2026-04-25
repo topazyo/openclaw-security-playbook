@@ -106,7 +106,7 @@ This playbook provides **7-layer defense-in-depth** security architecture:
   - **Developer Guide:** 2-hour onboarding for integration, testing, troubleshooting (`training/developer-guide.md`)
 
   ### 🤖 CI/CD Workflows
-  - **Security Scan:** Trivy, Bandit, npm audit, pip-audit, Gitleaks, SBOM (`.github/workflows/security-scan.yml`). The Trivy image job builds the repo-native `playbook` container target so CI scans a runnable image that this repository can actually produce.
+  - **Security Scan:** Trivy, Bandit, npm audit, pip-audit, Gitleaks, SBOM (`.github/workflows/security-scan.yml`). The Trivy image job builds the repo-native `playbook` container target so CI scans a runnable image that this repository can actually produce. **Note:** `openclaw-cli scan vulnerability` also attempts the Docker image scan locally; if `docker` or `trivy` is absent a WARN is printed to stderr and the image scan is skipped — only filesystem, Python, and secret scans run tool-lessly. <!-- FIX: C5-9 -->
   - **Compliance Check:** Policy validation, YAML linting, security tests, compliance reports (`.github/workflows/compliance-check.yml`)
   - **Runtime Regression:** Hosted runner validation and artifact archiving (`.github/workflows/runtime-security-regression.yml`)
   - **Detection Replay:** Adversarial replay and evasion validation (`.github/workflows/detection-replay-validation.yml`)
