@@ -32,6 +32,7 @@ from types import SimpleNamespace  # FIX: C5-finding-3
 
 AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"  # FIX: C5-finding-3
 FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"  # FIX: C5-finding-3
+NOTIFICATION_MANAGER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "notification-manager.py"  # FIX: C5-finding-3
 
 
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
@@ -80,6 +81,15 @@ def _read_single_report(log_dir):  # FIX: C5-finding-3
 
 def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, FORENSICS_COLLECTOR_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    sys.modules[spec.name] = module  # FIX: C5-finding-3
+    spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module  # FIX: C5-finding-3
+
+
+def _load_notification_manager_module(module_name):  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, NOTIFICATION_MANAGER_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
     sys.modules[spec.name] = module  # FIX: C5-finding-3
@@ -157,36 +167,35 @@ class TestDetectionPhase:
 
 class TestContainmentPhase:
     """Test incident containment procedures."""
-    
-    @patch("boto3.client")
-    def test_auto_containment_isolates_ec2(self, mock_boto, incident_simulator):
-        """Test auto-containment.py isolates compromised EC2."""
-        mock_ec2 = Mock()
-        mock_boto.return_value = mock_ec2
 
-        def _fake_isolate(instance_id, incident_id):
-            mock_ec2.modify_instance_attribute(
-                InstanceId=instance_id,
-                Groups=["sg-isolation-00000000"],
-            )
-
-        mock_ac = MagicMock()
-        mock_ac.isolate_ec2.side_effect = _fake_isolate
-        mock_ir = MagicMock(auto_containment=mock_ac)
-
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.auto_containment": mock_ac,
-        }):
-            from scripts.incident_response import auto_containment
-            auto_containment.isolate_ec2(
-                instance_id="i-0abc123",
-                incident_id=incident_simulator["incident_id"],
-            )
-
-        assert mock_ec2.modify_instance_attribute.called
-        call_kwargs = mock_ec2.modify_instance_attribute.call_args
-        assert call_kwargs is not None
+    def test_auto_containment_isolates_ec2(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test auto-containment.py isolates compromised EC2."""  # FIX: C5-finding-3
+        module, _log_dir, fake_ec2, _fake_route53resolver, _fake_docker_client, _fake_network, _fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        fake_ec2.describe_instances.return_value = {  # FIX: C5-finding-3
+            "Reservations": [{  # FIX: C5-finding-3
+                "Instances": [{  # FIX: C5-finding-3
+                    "SecurityGroups": [{"GroupId": "sg-app-123"}],  # FIX: C5-finding-3
+                    "SubnetId": "subnet-12345",  # FIX: C5-finding-3
+                    "State": {"Name": "running"},  # FIX: C5-finding-3
+                    "BlockDeviceMappings": [{"Ebs": {"VolumeId": "vol-12345"}}],  # FIX: C5-finding-3
+                    "VpcId": "vpc-12345",  # FIX: C5-finding-3
+                }]  # FIX: C5-finding-3
+            }]  # FIX: C5-finding-3
+        }  # FIX: C5-finding-3
+        fake_ec2.create_snapshot.return_value = {"SnapshotId": "snap-12345"}  # FIX: C5-finding-3
+        fake_ec2.create_security_group.return_value = {"GroupId": "sg-quarantine-12345"}  # FIX: C5-finding-3
+        manager = module.ContainmentManager(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        assert manager.isolate_ec2_instance("i-0abc123") is True  # FIX: C5-finding-3
+        fake_ec2.create_snapshot.assert_called_once_with(  # FIX: C5-finding-3
+            VolumeId="vol-12345",  # FIX: C5-finding-3
+            Description=f"Forensic snapshot for incident {incident_simulator['incident_id']}",  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        fake_ec2.modify_instance_attribute.assert_called_once_with(  # FIX: C5-finding-3
+            InstanceId="i-0abc123",  # FIX: C5-finding-3
+            Groups=["sg-quarantine-12345"],  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        assert manager.actions_taken[0]["action"] == "isolate_ec2"  # FIX: C5-finding-3
+        assert manager.actions_taken[0]["status"] == "success"  # FIX: C5-finding-3
 
 
 class TestAutoContainmentCliParity:
@@ -302,26 +311,28 @@ class TestForensicsCollectorRuntimeParity:
         processes = json.loads(processes_file.read_text(encoding="utf-8"))  # FIX: C5-finding-3
         assert processes[0]["connections_detail"][0]["raddr"] == "198.51.100.10:443"  # FIX: C5-finding-3
     
-    @patch("requests.post")
-    def test_notification_manager_sends_pagerduty(self, mock_post, incident_simulator):
-        """Test notification-manager.py sends PagerDuty alert."""
-        mock_post.return_value.status_code = 202
-        mock_nm = MagicMock()
-        mock_nm.send_pagerduty.return_value = {"status": "success"}
-        mock_ir = MagicMock(notification_manager=mock_nm)
+    def test_notification_manager_sends_pagerduty(self, incident_simulator):  # FIX: C5-finding-3
+        """Test notification-manager.py sends PagerDuty alert."""  # FIX: C5-finding-3
+        module = _load_notification_manager_module("notification_manager_issue_7_tests")  # FIX: C5-finding-3
+        module.PAGERDUTY_API_KEY = "pagerduty-token"  # FIX: C5-finding-3
+        module.PAGERDUTY_SERVICE_ID = "service-12345"  # FIX: C5-finding-3
+        manager = module.NotificationManager(incident_simulator["incident_id"], "CRITICAL")  # FIX: C5-finding-3
+        fake_response = Mock()  # FIX: C5-finding-3
+        fake_response.raise_for_status.return_value = None  # FIX: C5-finding-3
+        fake_response.json.return_value = {"incident": {"id": "PD-12345"}}  # FIX: C5-finding-3
 
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.notification_manager": mock_nm,
-        }):
-            from scripts.incident_response import notification_manager
-            result = notification_manager.send_pagerduty(
-                incident=incident_simulator,
-                severity="critical",
-            )
+        with patch.object(module.requests, "post", return_value=fake_response) as mock_post:  # FIX: C5-finding-3
+            assert manager.create_pagerduty_incident(  # FIX: C5-finding-3
+                title=f"Security Incident: {incident_simulator['incident_id']}",  # FIX: C5-finding-3
+                description="Containment required immediately",  # FIX: C5-finding-3
+            ) is True  # FIX: C5-finding-3
 
-        assert result["status"] == "success"
-        assert mock_nm.send_pagerduty.called
+        assert mock_post.call_args is not None  # FIX: C5-finding-3
+        assert mock_post.call_args.args[0] == "https://api.pagerduty.com/incidents"  # FIX: C5-finding-3
+        assert mock_post.call_args.kwargs["headers"]["Authorization"] == "Token token=pagerduty-token"  # FIX: C5-finding-3
+        assert mock_post.call_args.kwargs["json"]["incident"]["service"]["id"] == "service-12345"  # FIX: C5-finding-3
+        assert mock_post.call_args.kwargs["json"]["incident"]["urgency"] == "high"  # FIX: C5-finding-3
+        assert manager.notifications_sent[-1] == {"channel": "pagerduty", "status": "success", "id": "PD-12345"}  # FIX: C5-finding-3
 
 
 class TestEradicationPhase:
