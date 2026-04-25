@@ -23,10 +23,11 @@ class PromptSanitizer:
     """Very small prompt-risk detector for documentation examples."""
 
     HIGH_RISK_PATTERNS = (
-        re.compile(r"ignore\s+all\s+previous\s+instructions", re.IGNORECASE),
+        re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.IGNORECASE),  # FIX: C5-finding-4
         re.compile(r"system\s+prompt", re.IGNORECASE),
         re.compile(r"developer\s+message", re.IGNORECASE),
         re.compile(r"reveal\s+secrets?", re.IGNORECASE),
+        re.compile(r"dump\s+credentials?", re.IGNORECASE),  # FIX: C5-finding-4
     )
 
     def validate(self, prompt: str) -> ValidationResult:
@@ -43,11 +44,13 @@ class SafePathValidator:
         self.workspace_root = Path(workspace_root).resolve()
 
     def validate_path(self, candidate: str) -> tuple[bool, Optional[Path]]:
+        if not candidate or candidate.strip() in {"", ".", "./", ".\\"}:  # FIX: C5-finding-4
+            return False, None  # FIX: C5-finding-4
         try:
             resolved = (self.workspace_root / candidate).resolve()
         except OSError:
             return False, None
-        if resolved == self.workspace_root or self.workspace_root in resolved.parents:
+        if self.workspace_root in resolved.parents:
             return True, resolved
         return False, None
 
