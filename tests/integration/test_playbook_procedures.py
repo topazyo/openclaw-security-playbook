@@ -316,7 +316,7 @@ class TestForensicsCollectorRuntimeParity:
         module = _load_notification_manager_module("notification_manager_issue_7_tests")  # FIX: C5-finding-3
         module.PAGERDUTY_API_KEY = "pagerduty-token"  # FIX: C5-finding-3
         module.PAGERDUTY_SERVICE_ID = "service-12345"  # FIX: C5-finding-3
-        manager = module.NotificationManager(incident_simulator["incident_id"], "CRITICAL")  # FIX: C5-finding-3
+        manager = module.NotificationManager(incident_simulator["incident_id"], "critical")  # FIX: C5-finding-3
         fake_response = Mock()  # FIX: C5-finding-3
         fake_response.raise_for_status.return_value = None  # FIX: C5-finding-3
         fake_response.json.return_value = {"incident": {"id": "PD-12345"}}  # FIX: C5-finding-3

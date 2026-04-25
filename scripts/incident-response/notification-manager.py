@@ -98,7 +98,7 @@ class NotificationManager:
     
     def __init__(self, incident_id: str, severity: str):
         self.incident_id = incident_id
-        self.severity = severity
+        self.severity = severity.strip().upper()  # FIX: C5-finding-3
         self.notifications_sent = []
     
     def send_slack_notification(self, message: str, thread_ts: str = None) -> bool:
