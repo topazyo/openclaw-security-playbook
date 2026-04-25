@@ -53,48 +53,33 @@ jobs:
           repo_root = Path.cwd()
           pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
 
-          allowed_paths = { # FIX: C5-finding-1
-            Path(line.strip()) # FIX: C5-finding-1
-            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-finding-1
-            if line.strip() # FIX: C5-finding-1
-          } # FIX: C5-finding-1
-            Path("examples/incident-response/playbook-prompt-injection.md"),
-            Path("examples/incident-response/playbook-skill-compromise.md"),
-            Path("configs/examples/with-community-tools.yml"),
-            Path(".github/copilot-instructions.md"),
-            Path(".github/audit/findings-2026-04-24.md"),
+          allowed_paths = { # FIX: C5-[finding-N]
+            Path(line.strip()) # FIX: C5-[finding-N]
+            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-[finding-N]
+            if line.strip() # FIX: C5-[finding-N]
+          } | { # FIX: C5-[finding-N]
+            Path("examples/incident-response/playbook-prompt-injection.md"), # FIX: C5-[finding-N]
+            Path("examples/incident-response/playbook-skill-compromise.md"), # FIX: C5-[finding-N]
+            Path("configs/examples/with-community-tools.yml"), # FIX: C5-[finding-N]
+            Path(".github/copilot-instructions.md"), # FIX: C5-[finding-N]
+            Path(".github/audit/findings-2026-04-24.md"), # FIX: C5-[finding-N]
+          } # FIX: C5-[finding-N]
           file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-[finding-N]
           candidate_files = set()  # FIX: C5-[finding-N]
-          for root in scan_roots:
-            path = repo_root / root
-            if path.is_file():
+          for root in scan_roots:  # FIX: C5-[finding-N]
+            path = repo_root / root  # FIX: C5-[finding-N]
+            if path.is_file():  # FIX: C5-[finding-N]
               candidate_files.add(root)  # FIX: C5-[finding-N]
-            elif path.is_dir():
+            elif path.is_dir():  # FIX: C5-[finding-N]
               for file_pattern in file_patterns:  # FIX: C5-[finding-N]
                 candidate_files.update(  # FIX: C5-[finding-N]
                   p.relative_to(repo_root)  # FIX: C5-[finding-N]
                   for p in path.rglob(file_pattern)  # FIX: C5-[finding-N]
                   if p.is_file()  # FIX: C5-[finding-N]
-                )
+                )  # FIX: C5-[finding-N]
 
-          violations = []
+          violations = []  # FIX: C5-[finding-N]
           for rel_path in sorted(candidate_files):  # FIX: C5-[finding-N]
-          ]
-
-          candidate_files = []
-          for root in scan_roots:
-            path = repo_root / root
-            if path.is_file():
-              candidate_files.append(root)
-            elif path.is_dir():
-              candidate_files.extend(
-                p.relative_to(repo_root)
-                for p in path.rglob("*")
-                if p.is_file() and p.suffix.lower() in {'.md', '.yml', '.yaml', '.txt', '.sh'}
-              )
-
-          violations = []
-          for rel_path in sorted(set(candidate_files)):
             if rel_path in allowed_paths:
               continue
             text = (repo_root / rel_path).read_text(encoding="utf-8")
