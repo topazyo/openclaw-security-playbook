@@ -271,7 +271,7 @@ def _select_blast_radius_resource(incident_data: dict | None, require_real: bool
             raise click.ClickException("Eradication phase requires real incident data; no incident context was provided")  # FIX: C5-finding-2
         return None  # FIX: C5-finding-2
 
-    affected_resources = list(incident_data.get("affected_resources", []))  # FIX: C5-finding-2
+    affected_resources = tuple(incident_data.get("affected_resources", []))  # FIX: C5-finding-2
     ec2_resource = next((resource for resource in affected_resources if resource.startswith("i-")), None)  # FIX: C5-finding-2
     if ec2_resource is not None:  # FIX: C5-finding-2
         return ec2_resource  # FIX: C5-finding-2
