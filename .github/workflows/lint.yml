@@ -26,3 +26,65 @@ jobs:
       - name: Validate Detection Rules
         run: |
           python scripts/verification/validate_detection_rules.py
+      - name: Guard Phantom Integration References
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          repo_root = Path.cwd()
+          pattern = re.compile(r"openclaw-shield|openclaw-detect|openclaw-telemetry|clawguard", re.IGNORECASE)
+
+          allowed_paths = {
+            Path("README.md"),
+            Path("docs/guides/08-community-tools-integration.md"),
+            Path("examples/incident-response/playbook-credential-theft.md"),
+            Path("examples/incident-response/playbook-data-breach.md"),
+            Path("examples/incident-response/playbook-denial-of-service.md"),
+            Path("examples/incident-response/playbook-prompt-injection.md"),
+            Path("examples/incident-response/playbook-skill-compromise.md"),
+            Path("configs/examples/with-community-tools.yml"),
+            Path(".github/copilot-instructions.md"),
+            Path(".github/audit/findings-2026-04-24.md"),
+            Path(".github/agents/openclaw-audit.chatmode.md"),
+            Path("scripts/supply-chain/skill_manifest.py"),
+            Path("scripts/forensics/verify_hash_chain.py"),
+          }
+
+          scan_roots = [
+            Path("README.md"),
+            Path("docs"),
+            Path("detections/README.md"),
+            Path("training/security-training.md"),
+          ]
+
+          candidate_files = []
+          for root in scan_roots:
+            path = repo_root / root
+            if path.is_file():
+              candidate_files.append(root)
+            elif path.is_dir():
+              candidate_files.extend(
+                p.relative_to(repo_root)
+                for p in path.rglob("*")
+                if p.is_file() and p.suffix.lower() in {".md", ".yml", ".yaml", ".txt"}
+              )
+
+          violations = []
+          for rel_path in sorted(set(candidate_files)):
+            if rel_path in allowed_paths:
+              continue
+            text = (repo_root / rel_path).read_text(encoding="utf-8")
+            for line_number, line in enumerate(text.splitlines(), start=1):
+              if pattern.search(line):
+                violations.append(f"{rel_path}:{line_number}: {line.strip()}")
+
+          if violations:
+            print("Phantom integration reference guard failed:")
+            for violation in violations:
+              print(violation)
+            sys.exit(1)
+
+          print("Phantom integration reference guard passed.")
+          PY

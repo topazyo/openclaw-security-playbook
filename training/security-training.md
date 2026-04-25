@@ -78,7 +78,7 @@ pip install -e .
 
 #### Layer 4: Runtime Enforcement
 - **Purpose**: Block malicious AI agent actions in real-time
-- **Implementation**: openclaw-shield (prompt injection guards, PII redaction, tool allowlisting)
+- **Implementation**: runtime or gateway enforcement controls, or optional external tooling for prompt injection guards, PII redaction, and tool allowlisting <!-- FIX: C5-9 -->
 - **Configuration**: `docs/guides/08-community-tools-integration.md`
 
 #### Layer 5: Supply Chain Security
@@ -88,12 +88,12 @@ pip install -e .
 
 #### Layer 6: Monitoring & Detection
 - **Purpose**: Detect anomalous AI agent behavior
-- **Implementation**: openclaw-telemetry, Prometheus, Grafana, Elasticsearch
+- **Implementation**: telemetry pipeline plus Prometheus, Grafana, or Elasticsearch as deployed <!-- FIX: C5-9 -->
 - **Dashboards**: `examples/monitoring/`
 
 #### Layer 7: Governance & Compliance
 - **Purpose**: Discover and manage shadow AI deployments
-- **Implementation**: openclaw-detect, MDM integration, organization policies
+- **Implementation**: discovery tooling, MDM integration, and organization policies <!-- FIX: C5-9 -->
 - **Policies**: `configs/organization-policies/`
 
 ---
