@@ -82,7 +82,7 @@ def _write_playbooks(repo_root: Path, missing_playbooks: set[str] | None = None)
         playbook_path.write_text("# Incident response playbook\n", encoding="utf-8")  # FIX: C5-finding-1
 
 
-def _write_checklist(repo_root: Path, missing_fields: set[str] | None = None) -> None:  # FIX: C5-finding-1
+def _write_checklist(repo_root: Path, missing_fields: set[str] | None = None, empty_fields: set[str] | None = None) -> None:  # FIX: C5-finding-1
     checklist_payload = {  # FIX: C5-finding-1
         "incident_type": "Credential compromise",  # FIX: C5-finding-1
         "severity_level": "P0",  # FIX: C5-finding-1
@@ -98,16 +98,26 @@ def _write_checklist(repo_root: Path, missing_fields: set[str] | None = None) ->
     }  # FIX: C5-finding-1
     for field_name in missing_fields or set():  # FIX: C5-finding-1
         checklist_payload.pop(field_name, None)  # FIX: C5-finding-1
+    for field_name in empty_fields or set():  # FIX: C5-finding-1
+        value = checklist_payload.get(field_name)  # FIX: C5-finding-1
+        if isinstance(value, str):  # FIX: C5-finding-1
+            checklist_payload[field_name] = ""  # FIX: C5-finding-1
+        elif isinstance(value, list):  # FIX: C5-finding-1
+            checklist_payload[field_name] = []  # FIX: C5-finding-1
+        elif isinstance(value, dict):  # FIX: C5-finding-1
+            checklist_payload[field_name] = {}  # FIX: C5-finding-1
+        elif field_name in checklist_payload:  # FIX: C5-finding-1
+            checklist_payload[field_name] = None  # FIX: C5-finding-1
     checklist_path = repo_root / Path(_CHECKLIST_PATH)  # FIX: C5-finding-1
     checklist_path.parent.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-1
     checklist_path.write_text(json.dumps(checklist_payload, indent=2), encoding="utf-8")  # FIX: C5-finding-1
 
 
-def _seed_policy_repo(tmp_path: Path, critical_patch_sla_days: int | None = 1, dependency_audit_cadence_days: int | None = 7, missing_playbooks: set[str] | None = None, missing_checklist_fields: set[str] | None = None) -> Path:  # FIX: C5-finding-1
+def _seed_policy_repo(tmp_path: Path, critical_patch_sla_days: int | None = 1, dependency_audit_cadence_days: int | None = 7, missing_playbooks: set[str] | None = None, missing_checklist_fields: set[str] | None = None, empty_checklist_fields: set[str] | None = None) -> Path:  # FIX: C5-finding-1
     repo_root = tmp_path / "policy-repo"  # FIX: C5-finding-1
     _write_security_policy(repo_root, critical_patch_sla_days, dependency_audit_cadence_days)  # FIX: C5-finding-1
     _write_playbooks(repo_root, missing_playbooks=missing_playbooks)  # FIX: C5-finding-1
-    _write_checklist(repo_root, missing_fields=missing_checklist_fields)  # FIX: C5-finding-1
+    _write_checklist(repo_root, missing_fields=missing_checklist_fields, empty_fields=empty_checklist_fields)  # FIX: C5-finding-1
     return repo_root  # FIX: C5-finding-1
 
 
@@ -148,6 +158,13 @@ def test_sec_005_fails_with_missing_playbook_and_missing_checklist_field(tmp_pat
     assert result["compliant"] is False  # FIX: C5-finding-1
     assert any(violation.startswith("SEC-005.1") for violation in result["violations"])  # FIX: C5-finding-1
     assert any(violation.startswith("SEC-005.2") for violation in result["violations"])  # FIX: C5-finding-1
+
+
+def test_sec_005_fails_with_unpopulated_checklist_field(tmp_path: Path) -> None:  # FIX: C5-finding-1
+    repo_root = _seed_policy_repo(tmp_path, empty_checklist_fields={"lessons_learned"})  # FIX: C5-finding-1
+    result = _POLICY_MOD.PolicyValidator(repo_root=repo_root).validate_policy("SEC-005")  # FIX: C5-finding-1
+    assert result["compliant"] is False  # FIX: C5-finding-1
+    assert "SEC-005.2: Incident checklist fields must be populated: lessons_learned" in result["violations"]  # FIX: C5-finding-1
 
 
 def test_validator_script_returns_nonzero_for_seeded_noncompliant_repo(tmp_path: Path) -> None:  # FIX: C5-finding-1
