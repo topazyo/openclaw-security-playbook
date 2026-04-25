@@ -33,12 +33,20 @@ class PromptSanitizer:
         # Greek → Latin lookalikes
         "\u03b1": "a", "\u03b5": "e", "\u03b9": "i", "\u03bf": "o",  # FIX: C5-7
         "\u03c1": "r", "\u03bd": "v",                                  # FIX: C5-7
+        # Latin script / phonetic extension lookalikes not covered by NFKD   # FIX: C5-7
+        "\u0261": "g",  # ɡ LATIN SMALL LETTER SCRIPT G                  # FIX: C5-7
+        "\u0262": "g",  # ɢ LATIN LETTER SMALL CAPITAL G                 # FIX: C5-7
+        "\u025b": "e",  # ɛ LATIN SMALL LETTER OPEN E (epsilon)           # FIX: C5-7
+        "\u0585": "o",  # փ ARMENIAN SMALL LETTER OH (round o-shape)      # FIX: C5-7
+        "\u03c3": "o",  # σ GREEK SMALL LETTER SIGMA (sometimes used for o) # FIX: C5-7
+        "\u0252": "a",  # ɒ LATIN SMALL LETTER TURNED ALPHA               # FIX: C5-7
         # Zero-width / invisible separators
         "\u200b": "", "\u200c": "", "\u200d": "", "\ufeff": "",        # FIX: C5-7
     })  # FIX: C5-7
 
-    # Detect base64 blobs long enough to encode a risky phrase (≥40 chars). # FIX: C5-7
-    _B64_RE = re.compile(r"[A-Za-z0-9+/]{40,}={0,2}")  # FIX: C5-7
+    # Detect standard and URL-safe base64 blobs (≥20 chars covers short         # FIX: C5-7
+    # phrases such as 'reveal secrets' which encodes to 20 base64 chars).        # FIX: C5-7
+    _B64_RE = re.compile(r"[A-Za-z0-9+/_-]{20,}={0,3}")  # FIX: C5-7
 
     HIGH_RISK_PATTERNS = (  # FIX: C5-7
         # Char-insertion-aware + synonym-aware "ignore all previous instructions"
@@ -57,14 +65,30 @@ class PromptSanitizer:
             r"|system\s+prompt\s*[:=]\s*)",
             re.IGNORECASE,
         ),  # FIX: C5-7
-        re.compile(r"developer\s+message", re.IGNORECASE),
+        # "developer message" flagged only when accessed/exposed in attack context  # FIX: C5-7
+        re.compile(  # FIX: C5-7
+            r"(?:(?:reveal|expose|leak|bypass|override|modify|ignore|extract|show|print)"
+            r"\s+(?:(?:me\s+)?(?:the|your|my|all)\s+)?developer\s+message"
+            r"|developer\s+message\s*[:=]\s*)",
+            re.IGNORECASE,
+        ),  # FIX: C5-7
         re.compile(r"reveal\s+secrets?", re.IGNORECASE),
     )  # FIX: C5-7
 
     @classmethod
     def _normalize(cls, text: str) -> str:  # FIX: C5-7
-        """NFKC-normalize then map common cross-script homoglyphs to ASCII."""  # FIX: C5-7
-        return unicodedata.normalize("NFKC", text).translate(cls._CONFUSABLES)  # FIX: C5-7
+        """Multi-step normalization to resist homoglyph and accent-based evasion."""  # FIX: C5-7
+        # Step 1: NFKC — resolve compatibility equivalents (full-width, ligatures)  # FIX: C5-7
+        text = unicodedata.normalize("NFKC", text)                             # FIX: C5-7
+        # Step 2: map known cross-script confusables not covered by NFKD         # FIX: C5-7
+        text = text.translate(cls._CONFUSABLES)                                 # FIX: C5-7
+        # Step 3: NFKD + strip Mn (combining/diacritic) chars — catches accented  # FIX: C5-7
+        #         lookalikes that survive steps 1-2 (e.g., à→a, ó→o)             # FIX: C5-7
+        text = "".join(                                                          # FIX: C5-7
+            c for c in unicodedata.normalize("NFKD", text)                     # FIX: C5-7
+            if unicodedata.category(c) != "Mn"                                 # FIX: C5-7
+        )                                                                        # FIX: C5-7
+        return text                                                              # FIX: C5-7
 
     def validate(self, prompt: str) -> ValidationResult:  # FIX: C5-7
         normalized = self._normalize(prompt)  # FIX: C5-7
@@ -86,8 +110,8 @@ class PromptSanitizer:
                         return ValidationResult(  # FIX: C5-7
                             False, 0.95, "Matched risky pattern in base64 decoded content"  # FIX: C5-7
                         )  # FIX: C5-7
-            except Exception:  # FIX: C5-7
-                pass  # FIX: C5-7
+            except (ValueError, UnicodeDecodeError):  # FIX: C5-7 — narrow: programming errors propagate
+                pass  # malformed base64 or non-UTF-8 payload — skip this blob  # FIX: C5-7
 
         return ValidationResult(True, 0.05, None)
 
