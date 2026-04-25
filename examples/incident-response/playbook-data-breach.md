@@ -71,7 +71,7 @@
 
 1. **DLP Alerts - Data Loss Prevention**
    
-   openclaw-shield DLP module detects sensitive data leaving the system.
+  Runtime, gateway, or external DLP controls detect sensitive data leaving the system when configured. <!-- FIX: C5-9 -->
    
    **Example Alert**:
    ```json
@@ -94,7 +94,7 @@
    }
    ```
 
-2. **Unusual Data Access Patterns** (openclaw-telemetry)
+2. **Unusual Data Access Patterns** (telemetry pipeline) <!-- FIX: C5-9 -->
    
    ```json
    {
