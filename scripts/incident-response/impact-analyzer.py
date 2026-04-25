@@ -53,6 +53,7 @@ class ImpactAnalyzer:
         self.incident_id = incident_id
         self.graph = nx.DiGraph()
         self.affected_resources = set()
+        self.analyzed_ec2_instances = set()  # FIX: C5-finding-3
         self.ec2 = boto3.client('ec2', region_name=AWS_REGION)
         self.iam = boto3.client('iam')
         
@@ -63,38 +64,44 @@ class ImpactAnalyzer:
             "user_impact": {}, "financial_impact": {}
         }
     
-    def analyze_ec2_blast_radius(self, instance_id: str):
+    def analyze_ec2_blast_radius(self, instance_id: str) -> bool:  # FIX: C5-finding-3
         """Analyze EC2 instance dependencies"""
         logger.info(f"Analyzing EC2 blast radius: {instance_id}")
         
         try:
             response = self.ec2.describe_instances(InstanceIds=[instance_id])
             instance = response['Reservations'][0]['Instances'][0]
+            vpc_id = instance['VpcId']  # FIX: C5-finding-3
+            security_group_ids = [sg['GroupId'] for sg in instance['SecurityGroups']]  # FIX: C5-finding-3
+            role_name = None  # FIX: C5-finding-3
+            if 'IamInstanceProfile' in instance:  # FIX: C5-finding-3
+                role_arn = instance['IamInstanceProfile']['Arn']  # FIX: C5-finding-3
+                role_name = role_arn.split('/')[-1]  # FIX: C5-finding-3
             
             # Add to graph
-            self.graph.add_node(instance_id, type='ec2', vpc=instance['VpcId'])
-            self.affected_resources.add(instance_id)
+            self.graph.add_node(instance_id, type='ec2', vpc=vpc_id)  # FIX: C5-finding-3
+            self.affected_resources.add(instance_id)  # FIX: C5-finding-3
+            self.analyzed_ec2_instances.add(instance_id)  # FIX: C5-finding-3
             
             # Security groups
-            for sg in instance['SecurityGroups']:
-                sg_id = sg['GroupId']
-                self.graph.add_node(sg_id, type='security_group')
-                self.graph.add_edge(instance_id, sg_id)
-                self.affected_resources.add(sg_id)
+            for sg_id in security_group_ids:  # FIX: C5-finding-3
+                self.graph.add_node(sg_id, type='security_group')  # FIX: C5-finding-3
+                self.graph.add_edge(instance_id, sg_id)  # FIX: C5-finding-3
+                self.affected_resources.add(sg_id)  # FIX: C5-finding-3
             
             # IAM role
-            if 'IamInstanceProfile' in instance:
-                role_arn = instance['IamInstanceProfile']['Arn']
-                role_name = role_arn.split('/')[-1]
-                self.graph.add_node(role_name, type='iam_role')
-                self.graph.add_edge(instance_id, role_name)
-                self.affected_resources.add(role_name)
+            if role_name:  # FIX: C5-finding-3 — rejects empty string from trailing-slash ARN
+                self.graph.add_node(role_name, type='iam_role')  # FIX: C5-finding-3
+                self.graph.add_edge(instance_id, role_name)  # FIX: C5-finding-3
+                self.affected_resources.add(role_name)  # FIX: C5-finding-3
             
             self.impact_report['blast_radius']['total_resources'] = len(self.affected_resources)
-            self.impact_report['blast_radius']['ec2_instances'] = 1
+            self.impact_report['blast_radius']['ec2_instances'] = len(self.analyzed_ec2_instances)  # FIX: C5-finding-3
+            return True  # FIX: C5-finding-3
             
         except Exception as e:
             logger.error(f"Failed to analyze EC2: {e}")
+            return False  # FIX: C5-finding-3
     
     def estimate_financial_impact(self, downtime_hours: float = 4.0, affected_users: int = 100):
         """Estimate financial impact"""

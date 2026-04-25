@@ -34,6 +34,7 @@ AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incid
 FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"  # FIX: C5-finding-3
 NOTIFICATION_MANAGER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "notification-manager.py"  # FIX: C5-finding-3
 TIMELINE_GENERATOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "timeline-generator.py"  # FIX: C5-finding-3
+IMPACT_ANALYZER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "impact-analyzer.py"  # FIX: C5-finding-3
 
 
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
@@ -115,6 +116,23 @@ def _load_timeline_generator_module(module_name):  # FIX: C5-finding-3
         sys.modules[spec.name] = module  # FIX: C5-finding-3
         spec.loader.exec_module(module)  # FIX: C5-finding-3
     return module, fake_es_client, fake_logs_client, fake_cloudtrail_client  # FIX: C5-finding-3
+
+
+def _load_impact_analyzer_module(module_name):  # FIX: C5-finding-3
+    fake_ec2 = MagicMock()  # FIX: C5-finding-3
+    fake_iam = MagicMock()  # FIX: C5-finding-3
+    fake_graph = MagicMock()  # FIX: C5-finding-3
+    fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
+    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"ec2": fake_ec2, "iam": fake_iam}[service_name])  # FIX: C5-finding-3
+    fake_networkx = ModuleType("networkx")  # FIX: C5-finding-3
+    fake_networkx.DiGraph = MagicMock(return_value=fake_graph)  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, IMPACT_ANALYZER_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    with patch.dict(sys.modules, {"boto3": fake_boto3, "networkx": fake_networkx}):  # FIX: C5-finding-3
+        sys.modules[spec.name] = module  # FIX: C5-finding-3
+        spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module, fake_ec2, fake_iam, fake_graph  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -398,31 +416,80 @@ class TestEradicationPhase:
         assert generator.generate(output_path, output_format="html") is False  # FIX: C5-finding-3
         assert not output_path.exists()  # FIX: C5-finding-3
     
-    @patch("requests.get")
-    def test_impact_analyzer_calculates_blast_radius(self, mock_get, incident_simulator):
-        """Test impact-analyzer.py calculates affected resources."""
-        mock_get.return_value.json.return_value = {
-            "affected_services": ["api-gateway", "user-service"],
-            "affected_users": 1500,
-            "data_exposure": "HIGH",
-        }
-        expected_impact = {"affected_users": 1500, "data_exposure": "HIGH"}
-        mock_ia = MagicMock()
-        mock_ia.analyze.return_value = expected_impact
-        mock_ir = MagicMock(impact_analyzer=mock_ia)
+    def test_impact_analyzer_calculates_blast_radius(self, incident_simulator):  # FIX: C5-finding-3
+        """Test impact-analyzer.py calculates affected resources."""  # FIX: C5-finding-3
+        module, fake_ec2, _fake_iam, fake_graph = _load_impact_analyzer_module("impact_analyzer_issue_7_tests")  # FIX: C5-finding-3
+        fake_ec2.describe_instances.return_value = {  # FIX: C5-finding-3
+            "Reservations": [{  # FIX: C5-finding-3
+                "Instances": [{  # FIX: C5-finding-3
+                    "VpcId": "vpc-12345",  # FIX: C5-finding-3
+                    "SecurityGroups": [{"GroupId": "sg-app-123"}, {"GroupId": "sg-db-456"}],  # FIX: C5-finding-3
+                    "IamInstanceProfile": {"Arn": "arn:aws:iam::123456789012:instance-profile/app-role"},  # FIX: C5-finding-3
+                }]  # FIX: C5-finding-3
+            }]  # FIX: C5-finding-3
+        }  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-0abc123") is True  # FIX: C5-finding-3
+        fake_ec2.describe_instances.assert_called_once_with(InstanceIds=["i-0abc123"])  # FIX: C5-finding-3
+        fake_graph.add_node.assert_any_call("i-0abc123", type="ec2", vpc="vpc-12345")  # FIX: C5-finding-3
+        fake_graph.add_edge.assert_any_call("i-0abc123", "sg-app-123")  # FIX: C5-finding-3
+        fake_graph.add_edge.assert_any_call("i-0abc123", "sg-db-456")  # FIX: C5-finding-3
+        fake_graph.add_edge.assert_any_call("i-0abc123", "app-role")  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["ec2_instances"] == 1  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["total_resources"] == 4  # FIX: C5-finding-3
 
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.impact_analyzer": mock_ia,
-        }):
-            from scripts.incident_response import impact_analyzer
-            impact = impact_analyzer.analyze(
-                incident_id=incident_simulator["incident_id"],
-                initial_resources=incident_simulator["affected_resources"],
-            )
+    def test_impact_analyzer_returns_false_on_malformed_instance_data(self, incident_simulator):  # FIX: C5-finding-3
+        """Test impact-analyzer.py reports failure when EC2 metadata is incomplete."""  # FIX: C5-finding-3
+        module, fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_malformed_issue_7_tests")  # FIX: C5-finding-3
+        fake_ec2.describe_instances.return_value = {"Reservations": [{"Instances": [{"SecurityGroups": [{"GroupId": "sg-app-123"}]}]}]}  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-0abc123") is False  # FIX: C5-finding-3
+        assert analyzer.affected_resources == set()  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"] == {}  # FIX: C5-finding-3
 
-        assert impact["affected_users"] == 1500
-        assert impact["data_exposure"] == "HIGH"
+    def test_impact_analyzer_tracks_multiple_ec2_instances(self, incident_simulator):  # FIX: C5-finding-3
+        """Test impact-analyzer.py counts all analyzed EC2 instances."""  # FIX: C5-finding-3
+        module, fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_multiple_issue_7_tests")  # FIX: C5-finding-3
+        fake_ec2.describe_instances.side_effect = [  # FIX: C5-finding-3
+            {"Reservations": [{"Instances": [{"VpcId": "vpc-1", "SecurityGroups": [{"GroupId": "sg-1"}]}]}]},  # FIX: C5-finding-3
+            {"Reservations": [{"Instances": [{"VpcId": "vpc-2", "SecurityGroups": [{"GroupId": "sg-2"}]}]}]},  # FIX: C5-finding-3
+        ]  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-1") is True  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-2") is True  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["ec2_instances"] == 2  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["total_resources"] == 4  # FIX: C5-finding-3
+
+    def test_impact_analyzer_does_not_count_failed_analysis_in_later_success(self, incident_simulator):  # FIX: C5-finding-3
+        """Test impact-analyzer.py does not retain failed EC2 analyses in later counts."""  # FIX: C5-finding-3
+        module, fake_ec2, _fake_iam, _fake_graph = _load_impact_analyzer_module("impact_analyzer_poison_issue_7_tests")  # FIX: C5-finding-3
+        fake_ec2.describe_instances.side_effect = [  # FIX: C5-finding-3
+            {"Reservations": [{"Instances": [{"VpcId": "vpc-1", "SecurityGroups": [{"GroupId": "sg-1"}], "IamInstanceProfile": {}}]}]},  # FIX: C5-finding-3
+            {"Reservations": [{"Instances": [{"VpcId": "vpc-2", "SecurityGroups": [{"GroupId": "sg-2"}]}]}]},  # FIX: C5-finding-3
+        ]  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-bad") is False  # FIX: C5-finding-3
+        assert analyzer.analyze_ec2_blast_radius("i-good") is True  # FIX: C5-finding-3
+        assert analyzer.analyzed_ec2_instances == {"i-good"}  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["ec2_instances"] == 1  # FIX: C5-finding-3
+        assert analyzer.impact_report["blast_radius"]["total_resources"] == 2  # FIX: C5-finding-3
+
+    def test_impact_analyzer_trailing_slash_arn_does_not_pollute_graph(self, incident_simulator):  # FIX: C5-finding-3
+        """Test that an IamInstanceProfile ARN ending with '/' does not add an empty-string node."""  # FIX: C5-finding-3
+        module, fake_ec2, _fake_iam, fake_graph = _load_impact_analyzer_module("impact_analyzer_trailing_slash_7_tests")  # FIX: C5-finding-3
+        fake_ec2.describe_instances.return_value = {  # FIX: C5-finding-3
+            "Reservations": [{"Instances": [{  # FIX: C5-finding-3
+                "VpcId": "vpc-1",  # FIX: C5-finding-3
+                "SecurityGroups": [{"GroupId": "sg-1"}],  # FIX: C5-finding-3
+                "IamInstanceProfile": {"Arn": "arn:aws:iam::123456789012:instance-profile/"},  # FIX: C5-finding-3
+            }]}]  # FIX: C5-finding-3
+        }  # FIX: C5-finding-3
+        analyzer = module.ImpactAnalyzer(incident_simulator["incident_id"])  # FIX: C5-finding-3
+        result = analyzer.analyze_ec2_blast_radius("i-trailing")  # FIX: C5-finding-3
+        assert result is True  # FIX: C5-finding-3
+        graph_nodes = list(analyzer.graph.nodes)  # FIX: C5-finding-3
+        assert "" not in graph_nodes, "empty-string IAM role node must not be added for trailing-slash ARN"  # FIX: C5-finding-3
+        assert "" not in analyzer.affected_resources  # FIX: C5-finding-3
 
 
 class TestRecoveryPhase:
