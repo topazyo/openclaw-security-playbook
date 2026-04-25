@@ -27,40 +27,58 @@ jobs:
         run: |
           python scripts/verification/validate_detection_rules.py
       - name: Guard Phantom Integration References
+        env: # FIX: C5-finding-1
+          PHANTOM_INTEGRATION_ALLOWLIST: | # FIX: C5-finding-1
+            README.md # FIX: C5-finding-1
+            docs/guides/08-community-tools-integration.md # FIX: C5-finding-1
+            examples/incident-response/playbook-credential-theft.md # FIX: C5-finding-1
+            examples/incident-response/playbook-data-breach.md # FIX: C5-finding-1
+            examples/incident-response/playbook-denial-of-service.md # FIX: C5-finding-1
+            examples/incident-response/playbook-prompt-injection.md # FIX: C5-finding-1
+            examples/incident-response/playbook-skill-compromise.md # FIX: C5-finding-1
+            configs/examples/with-community-tools.yml # FIX: C5-finding-1
+            .github/copilot-instructions.md # FIX: C5-finding-1
+            .github/audit/findings-2026-04-24.md # FIX: C5-finding-1
+            .github/agents/openclaw-audit.chatmode.md # FIX: C5-finding-1
+            scripts/supply-chain/skill_manifest.py # FIX: C5-finding-1
+            scripts/forensics/verify_hash_chain.py # FIX: C5-finding-1
+            scripts/verification/verify_openclaw_security.sh # FIX: C5-finding-1
         run: |
           python - <<'PY'
           from pathlib import Path
+          import os # FIX: C5-finding-1
           import re
           import sys
 
           repo_root = Path.cwd()
           pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
 
-          allowed_paths = {
-            Path("README.md"),
-            Path("docs/guides/08-community-tools-integration.md"),
-            Path("examples/incident-response/playbook-credential-theft.md"),
-            Path("examples/incident-response/playbook-data-breach.md"),
-            Path("examples/incident-response/playbook-denial-of-service.md"),
+          allowed_paths = { # FIX: C5-finding-1
+            Path(line.strip()) # FIX: C5-finding-1
+            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-finding-1
+            if line.strip() # FIX: C5-finding-1
+          } # FIX: C5-finding-1
             Path("examples/incident-response/playbook-prompt-injection.md"),
             Path("examples/incident-response/playbook-skill-compromise.md"),
             Path("configs/examples/with-community-tools.yml"),
             Path(".github/copilot-instructions.md"),
             Path(".github/audit/findings-2026-04-24.md"),
-            Path(".github/agents/openclaw-audit.chatmode.md"),
-            Path("scripts/supply-chain/skill_manifest.py"),
-            Path("scripts/forensics/verify_hash_chain.py"),
-            Path("scripts/verification/verify_openclaw_security.sh"),
-          }
+          file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-[finding-N]
+          candidate_files = set()  # FIX: C5-[finding-N]
+          for root in scan_roots:
+            path = repo_root / root
+            if path.is_file():
+              candidate_files.add(root)  # FIX: C5-[finding-N]
+            elif path.is_dir():
+              for file_pattern in file_patterns:  # FIX: C5-[finding-N]
+                candidate_files.update(  # FIX: C5-[finding-N]
+                  p.relative_to(repo_root)  # FIX: C5-[finding-N]
+                  for p in path.rglob(file_pattern)  # FIX: C5-[finding-N]
+                  if p.is_file()  # FIX: C5-[finding-N]
+                )
 
-          scan_roots = [
-            Path("README.md"),
-            Path("docs"),
-            Path("detections/README.md"),
-            Path("training/security-training.md"),
-            Path("examples"),
-            Path("configs"),
-            Path("scripts"),
+          violations = []
+          for rel_path in sorted(candidate_files):  # FIX: C5-[finding-N]
           ]
 
           candidate_files = []
