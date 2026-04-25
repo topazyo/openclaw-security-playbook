@@ -44,7 +44,7 @@ from dataclasses import dataclass
 # Cryptography library for encryption
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # FIX: C5-finding-4
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from cryptography.exceptions import InvalidTag
@@ -741,7 +741,9 @@ def derive_key_from_password(password: str, salt: bytes, iterations: int = 10000
         >>> # Store: salt + encrypted data
         >>> stored_data = salt + encrypted
     """
-    kdf = PBKDF2(
+    if len(salt) < 16:  # FIX: C5-finding-4
+        raise ValueError("salt must be at least 16 bytes")  # FIX: C5-finding-4
+    kdf = PBKDF2HMAC(  # FIX: C5-finding-4
         algorithm=hashes.SHA256(),
         length=32,  # 256 bits
         salt=salt,
