@@ -20,9 +20,36 @@ Usage:
   pytest tests/integration/test_backup_recovery.py -v
 """
 
-import pytest
-from unittest.mock import patch
-from datetime import datetime, timezone
+import importlib.util  # FIX: C5-finding-3
+import sys  # FIX: C5-finding-3
+from datetime import datetime, timezone  # FIX: C5-finding-3
+from pathlib import Path  # FIX: C5-finding-3
+from types import ModuleType  # FIX: C5-finding-3
+from unittest.mock import MagicMock, Mock, patch  # FIX: C5-finding-3
+
+import pytest  # FIX: C5-finding-3
+
+
+BACKUP_VERIFICATION_PATH = Path(__file__).resolve().parents[2] / "examples" / "security-controls" / "backup-verification.py"  # FIX: C5-finding-3
+
+
+def _load_backup_verification_module(module_name: str):  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, BACKUP_VERIFICATION_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    sys.modules[spec.name] = module  # FIX: C5-finding-3
+    spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module  # FIX: C5-finding-3
+
+
+def _fake_boto3_with_backup_pages(pages):  # FIX: C5-finding-3
+    fake_s3_client = MagicMock()  # FIX: C5-finding-3
+    fake_paginator = MagicMock()  # FIX: C5-finding-3
+    fake_paginator.paginate.return_value = pages  # FIX: C5-finding-3
+    fake_s3_client.get_paginator.return_value = fake_paginator  # FIX: C5-finding-3
+    fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
+    fake_boto3.client = Mock(return_value=fake_s3_client)  # FIX: C5-finding-3
+    return fake_boto3, fake_s3_client, fake_paginator  # FIX: C5-finding-3
 
 
 @pytest.fixture
@@ -38,97 +65,125 @@ def backup_config():
 
 class TestRTOVerification:
     """Test Recovery Time Objective."""
-    
-    @patch("subprocess.run")
-    def test_restore_completes_under_rto(self, mock_subprocess, backup_config):
-        """Test restore completes within 4 hours."""
-        from examples.backups import backup_verification
-        
-        start_time = datetime.now(timezone.utc)
-        
-        # Simulate restore
-        mock_subprocess.return_value.returncode = 0
-        
-        result = backup_verification.verify_rto(
-            backup_id="backup-2024-01-15",
-            target_rto_hours=backup_config["rto_hours"],
-        )
-        
-        end_time = datetime.now(timezone.utc)
-        duration = (end_time - start_time).total_seconds() / 3600
-        
-        assert duration < backup_config["rto_hours"]
-        assert result["status"] == "success"
+
+    def test_restore_completes_under_rto(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real disaster recovery flow completes within the configured RTO."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_rto_issue_7_tests")  # FIX: C5-finding-3
+        backup_path = tmp_path / "openclaw-backup.sql.gz"  # FIX: C5-finding-3
+        backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
+        manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
+        start_time = datetime.now(timezone.utc)  # FIX: C5-finding-3
+
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
+            metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
+
+        duration = (datetime.now(timezone.utc) - start_time).total_seconds() / 3600  # FIX: C5-finding-3
+        assert duration < backup_config["rto_hours"]  # FIX: C5-finding-3
+        assert metrics.meets_rto is True  # FIX: C5-finding-3
 
 
 class TestRPOVerification:
     """Test Recovery Point Objective."""
-    
-    def test_incremental_backups_every_15_min(self, backup_config):
-        """Test incremental backups run every 15 minutes."""
-        from examples.backups import backup_verification
-        
-        backups = backup_verification.list_recent_backups(hours=1)
-        
-        # Should have ~4 backups in last hour (every 15 min)
-        assert len(backups) >= 3
+
+    def test_recovery_metrics_preserve_fifteen_minute_rpo(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real recovery metrics preserve the documented 15-minute RPO."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_rpo_issue_7_tests")  # FIX: C5-finding-3
+        backup_path = tmp_path / "openclaw-backup.sql.gz"  # FIX: C5-finding-3
+        backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
+        manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
+
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
+            metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
+
+        assert metrics.rpo_minutes == backup_config["rpo_minutes"]  # FIX: C5-finding-3
+        assert metrics.actual_data_loss == 15.0  # FIX: C5-finding-3
+        assert metrics.meets_rpo is True  # FIX: C5-finding-3
 
 
 class Test321Strategy:
     """Test 3-2-1 backup strategy."""
-    
-    def test_three_copies_exist(self, backup_config):
-        """Test 3 backup copies exist."""
-        from examples.backups import backup_verification
-        
-        copies = backup_verification.verify_backup_copies(
-            backup_id="backup-2024-01-15"
-        )
-        
-        assert len(copies) >= 3
-    
-    def test_two_media_types(self, backup_config):
-        """Test backups on 2 different media types."""
-        from examples.backups import backup_verification
-        
-        media_types = backup_verification.get_media_types()
-        
-        assert "EBS" in media_types
-        assert "S3" in media_types
-    
-    def test_one_offsite_copy(self, backup_config):
-        """Test 1 offsite backup copy exists."""
-        from examples.backups import backup_verification
-        
-        offsite = backup_verification.verify_offsite_backup()
-        
-        assert offsite["location"] == "s3-glacier"
-        assert offsite["region"] != "us-east-1"  # Different region
+
+    def test_three_copies_exist(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check reports three copies when offsite evidence exists."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_copies_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["3_copies"] is True  # FIX: C5-finding-3
+
+    def test_two_media_types(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check reports two media types when offsite evidence exists."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_media_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["2_media_types"] is True  # FIX: C5-finding-3
+
+    def test_one_offsite_copy(self, backup_config):  # FIX: C5-finding-3
+        """Test the real 3-2-1 compliance check reports the offsite copy when S3 contains the backup."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_321_offsite_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        strategy.account_id = "123456789012"  # FIX: C5-finding-3
+        fake_boto3, _fake_s3_client, fake_paginator = _fake_boto3_with_backup_pages([{"Contents": [{"Key": "database/2026/04/25/backup-2024-01-15.sql.gz"}]}])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            compliance = strategy.verify_3_2_1_compliance("backup-2024-01-15")  # FIX: C5-finding-3
+
+        assert compliance["1_offsite"] is True  # FIX: C5-finding-3
+        fake_paginator.paginate.assert_called_once()  # FIX: C5-finding-3
 
 
 class TestIntegrityChecks:
     """Test backup integrity validation."""
-    
-    def test_sha256_checksum_match(self, backup_config):
-        """Test SHA-256 checksums match."""
-        from examples.backups import backup_verification
-        
-        result = backup_verification.verify_checksum(
-            backup_id="backup-2024-01-15"
-        )
-        
-        assert result["checksum_match"] is True
-    
-    def test_worm_object_lock(self, backup_config):
-        """Test S3 object lock prevents deletion."""
-        from examples.backups import backup_verification
-        
-        lock_status = backup_verification.verify_object_lock(
-            backup_id="backup-2024-01-15"
-        )
-        
-        assert lock_status["locked"] is True
-        assert lock_status["retention_days"] >= 2555  # 7 years
+
+    def test_sha256_checksum_match(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real backup verifier accepts a matching SHA-256 manifest."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_checksum_issue_7_tests")  # FIX: C5-finding-3
+        backup_path = tmp_path / "backup-2024-01-15.sql.gz"  # FIX: C5-finding-3
+        backup_path.write_bytes(b"backup-payload")  # FIX: C5-finding-3
+        manifest = module.BackupManifest(  # FIX: C5-finding-3
+            backup_id="backup-2024-01-15",  # FIX: C5-finding-3
+            backup_type=module.BackupType.DATABASE.value,  # FIX: C5-finding-3
+            created_at=datetime.now(timezone.utc).isoformat(),  # FIX: C5-finding-3
+            source_system="openclaw-db-us-west-2",  # FIX: C5-finding-3
+            files={backup_path.name: module.BackupVerifier._calculate_file_checksum(str(backup_path))},  # FIX: C5-finding-3
+            size_bytes=backup_path.stat().st_size,  # FIX: C5-finding-3
+            compression="gzip",  # FIX: C5-finding-3
+            encryption="none",  # FIX: C5-finding-3
+            retention_days=30,  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        manifest_path = backup_path.parent / f"{backup_path.name}.manifest.json"  # FIX: C5-finding-3
+        manifest_path.write_text(manifest.to_json(), encoding="utf-8")  # FIX: C5-finding-3
+
+        is_valid, errors = module.BackupVerifier().verify_backup_integrity(str(backup_path))  # FIX: C5-finding-3
+
+        assert is_valid is True  # FIX: C5-finding-3
+        assert errors == []  # FIX: C5-finding-3
+
+    def test_offsite_upload_uses_glacier_and_encryption(self, tmp_path, backup_config):  # FIX: C5-finding-3
+        """Test the real offsite upload uses archive storage and AES-256 encryption."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_upload_issue_7_tests")  # FIX: C5-finding-3
+        strategy = module.BackupStrategy(backup_region=backup_config["backup_locations"][1].split("-")[-1])  # FIX: C5-finding-3
+        backup_path = tmp_path / "backup-2024-01-15.sql.gz"  # FIX: C5-finding-3
+        backup_path.write_bytes(b"backup-payload")  # FIX: C5-finding-3
+        (tmp_path / "backup-2024-01-15.sql.gz.manifest.json").write_text("{}", encoding="utf-8")  # FIX: C5-finding-3
+        fake_boto3, fake_s3_client, _fake_paginator = _fake_boto3_with_backup_pages([])  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):  # FIX: C5-finding-3
+            s3_uri = strategy.upload_to_offsite(str(backup_path))  # FIX: C5-finding-3
+
+        assert s3_uri.startswith(f"s3://{strategy.s3_backup_bucket}/database/")  # FIX: C5-finding-3
+        first_upload_kwargs = fake_s3_client.upload_file.call_args_list[0].kwargs  # FIX: C5-finding-3
+        assert first_upload_kwargs["ExtraArgs"]["ServerSideEncryption"] == "AES256"  # FIX: C5-finding-3
+        assert first_upload_kwargs["ExtraArgs"]["StorageClass"] == "GLACIER"  # FIX: C5-finding-3
 
 
 if __name__ == "__main__":

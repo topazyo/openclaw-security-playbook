@@ -32,6 +32,9 @@ from types import ModuleType, SimpleNamespace  # FIX: C5-finding-3
 
 AUTO_CONTAINMENT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "auto-containment.py"  # FIX: C5-finding-3
 FORENSICS_COLLECTOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "forensics-collector.py"  # FIX: C5-finding-3
+IOC_SCANNER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "ioc-scanner.py"  # FIX: C5-finding-3
+BACKUP_VERIFICATION_PATH = Path(__file__).resolve().parents[2] / "examples" / "security-controls" / "backup-verification.py"  # FIX: C5-finding-3
+REPORT_WEEKLY_PATH = Path(__file__).resolve().parents[2] / "src" / "clawdbot" / "report_weekly.py"  # FIX: C5-finding-3
 NOTIFICATION_MANAGER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "notification-manager.py"  # FIX: C5-finding-3
 TIMELINE_GENERATOR_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "timeline-generator.py"  # FIX: C5-finding-3
 IMPACT_ANALYZER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incident-response" / "impact-analyzer.py"  # FIX: C5-finding-3
@@ -82,7 +85,61 @@ def _read_single_report(log_dir):  # FIX: C5-finding-3
 
 
 def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
+    fake_psutil = ModuleType("psutil")  # FIX: C5-finding-3
+    fake_psutil.Error = RuntimeError  # FIX: C5-finding-3
+    fake_psutil.NoSuchProcess = RuntimeError  # FIX: C5-finding-3
+    fake_psutil.AccessDenied = RuntimeError  # FIX: C5-finding-3
+    fake_psutil.disk_partitions = Mock()  # FIX: C5-finding-3
+    fake_psutil.disk_usage = Mock()  # FIX: C5-finding-3
+    fake_psutil.process_iter = Mock()  # FIX: C5-finding-3
+    fake_psutil.net_connections = Mock()  # FIX: C5-finding-3
+    fake_cryptography = ModuleType("cryptography")  # FIX: C5-finding-3
+    fake_hazmat = ModuleType("cryptography.hazmat")  # FIX: C5-finding-3
+    fake_primitives = ModuleType("cryptography.hazmat.primitives")  # FIX: C5-finding-3
+    fake_primitives.hashes = ModuleType("hashes")  # FIX: C5-finding-3
+    fake_primitives.serialization = ModuleType("serialization")  # FIX: C5-finding-3
+    fake_asymmetric = ModuleType("cryptography.hazmat.primitives.asymmetric")  # FIX: C5-finding-3
+    fake_asymmetric.rsa = ModuleType("rsa")  # FIX: C5-finding-3
+    fake_asymmetric.padding = ModuleType("padding")  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, FORENSICS_COLLECTOR_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    with patch.dict(sys.modules, {  # FIX: C5-finding-3
+        "psutil": fake_psutil,  # FIX: C5-finding-3
+        "cryptography": fake_cryptography,  # FIX: C5-finding-3
+        "cryptography.hazmat": fake_hazmat,  # FIX: C5-finding-3
+        "cryptography.hazmat.primitives": fake_primitives,  # FIX: C5-finding-3
+        "cryptography.hazmat.primitives.asymmetric": fake_asymmetric,  # FIX: C5-finding-3
+    }):  # FIX: C5-finding-3
+        sys.modules[spec.name] = module  # FIX: C5-finding-3
+        spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module  # FIX: C5-finding-3
+
+
+def _load_ioc_scanner_module(module_name):  # FIX: C5-finding-3
+    fake_requests = ModuleType("requests")  # FIX: C5-finding-3
+    fake_requests.get = Mock()  # FIX: C5-finding-3
+    fake_requests.exceptions = SimpleNamespace(RequestException=Exception)  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, IOC_SCANNER_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    with patch.dict(sys.modules, {"requests": fake_requests}):  # FIX: C5-finding-3
+        sys.modules[spec.name] = module  # FIX: C5-finding-3
+        spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module, fake_requests  # FIX: C5-finding-3
+
+
+def _load_backup_verification_module(module_name):  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, BACKUP_VERIFICATION_PATH)  # FIX: C5-finding-3
+    assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
+    module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
+    sys.modules[spec.name] = module  # FIX: C5-finding-3
+    spec.loader.exec_module(module)  # FIX: C5-finding-3
+    return module  # FIX: C5-finding-3
+
+
+def _load_report_weekly_module(module_name):  # FIX: C5-finding-3
+    spec = importlib.util.spec_from_file_location(module_name, REPORT_WEEKLY_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
     sys.modules[spec.name] = module  # FIX: C5-finding-3
@@ -149,58 +206,81 @@ def incident_simulator():
 
 class TestDetectionPhase:
     """Test incident detection procedures."""
-    
-    @patch("subprocess.run")
-    def test_forensics_collector_execution(self, mock_subprocess, incident_simulator):
-        """Test forensics-collector.py gathers evidence."""
-        mock_subprocess.return_value.returncode = 0
-        expected_evidence = {
-            "memory_dumps": ["dump.raw"],
-            "disk_snapshots": ["snap.img"],
-            "network_logs": ["pcap.pcap"],
-        }
-        mock_fc = MagicMock()
-        mock_fc.collect.return_value = expected_evidence
-        mock_ir = MagicMock(forensics_collector=mock_fc)
 
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.forensics_collector": mock_fc,
-        }):
-            from scripts.incident_response import forensics_collector
-            evidence = forensics_collector.collect(
-                incident_id=incident_simulator["incident_id"],
-                resources=incident_simulator["affected_resources"],
-            )
+    def test_forensics_collector_execution(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
+        """Test forensics-collector.py gathers evidence through the real collection flow."""  # FIX: C5-finding-3
+        module = _load_forensics_collector_module("forensics_collector_detection_issue_7_tests")  # FIX: C5-finding-3
+        collector = module.ForensicsCollector(incident_simulator["incident_id"], "quick")  # FIX: C5-finding-3
+        collector.evidence_dir = tmp_path / "forensics"  # FIX: C5-finding-3
+        collector.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        source_logs_dir = tmp_path / "source-logs"  # FIX: C5-finding-3
+        source_logs_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
+        (source_logs_dir / "agent.log").write_text("security event\n", encoding="utf-8")  # FIX: C5-finding-3
 
-        assert "memory_dumps" in evidence
-        assert "disk_snapshots" in evidence
-        assert "network_logs" in evidence
-    
-    @patch("requests.get")
-    def test_ioc_scanner_threat_intel(self, mock_get, incident_simulator):
-        """Test IOC scanner queries threat intelligence."""
-        mock_get.return_value.json.return_value = {
-            "indicators": [
-                {"type": "ip", "value": "198.51.100.1", "threat_level": "high"}
-            ]
-        }
-        expected_iocs = [{"type": "ip", "value": "198.51.100.1", "threat_level": "high"}]
-        mock_scanner = MagicMock()
-        mock_scanner.scan.return_value = expected_iocs
-        mock_discovery = MagicMock(ioc_scanner=mock_scanner)
+        fake_partition = SimpleNamespace(device="/dev/sda1", mountpoint="/", fstype="ext4", opts="rw")  # FIX: C5-finding-3
+        fake_usage = SimpleNamespace(total=1000, used=400, free=600, percent=40.0)  # FIX: C5-finding-3
+        fake_process_connection = SimpleNamespace(  # FIX: C5-finding-3
+            family="AF_INET",  # FIX: C5-finding-3
+            type="SOCK_STREAM",  # FIX: C5-finding-3
+            laddr=SimpleNamespace(ip="127.0.0.1", port=8443),  # FIX: C5-finding-3
+            raddr=SimpleNamespace(ip="198.51.100.10", port=443),  # FIX: C5-finding-3
+            status="ESTABLISHED",  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
+        fake_network_connection = SimpleNamespace(  # FIX: C5-finding-3
+            family="AF_INET",  # FIX: C5-finding-3
+            type="SOCK_STREAM",  # FIX: C5-finding-3
+            laddr=SimpleNamespace(ip="10.0.0.5", port=8080),  # FIX: C5-finding-3
+            raddr=SimpleNamespace(ip="198.51.100.20", port=80),  # FIX: C5-finding-3
+            status="ESTABLISHED",  # FIX: C5-finding-3
+            pid=4242,  # FIX: C5-finding-3
+        )  # FIX: C5-finding-3
 
-        with patch.dict(sys.modules, {
-            "scripts.discovery": mock_discovery,
-            "scripts.discovery.ioc_scanner": mock_scanner,
-        }):
-            from scripts.discovery import ioc_scanner
-            iocs = ioc_scanner.scan(
-                resources=incident_simulator["affected_resources"]
-            )
+        class FakeProcess:  # FIX: C5-finding-3
+            info = {  # FIX: C5-finding-3
+                "pid": 4242,  # FIX: C5-finding-3
+                "name": "python",  # FIX: C5-finding-3
+                "username": "tester",  # FIX: C5-finding-3
+                "cmdline": ["python", "collector.py"],  # FIX: C5-finding-3
+                "create_time": 1_700_000_000.0,  # FIX: C5-finding-3
+            }  # FIX: C5-finding-3
 
-        assert len(iocs) > 0
-        assert iocs[0]["threat_level"] == "high"
+            def connections(self):  # FIX: C5-finding-3
+                return [fake_process_connection]  # FIX: C5-finding-3
+
+        with patch.object(module.psutil, "disk_partitions", return_value=[fake_partition]), patch.object(module.psutil, "disk_usage", return_value=fake_usage), patch.object(module.psutil, "process_iter", return_value=[FakeProcess()]), patch.object(module.psutil, "net_connections", return_value=[fake_network_connection]), patch.object(module.shutil, "which", return_value=None), patch.object(module, "LOG_DIR", source_logs_dir):  # FIX: C5-finding-3
+            assert collector.collect_all(include_memory=False, include_network=False) is True  # FIX: C5-finding-3
+
+        manifest_path = collector.evidence_dir / "chain-of-custody.json"  # FIX: C5-finding-3
+        assert manifest_path.exists()  # FIX: C5-finding-3
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))  # FIX: C5-finding-3
+        evidence_names = {item["name"] for item in manifest["evidence_items"]}  # FIX: C5-finding-3
+        assert {"disk_metadata", "process_list", "network_connections", "openclaw_log_agent.log"}.issubset(evidence_names)  # FIX: C5-finding-3
+
+    def test_ioc_scanner_threat_intel(self, incident_simulator):  # FIX: C5-finding-3
+        """Test IOC scanner queries threat intelligence through the real AbuseIPDB path."""  # FIX: C5-finding-3
+        module, fake_requests = _load_ioc_scanner_module("ioc_scanner_detection_issue_7_tests")  # FIX: C5-finding-3
+        module.ABUSEIPDB_API_KEY = "abuseipdb-test-key"  # FIX: C5-finding-3
+        fake_response = Mock()  # FIX: C5-finding-3
+        fake_response.raise_for_status.return_value = None  # FIX: C5-finding-3
+        fake_response.json.return_value = {  # FIX: C5-finding-3
+            "data": {  # FIX: C5-finding-3
+                "abuseConfidenceScore": 75,  # FIX: C5-finding-3
+                "totalReports": 4,  # FIX: C5-finding-3
+                "countryCode": "US",  # FIX: C5-finding-3
+                "isp": "ExampleISP",  # FIX: C5-finding-3
+                "lastReportedAt": "2026-04-25T00:00:00Z",  # FIX: C5-finding-3
+            }  # FIX: C5-finding-3
+        }  # FIX: C5-finding-3
+        fake_requests.get.return_value = fake_response  # FIX: C5-finding-3
+        scanner = module.IOCScanner()  # FIX: C5-finding-3
+
+        result = scanner.check_ip_reputation("198.51.100.1")  # FIX: C5-finding-3
+
+        assert result["is_malicious"] is True  # FIX: C5-finding-3
+        assert result["abuse_score"] == 75  # FIX: C5-finding-3
+        assert scanner.results["threat_score"] == 75  # FIX: C5-finding-3
+        assert scanner.results["iocs_found"][0]["value"] == "198.51.100.1"  # FIX: C5-finding-3
+        fake_requests.get.assert_called_once()  # FIX: C5-finding-3
 
 
 class TestContainmentPhase:
@@ -494,89 +574,63 @@ class TestEradicationPhase:
 
 class TestRecoveryPhase:
     """Test service recovery procedures."""
-    
-    @patch("subprocess.run")
-    def test_service_restoration(self, mock_subprocess, incident_simulator):
-        """Test services are restored after eradication."""
-        mock_subprocess.return_value.returncode = 0
-        expected_result = {
-            "status": "restored",
-            "services": [
-                {"name": "api-gateway", "health": "healthy"},
-                {"name": "user-service", "health": "healthy"},
-            ],
-        }
-        mock_recovery = MagicMock()
-        mock_recovery.restore_services.return_value = expected_result
-        mock_ir = MagicMock(recovery=mock_recovery)
 
-        with patch.dict(sys.modules, {
-            "scripts.incident_response": mock_ir,
-            "scripts.incident_response.recovery": mock_recovery,
-        }):
-            from scripts.incident_response import recovery
-            result = recovery.restore_services(
-                incident_id=incident_simulator["incident_id"],
-                services=["api-gateway", "user-service"],
-            )
+    def test_service_restoration(self, tmp_path):  # FIX: C5-finding-3
+        """Test the real disaster recovery flow restores a backup and returns recovery metrics."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_recovery_issue_7_tests")  # FIX: C5-finding-3
+        backup_path = tmp_path / "openclaw-backup.sql.gz"  # FIX: C5-finding-3
+        backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
+        manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
 
-        assert result["status"] == "restored"
-        assert all(s["health"] == "healthy" for s in result["services"])
-    
-    @patch("requests.get")
-    def test_health_checks_pass(self, mock_get, incident_simulator):
-        """Test health checks pass after recovery."""
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {"status": "healthy"}
-        expected_health = [{"name": "api-gateway", "status": "healthy"},
-                           {"name": "user-service", "status": "healthy"}]
-        mock_hc = MagicMock()
-        mock_hc.check_all_services.return_value = expected_health
-        mock_monitoring = MagicMock(health_check=mock_hc)
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10, "sessions": 5}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:  # FIX: C5-finding-3
+            metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
 
-        with patch.dict(sys.modules, {
-            "scripts.monitoring": mock_monitoring,
-            "scripts.monitoring.health_check": mock_hc,
-        }):
-            from scripts.monitoring import health_check
-            health = health_check.check_all_services()
+        assert metrics.meets_rto is True  # FIX: C5-finding-3
+        assert metrics.meets_rpo is True  # FIX: C5-finding-3
+        assert metrics.actual_recovery_time is not None  # FIX: C5-finding-3
+        assert mock_run.call_count == 2  # FIX: C5-finding-3
+        assert mock_run.call_args_list[0].args[0][:2] == ["gunzip", "-c"]  # FIX: C5-finding-3
+        assert mock_run.call_args_list[1].args[0][:2] == ["psql", "postgresql://restore-target"]  # FIX: C5-finding-3
 
-        assert len(health) > 0
-        assert all(s["status"] == "healthy" for s in health)
+    def test_health_checks_pass(self):  # FIX: C5-finding-3
+        """Test the real recovery smoke tests pass when the restored database looks healthy."""  # FIX: C5-finding-3
+        module = _load_backup_verification_module("backup_verification_smoke_issue_7_tests")  # FIX: C5-finding-3
+        manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
+        fake_cursor = MagicMock()  # FIX: C5-finding-3
+        fake_cursor.fetchone.side_effect = [(2,), (10,)]  # FIX: C5-finding-3
+        fake_conn = MagicMock()  # FIX: C5-finding-3
+        fake_conn.cursor.return_value = fake_cursor  # FIX: C5-finding-3
+        fake_psycopg2 = ModuleType("psycopg2")  # FIX: C5-finding-3
+        fake_psycopg2.connect = Mock(return_value=fake_conn)  # FIX: C5-finding-3
+        fake_psycopg2.Error = Exception  # FIX: C5-finding-3
+
+        with patch.dict(sys.modules, {"psycopg2": fake_psycopg2}):  # FIX: C5-finding-3
+            manager._run_smoke_tests("postgresql://restore-target")  # FIX: C5-finding-3
+
+        assert fake_cursor.execute.call_count == 2  # FIX: C5-finding-3
+        fake_cursor.close.assert_called_once()  # FIX: C5-finding-3
+        fake_conn.close.assert_called_once()  # FIX: C5-finding-3
 
 
 class TestPIRPhase:
     """Test post-incident review."""
-    
-    @patch("subprocess.run")
-    def test_weekly_report_includes_incident(self, mock_subprocess, incident_simulator):
-        """Test generate-weekly-report.py includes incident metrics."""
-        mock_subprocess.return_value.returncode = 0
-        expected_report = {
-            "incidents": [{"incident_id": incident_simulator["incident_id"],
-                           "severity": "P0"}],
-            "start_date": "2024-01-15",
-            "end_date": "2024-01-22",
-        }
-        mock_gwr = MagicMock()
-        mock_gwr.generate.return_value = expected_report
-        mock_reporting = MagicMock(generate_weekly_report=mock_gwr)
 
-        with patch.dict(sys.modules, {
-            "scripts.reporting": mock_reporting,
-            "scripts.reporting.generate_weekly_report": mock_gwr,
-        }):
-            from scripts.reporting import generate_weekly_report
-            report = generate_weekly_report.generate(
-                start_date="2024-01-15",
-                end_date="2024-01-22",
-            )
+    def test_weekly_report_generates_canonical_report(self, tmp_path):  # FIX: C5-finding-3
+        """Test the real weekly report backend writes the canonical weekly review schema."""  # FIX: C5-finding-3
+        module = _load_report_weekly_module("report_weekly_issue_7_tests")  # FIX: C5-finding-3
+        output_path = tmp_path / "weekly-report.json"  # FIX: C5-finding-3
 
-        assert "incidents" in report
-        assert any(
-            inc["incident_id"] == incident_simulator["incident_id"]
-            for inc in report["incidents"]
-        )
+        with patch.object(module, "_gather_compliance", return_value={"soc2": {"compliance_percentage": 98.5}, "iso27001": {"compliance_percentage": 97.0}, "gdpr": {"compliance_percentage": 99.0}}), patch.object(module, "_gather_certificates", return_value={"total": 2, "expiring_soon": 0, "certificates": []}):  # FIX: C5-finding-3
+            report = module.generate_weekly_report(  # FIX: C5-finding-3
+                start_date="2026-04-18",  # FIX: C5-finding-3
+                end_date="2026-04-25",  # FIX: C5-finding-3
+                output_path=str(output_path),  # FIX: C5-finding-3
+            )  # FIX: C5-finding-3
+
+        assert report["command"] == "report weekly"  # FIX: C5-finding-3
+        assert report["period"] == {"start": "2026-04-18", "end": "2026-04-25"}  # FIX: C5-finding-3
+        assert report["overall_status"] == "healthy"  # FIX: C5-finding-3
+        assert output_path.exists()  # FIX: C5-finding-3
 
 
 if __name__ == "__main__":
