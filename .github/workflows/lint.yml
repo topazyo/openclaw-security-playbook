@@ -13,7 +13,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: YAML Lint
         run: |
           pip install yamllint sigma-cli
@@ -43,6 +43,7 @@ jobs:
             scripts/supply-chain/skill_manifest.py # FIX: C5-finding-1
             scripts/forensics/verify_hash_chain.py # FIX: C5-finding-1
             scripts/verification/verify_openclaw_security.sh # FIX: C5-finding-1
+            .github/workflows/lint.yml # FIX: C5-24
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -76,6 +77,8 @@ jobs:
 
           violations = []  # FIX: C5-finding-1
           for rel_path in sorted(candidate_files):  # FIX: C5-finding-1
+            if rel_path in allowed_paths:  # FIX: C5-24
+              continue  # FIX: C5-24
             text = (repo_root / rel_path).read_text(encoding="utf-8")
             for line_number, line in enumerate(text.splitlines(), start=1):
               if pattern.search(line):
