@@ -193,7 +193,8 @@ class ComplianceReporter:
             data = json.load(f)
         controls = data.get("controls")
         if isinstance(controls, list):
-            return self._normalize_control_list("SOC2", controls)  # FIX: C5-finding-4
+            typed_controls = cast(list[Any], controls)  # FIX: C5-finding-4
+            return self._normalize_control_list("SOC2", typed_controls)  # FIX: C5-finding-4
 
         control_mappings = data.get("control_mappings")
         if isinstance(control_mappings, dict):
@@ -209,7 +210,8 @@ class ComplianceReporter:
             data = json.load(f)
         controls = data.get("controls")
         if isinstance(controls, list):
-            return self._normalize_control_list("ISO27001", controls)  # FIX: C5-finding-4
+            typed_controls = cast(list[Any], controls)  # FIX: C5-finding-4
+            return self._normalize_control_list("ISO27001", typed_controls)  # FIX: C5-finding-4
 
         annex_a_controls = data.get("annex_a_controls")
         if isinstance(annex_a_controls, dict):
