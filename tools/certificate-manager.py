@@ -45,8 +45,8 @@ class CertificateManager:
                 capture_output=True,
                 text=True,
             )
-        except OSError as exc:  # FIX: C5-14 — covers FileNotFoundError, PermissionError, and other OS failures
-            return _unreadable(f"openssl could not be launched: {exc}")  # FIX: C5-14
+        except OSError as exc:  # FIX: C5-14 — covers startup failures for the openssl executable itself
+            return _unreadable(f"openssl executable not found or could not be executed: {exc}")  # FIX: C5-14
 
         if result.returncode != 0:  # FIX: C5-14
             return _unreadable(f"openssl exited {result.returncode}: {result.stderr.strip()}")  # FIX: C5-14
