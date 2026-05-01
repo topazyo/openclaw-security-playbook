@@ -768,7 +768,7 @@ def certificates(ctx, output):
         rows = [
             [
                 c["cert_path"],
-                c["days_until_expiry"] if c["days_until_expiry"] is not None else "—",  # FIX: C5-14 — None for unreadable certs
+                c["days_until_expiry"] if c["days_until_expiry"] is not None else "N/A",  # FIX: C5-14 — None for unreadable certs
                 "YES" if c["needs_renewal"] else "NO",
                 c.get("status", "unknown"),  # FIX: C5-14 — deterministic state column
             ]
