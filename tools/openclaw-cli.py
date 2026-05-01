@@ -766,10 +766,15 @@ def certificates(ctx, output):
         click.echo("[!] No certificates found under /etc/openclaw/tls")
     else:
         rows = [
-            [c["cert_path"], c["days_until_expiry"], "YES" if c["needs_renewal"] else "NO"]
+            [
+                c["cert_path"],
+                c["days_until_expiry"] if c["days_until_expiry"] is not None else "—",  # FIX: C5-14 — None for unreadable certs
+                "YES" if c["needs_renewal"] else "NO",
+                c.get("status", "unknown"),  # FIX: C5-14 — deterministic state column
+            ]
             for c in certs
         ]
-        click.echo(tabulate(rows, headers=["Certificate", "Days Until Expiry", "Needs Renewal"]))
+        click.echo(tabulate(rows, headers=["Certificate", "Days Until Expiry", "Needs Renewal", "Status"]))  # FIX: C5-14
 
     if output:
         safe_output = _validate_output_path(output)
