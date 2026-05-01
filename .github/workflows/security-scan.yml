@@ -217,8 +217,8 @@ jobs:
 
       - name: Run pip-audit
         run: |
-          pip-audit --format json --output pip-audit.json || true
-          pip-audit --desc
+          pip-audit --requirement requirements.txt --format json --output pip-audit.json || true
+          pip-audit --requirement requirements.txt --desc
 
       - name: Upload pip-audit results
         uses: actions/upload-artifact@v4
