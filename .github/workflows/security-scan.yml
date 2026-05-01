@@ -211,6 +211,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Upgrade pip to patched version (CVE-2026-3219)
+        run: python -m pip install --upgrade "pip>=26.1"
+
       - name: Install pip-audit
         run: |
           pip install pip-audit
