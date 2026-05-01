@@ -273,9 +273,9 @@ class ComplianceReporter:
                 if not isinstance(compliance_mapping, dict):  # FIX: C5-finding-4
                     raise ValueError(f"GDPR compliance mapping is invalid: {relative_path}:{section_name}")  # FIX: C5-finding-4
                 compliance_mapping = cast(dict[str, Any], compliance_mapping)  # FIX: C5-finding-4
-                    status = details.get("gdpr_status", "pending")  # FIX: C5-finding-4
-                    if not isinstance(status, str):  # FIX: C5-finding-4
-                        raise ValueError(f"GDPR status must be a string: {relative_path}:{section_name}")  # FIX: C5-finding-4
+                status = details.get("gdpr_status", "pending")  # FIX: C5-finding-4
+                if not isinstance(status, str):  # FIX: C5-finding-4
+                    raise ValueError(f"GDPR status must be a string: {relative_path}:{section_name}")  # FIX: C5-finding-4
                 gdpr_articles = compliance_mapping.get("GDPR", [])  # FIX: C5-finding-4
                 if not gdpr_articles:  # FIX: C5-finding-4
                     continue  # FIX: C5-finding-4
