@@ -54,12 +54,11 @@ jobs:
           repo_root = Path.cwd()
           pattern = re.compile(r"openclaw-shield\b|openclaw-detect\b|openclaw-telemetry\b|clawguard\b", re.IGNORECASE)
 
-          allowed_paths = { # FIX: C5-finding-1
-            Path(line.strip()) # FIX: C5-finding-1
-            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines() # FIX: C5-finding-1
-            if line.strip() # FIX: C5-finding-1
-
-          } # FIX: C5-finding-1
+          allowed_paths = {
+            Path(line.split("#")[0].strip())  # FIX: C5-24
+            for line in os.environ["PHANTOM_INTEGRATION_ALLOWLIST"].splitlines()
+            if line.split("#")[0].strip()  # FIX: C5-24
+          }
           file_patterns = ("*.md", "*.yml", "*.yaml", "*.txt", "*.sh")  # FIX: C5-finding-1
           scan_roots = (".github", "configs", "docs", "examples", "scripts")  # FIX: C5-finding-1
           candidate_files = set()  # FIX: C5-finding-1
