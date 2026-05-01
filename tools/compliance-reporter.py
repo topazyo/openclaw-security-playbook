@@ -56,6 +56,20 @@ class ComplianceReporter:
         return implemented, pending, percentage
 
     @staticmethod
+    def _calculate_statement_summary(statement: dict[str, Any]) -> tuple[int, int, float]:  # FIX: C5-finding-5
+        implemented = statement.get("implemented")  # FIX: C5-finding-5
+        pending = statement.get("planned")  # FIX: C5-finding-5
+        if not isinstance(implemented, int) or not isinstance(pending, int):  # FIX: C5-finding-5
+            raise ValueError("ISO27001 statement_of_applicability requires integer implemented and planned counts")  # FIX: C5-finding-5
+
+        applicable = implemented + pending  # FIX: C5-finding-5
+        if applicable <= 0:  # FIX: C5-finding-5
+            raise ValueError("ISO27001 statement_of_applicability has no applicable controls")  # FIX: C5-finding-5
+
+        percentage = round((implemented / applicable) * 100, 2)  # FIX: C5-finding-5
+        return implemented, pending, percentage  # FIX: C5-finding-5
+
+    @staticmethod
     def _normalize_mapping_controls(mapping_name: str, mapping: dict[str, Any]) -> list[dict[str, Any]]:
         controls: list[dict[str, Any]] = []
         for control_id, details in mapping.items():
@@ -96,6 +110,11 @@ class ComplianceReporter:
         if not controls:
             raise ValueError(f"{mapping_name} mapping is empty or invalid")
 
+        if any("status" not in control for control in controls):  # FIX: C5-finding-5
+            raise ValueError(  # FIX: C5-finding-5
+                f"{mapping_name} mapping schema drift: expected explicit status for each control"  # FIX: C5-finding-5
+            )  # FIX: C5-finding-5
+
         return controls
     
     def generate_report(self, framework="SOC2"):
@@ -126,16 +145,30 @@ class ComplianceReporter:
     def _generate_iso27001_report(self):
         """Generate ISO 27001 compliance report."""
         controls = self._load_iso27001_controls()
-        implemented, pending, percentage = self._calculate_summary(controls)
+        implemented, pending, percentage = self._load_iso27001_statement_summary()  # FIX: C5-finding-5
         
         return {
             "framework": "ISO 27001:2022",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "controls": controls,
-            "compliance_percentage": 100.0,
-            "article_32_compliant": True,
-            "data_breach_notification_procedures": "Automated via notification-manager.py",
+            "implemented_count": implemented,  # FIX: C5-finding-5
+            "pending_count": pending,  # FIX: C5-finding-5
+            "compliance_percentage": percentage,  # FIX: C5-finding-5
         }
+
+    def _generate_gdpr_report(self):  # FIX: C5-finding-4
+        """Generate GDPR compliance report."""  # FIX: C5-finding-4
+        controls = self._load_gdpr_controls()  # FIX: C5-finding-4
+        implemented, pending, percentage = self._calculate_summary(controls)  # FIX: C5-finding-4
+
+        return {  # FIX: C5-finding-4
+            "framework": "GDPR",  # FIX: C5-finding-4
+            "generated_at": datetime.now(timezone.utc).isoformat(),  # FIX: C5-finding-4
+            "controls": controls,  # FIX: C5-finding-4
+            "implemented_count": implemented,  # FIX: C5-finding-4
+            "pending_count": pending,  # FIX: C5-finding-4
+            "compliance_percentage": percentage,  # FIX: C5-finding-4
+        }  # FIX: C5-finding-4
     
     def _load_soc2_controls(self):
         """Load SOC 2 control status from configs."""
@@ -166,6 +199,71 @@ class ComplianceReporter:
             return self._normalize_nested_control_groups("ISO27001", annex_a_controls)
 
         raise ValueError("ISO27001 controls format is invalid: expected controls list or annex_a_controls object")
+
+    def _load_iso27001_statement_summary(self):  # FIX: C5-finding-5
+        """Load ISO 27001 summary from the authoritative Statement of Applicability."""  # FIX: C5-finding-5
+        controls_path = _safe_repo_path("configs/organization-policies/iso27001-compliance-mapping.json")  # FIX: C5-finding-5
+        with open(controls_path, encoding="utf-8") as f:  # FIX: C5-finding-5
+            data = json.load(f)  # FIX: C5-finding-5
+
+        statement = data.get("statement_of_applicability")  # FIX: C5-finding-5
+        if not isinstance(statement, dict):  # FIX: C5-finding-5
+            raise ValueError("ISO27001 report requires statement_of_applicability for truthful summary counts")  # FIX: C5-finding-5
+
+        return self._calculate_statement_summary(statement)  # FIX: C5-finding-5
+
+    def _load_gdpr_controls(self):  # FIX: C5-finding-4
+        """Load GDPR control status from existing organization policy mappings."""  # FIX: C5-finding-4
+        policy_files = [  # FIX: C5-finding-4
+            "configs/organization-policies/engineering-policy.json",  # FIX: C5-finding-4
+            "configs/organization-policies/security-policy.json",  # FIX: C5-finding-4
+        ]  # FIX: C5-finding-4
+        controls: list[dict[str, Any]] = []  # FIX: C5-finding-4
+
+        for relative_path in policy_files:  # FIX: C5-finding-4
+            policy_path = _safe_repo_path(relative_path)  # FIX: C5-finding-4
+            with open(policy_path, encoding="utf-8") as f:  # FIX: C5-finding-4
+                data = json.load(f)  # FIX: C5-finding-4
+
+            policy_id = data.get("policy_id", policy_path.stem)  # FIX: C5-finding-4
+            policy_sections = data.get("policies", {})  # FIX: C5-finding-4
+            if not isinstance(policy_sections, dict):  # FIX: C5-finding-4
+                raise ValueError(f"GDPR policy source has invalid policies object: {relative_path}")  # FIX: C5-finding-4
+
+            for section_name, details in policy_sections.items():  # FIX: C5-finding-4
+                if not isinstance(details, dict):  # FIX: C5-finding-4
+                    raise ValueError(f"GDPR policy section is invalid: {relative_path}:{section_name}")  # FIX: C5-finding-4
+
+                compliance_mapping = details.get("compliance_mapping", {})  # FIX: C5-finding-4
+                if not isinstance(compliance_mapping, dict):  # FIX: C5-finding-4
+                    raise ValueError(f"GDPR compliance mapping is invalid: {relative_path}:{section_name}")  # FIX: C5-finding-4
+
+                gdpr_articles = compliance_mapping.get("GDPR", [])  # FIX: C5-finding-4
+                if not gdpr_articles:  # FIX: C5-finding-4
+                    continue  # FIX: C5-finding-4
+                if not isinstance(gdpr_articles, list):  # FIX: C5-finding-4
+                    raise ValueError(f"GDPR compliance mapping must be a list: {relative_path}:{section_name}")  # FIX: C5-finding-4
+
+                for article in gdpr_articles:  # FIX: C5-finding-4
+                    if not isinstance(article, str):  # FIX: C5-finding-4
+                        raise ValueError(f"GDPR article identifier must be a string: {relative_path}:{section_name}")  # FIX: C5-finding-4
+                    status = details.get("gdpr_status", "pending")  # FIX: C5-finding-4
+                    if status not in {"implemented", "pending"}:  # FIX: C5-finding-4
+                        raise ValueError(f"GDPR status must be implemented or pending: {relative_path}:{section_name}")  # FIX: C5-finding-4
+                    controls.append({  # FIX: C5-finding-4
+                        "control_id": article,  # FIX: C5-finding-4
+                        "policy_id": policy_id,  # FIX: C5-finding-4
+                        "policy_section": section_name,  # FIX: C5-finding-4
+                        "control": details.get("policy", section_name),  # FIX: C5-finding-4
+                        "evidence": details.get("controls", []),  # FIX: C5-finding-4
+                        "status": status,  # FIX: C5-finding-4
+                        "status_reason": "Explicit gdpr_status is required to claim implementation",  # FIX: C5-finding-4
+                    })  # FIX: C5-finding-4
+
+        if not controls:  # FIX: C5-finding-4
+            raise ValueError("GDPR controls format is invalid: expected GDPR compliance_mapping entries")  # FIX: C5-finding-4
+
+        return controls  # FIX: C5-finding-4
 
 
 def generate_report(framework="SOC2"):
