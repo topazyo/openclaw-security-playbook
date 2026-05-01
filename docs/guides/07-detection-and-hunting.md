@@ -32,10 +32,10 @@ Run shell-centric commands through WSL2 or PowerShell equivalents.
 **For Tier 1 (Discovery):** EDR agent deployed on target endpoints. No additional tooling required.
 
 **For Tier 2/3 (Behavioral Hunting and Kill Chain Detection):**
-- `openclaw-telemetry` installed and running on agent hosts, forwarding JSONL events to your SIEM.
-  See [`docs/guides/08-community-tools-integration.md`](08-community-tools-integration.md) for
-  setup guidance. The telemetry schema is documented in [`detections/README.md`](../../detections/README.md).
-- SIEM receiving CEF/syslog events from openclaw-telemetry
+- A telemetry pipeline installed and running on agent hosts, forwarding structured events to your SIEM. <!-- FIX: C5-9 -->
+  See [`docs/guides/08-community-tools-integration.md`](08-community-tools-integration.md) if you plan to evaluate separately supplied external tooling. This repository does not bundle a telemetry forwarder. <!-- FIX: C5-9 -->
+  The telemetry schema assumptions for Tier 2/3 content are documented in [`detections/README.md`](../../detections/README.md). <!-- FIX: C5-9 -->
+- SIEM receiving CEF/syslog or equivalent normalized events from that telemetry pipeline <!-- FIX: C5-9 -->
 - For KQL queries: Microsoft Sentinel with CommonSecurityLog table populated
 
 ## Deployment Sequence
@@ -81,7 +81,7 @@ Generated output includes openclaw rule names for the selected backend.
 
 ### Step 3: Deploy Behavioral Hunting
 
-Once openclaw-telemetry is running and forwarding to your SIEM:
+Once your telemetry pipeline is running and forwarding to your SIEM: <!-- FIX: C5-9 -->
 
 1. Establish a 7-day baseline of normal tool execution patterns before enabling alerts
 2. Tune the off-hours window in Hunt 3 to match actual working hours for your org

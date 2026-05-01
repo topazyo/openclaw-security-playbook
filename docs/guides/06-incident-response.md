@@ -172,7 +172,9 @@ jq -r 'select(.event=="tool_execution") | .tool_name' ~/.openclaw/logs/audit.jso
 
 ### Phase 3: Containment (10-15 minutes)
 
-Deploy openclaw-shield:
+If your environment uses separate runtime enforcement tooling, tighten it here. This repository does not bundle that service. <!-- FIX: C5-9 -->
+
+Example external prompt-guard policy shape: <!-- FIX: C5-9 -->
 
 ```yaml
 # ~/.openclaw/config/shield.yml

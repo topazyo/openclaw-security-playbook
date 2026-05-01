@@ -51,7 +51,7 @@ This policy ensures:
 - All related infrastructure (MCP servers, gateways, monitoring systems)
 
 **Enforcement:**
-- Technical enforcement via [access controls](./access-control-policy.md), [runtime enforcement](../guides/08-community-tools-integration.md) (openclaw-shield), and [monitoring](../guides/08-community-tools-integration.md) (openclaw-telemetry)
+- Technical enforcement via [access controls](./access-control-policy.md), runtime or gateway enforcement controls, and monitoring or telemetry tooling when integrated <!-- FIX: C5-9 -->
 - Administrative enforcement via quarterly access reviews and audit log analysis
 - Disciplinary enforcement via HR for policy violations
 
@@ -188,7 +188,7 @@ docker run -d --name clawdbot \
 ❌ PROHIBITED: "Create malware code to exploit vulnerability X"
 ```
 
-**Protected by**: [openclaw-shield](../guides/08-community-tools-integration.md) (runtime prompt injection detection)
+**Protected by**: runtime, gateway, or external prompt-enforcement controls when configured <!-- FIX: C5-9 -->
 
 ---
 
@@ -241,8 +241,8 @@ docker run -d --name clawdbot \
 - Print or photograph confidential information (unless business need)
 
 **Data Loss Prevention (DLP)**:
-- Monitored via openclaw-telemetry (conversation history analysis)
-- Blocked by openclaw-shield (PII redaction, output filtering)
+- Monitored via telemetry tooling when integrated (conversation history analysis) <!-- FIX: C5-9 -->
+- Blocked by runtime, gateway, or external DLP controls when configured (PII redaction, output filtering) <!-- FIX: C5-9 -->
 - Audited in quarterly access reviews
 
 **Attack Scenario**: See [Scenario 006: Credential Exfiltration via Conversation History](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)
@@ -325,7 +325,7 @@ resources:
 - Using VPN split-tunneling to access internal systems
 - Running AI agents outside Docker (unless approved for development)
 - Modifying seccomp/AppArmor profiles to relax restrictions
-- Disabling openclaw-shield or openclaw-telemetry
+- Disabling deployed runtime enforcement or telemetry controls <!-- FIX: C5-9 -->
 
 **Examples**:
 ```bash
@@ -432,10 +432,10 @@ socat TCP-LISTEN:18789,fork TCP:localhost:18789  # Port forwarding attack
 - Skill installations and updates
 - Network connections (source IP, destination, ports)
 - Resource utilization (CPU, memory, API tokens)
-- Behavioral anomalies (via openclaw-telemetry)
+- Behavioral anomalies (via telemetry tooling when integrated) <!-- FIX: C5-9 -->
 
 **How We Monitor**:
-- Real-time: SIEM integration, openclaw-telemetry alerts
+- Real-time: SIEM integration, telemetry alerts when available <!-- FIX: C5-9 -->
 - Daily: Security analyst log review
 - Weekly: Automated reports (anomalies, policy violations)
 - Quarterly: Access reviews, compliance audits
@@ -447,13 +447,13 @@ socat TCP-LISTEN:18789,fork TCP:localhost:18789  # Port forwarding attack
 ### Automated Enforcement
 
 **Preventive Controls** (block violations before they happen):
-- openclaw-shield: Prompt injection blocking, PII redaction, tool allowlisting
+- Runtime, gateway, or external prompt-enforcement controls: Prompt injection blocking, PII redaction, tool allowlisting when configured <!-- FIX: C5-9 -->
 - Firewall rules: Block public internet access, enforce VPN
 - RBAC: Deny unauthorized access attempts
 - Resource limits: Kill containers exceeding limits
 
 **Detective Controls** (identify violations after they happen):
-- openclaw-telemetry: Behavioral anomaly detection
+- Telemetry tooling: Behavioral anomaly detection when integrated <!-- FIX: C5-9 -->
 - Audit logs: Immutable trail of all actions
 - Integrity monitoring: Detect modified skills or configs
 

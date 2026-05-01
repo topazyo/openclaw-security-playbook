@@ -62,7 +62,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 | **Access Credentials** | User setup | Authentication | Contractual necessity | Duration of account |
 | **Audit Logs** | System-generated | Security, compliance, fraud detection | Legitimate interest + legal obligation | 7 years (compliance requirement) |
 | **Employee Data** | HR onboarding | Employment, access control | Contractual necessity | Employment + 7 years (legal requirement) |
-| **PII in Prompts** | User input | Redacted at ingestion when `openclaw-shield` is deployed and configured (see `docs/guides/08-community-tools-integration.md`); if `openclaw-shield` is not deployed, PII reaches the model and is governed by the relevant conversation-history retention policy | Conditional on deployment | See retention policy; not stored if redaction is active |
+| **PII in Prompts** | User input | Redacted at ingestion when approved prompt-redaction controls are deployed and configured; otherwise PII reaches the model and is governed by the relevant conversation-history retention policy <!-- FIX: C5-9 --> | Conditional on deployment | See retention policy; not stored if redaction is active |
 
 ---
 
@@ -365,7 +365,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 - **Access reviews**: Quarterly (revoke unnecessary access)
 
 **Monitoring** (Article 32(1)(d)):
-- **Continuous monitoring**: openclaw-telemetry, SIEM (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml))
+- **Continuous monitoring**: telemetry pipeline or SIEM, if deployed (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml)) <!-- FIX: C5-9 -->
 - **Anomaly detection**: Behavioral analytics (unusual data access patterns trigger alerts)
 - **Audit logging**: Immutable logs (who accessed what personal data, when)
 
@@ -375,7 +375,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 - **Tested recovery**: Monthly restore tests
 
 **PII Redaction**:
-- **AI prompts**: openclaw-shield detects PII (email, SSN, credit card) and redacts before processing
+- **AI prompts**: runtime, gateway, or external prompt-redaction controls can detect PII (email, SSN, credit card) and redact before processing when configured <!-- FIX: C5-9 -->
 - **Logs**: Email addresses masked (u***@example.com)
 
 ---
@@ -418,7 +418,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 ### Data Protection by Design
 
 **Privacy-Enhancing Technologies (PETs)**:
-- **PII redaction**: openclaw-shield automatically redacts PII in prompts (default enabled)
+- **PII redaction**: prompt-redaction controls can automatically redact PII in prompts when configured <!-- FIX: C5-9 -->
 - **Pseudonymization**: User IDs can be pseudonymized on request
 - **Encryption by default**: All credentials encrypted (OS keychain), backups encrypted
 
@@ -463,7 +463,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 
 **Detection Methods**:
 - **Automated alerts**: SIEM detects anomalies (unusual data access, bulk exports)
-- **openclaw-telemetry**: Behavioral monitoring (credential exfiltration attempts)
+- **Behavioral monitoring**: telemetry tooling can detect credential exfiltration attempts when integrated <!-- FIX: C5-9 -->
 - **User reports**: Users can report suspected breaches (security@company.com)
 
 **Incident Classification** (see [Incident Response Policy](../policies/incident-response-policy.md)):
@@ -640,16 +640,16 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 - **Client-side only**: Not feasible (AI API requires server-side access)
 - **Shorter retention**: 90 days default balances utility and privacy
 
-**Proportionality**: Data minimization (don't collect unless user consents for longer retention), PII redaction (openclaw-shield), encryption
+**Proportionality**: Data minimization (don't collect unless user consents for longer retention), PII redaction controls when configured, encryption <!-- FIX: C5-9 -->
 
 #### 3. Risk Assessment
 
 | Risk | Likelihood | Severity | Impact | Mitigation |
 |------|------------|----------|--------|------------|
 | **Unauthorized access** (credential exfiltration) | Medium | High | Identity theft, confidential info disclosure | MFA, VPN, access controls (see [Access Control Policy](../policies/access-control-policy.md)) |
-| **PII leakage** (user includes PII in prompt) | High | Medium | Privacy violation, GDPR breach | PII redaction (openclaw-shield), user training (don't share PII) |
+| **PII leakage** (user includes PII in prompt) | High | Medium | Privacy violation, GDPR breach | PII redaction controls when configured, user training (don't share PII) <!-- FIX: C5-9 --> |
 | **Data breach** (cloud storage compromised) | Low | High | Mass disclosure of conversations | Encryption (AES-256), access logging, monitoring |
-| **Insider threat** (employee exfiltration) | Low | High | Confidential info disclosure | Least privilege, behavioral monitoring (openclaw-telemetry), audit logs |
+| **Insider threat** (employee exfiltration) | Low | High | Confidential info disclosure | Least privilege, behavioral monitoring via telemetry tooling when integrated, audit logs <!-- FIX: C5-9 --> |
 | **Third-party risk** (Anthropic breach) | Low | High | Mass disclosure | DPA with Anthropic, SOC 2 compliance, contractual liability |
 
 **Overall Risk**: Medium (after mitigations)
@@ -657,10 +657,10 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 #### 4. Measures to Address Risks
 
 **Technical**:
-- **PII redaction**: openclaw-shield (default enabled)
+- **PII redaction**: prompt-redaction controls when configured <!-- FIX: C5-9 -->
 - **Encryption**: AES-256 (at rest), TLS 1.2+ (in transit)
 - **Access controls**: RBAC, JIT, MFA
-- **Monitoring**: openclaw-telemetry, SIEM alerts
+- **Monitoring**: telemetry tooling when integrated, SIEM alerts <!-- FIX: C5-9 -->
 
 **Organizational**:
 - **Data classification**: Conversation history classified as Confidential (see [Data Classification Policy](../policies/data-classification.md))
@@ -752,7 +752,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 2. **Pseudonymization**: User IDs pseudonymized (but prompt content still personal data)
 3. **Contractual**: Anthropic contractually obligated to challenge overbroad government requests
 4. **Transparency**: Anthropic publishes transparency report (government data requests)
-5. **Data minimization**: PII redaction (openclaw-shield) reduces sensitive data transferred
+5. **Data minimization**: prompt-redaction controls reduce sensitive data transferred when configured <!-- FIX: C5-9 -->
 6. **Retention minimization**: 90-day default retention (less data stored = less data subject to surveillance)
 
 **Conclusion**: Supplementary measures reduce (but don't eliminate) risk. Users informed of residual risk in privacy notice.
@@ -882,7 +882,7 @@ ClawdBot/OpenClaw deployments. Fill in all `[FILL IN: ...]` markers before publi
 
 2. **Technical Measures**:
    - Encryption (configurations audited)
-   - PII redaction (openclaw-shield logs)
+   - PII redaction (logs from runtime, gateway, or external redaction controls when configured) <!-- FIX: C5-9 -->
    - Access controls (RBAC configurations, access logs)
 
 3. **Organizational Measures**:

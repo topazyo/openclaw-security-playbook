@@ -250,7 +250,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
   - **Insider threat**: Credential exfiltration by employees (see [Scenario 005](../../examples/scenarios/scenario-005-credential-theft-via-skill.md))
   - **Impersonation**: Unauthorized use of AI agent
   - **Data exfiltration**: Conversation history theft (see [Scenario 006](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md))
-- Behavioral monitoring (openclaw-telemetry detects anomalies)
+- Behavioral monitoring (telemetry tooling detects anomalies when integrated) <!-- FIX: C5-9 -->
 - Audit logs immutable (cannot be deleted by users)
 
 **Evidence**:
@@ -283,7 +283,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity selects, develops, and performs ongoing and/or separate evaluations.
 
 **Implementation**:
-- **Real-time**: openclaw-telemetry, SIEM alerts (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml))
+- **Real-time**: telemetry tooling when integrated, SIEM alerts (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml)) <!-- FIX: C5-9 -->
 - **Daily**: Security analyst log review
 - **Weekly**: Vulnerability scan results
 - **Quarterly**: Access reviews, configuration audits
@@ -505,7 +505,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Implementation**:
 - TLS 1.3 for all network communication
 - VPN required for remote access (see [Network Segmentation](../guides/03-network-segmentation.md))
-- Data Loss Prevention (DLP): openclaw-shield blocks credential exfiltration
+- Data Loss Prevention (DLP): runtime, gateway, or external DLP controls can block credential exfiltration when configured <!-- FIX: C5-9 -->
 - Backup encryption: AES-256 + GPG (see [Backup and Recovery](../procedures/backup-recovery.md))
 
 **Evidence**:
@@ -556,7 +556,7 @@ This document maps ClawdBot/OpenClaw security controls to SOC 2 Type II Trust Se
 **Control Objective**: The entity monitors system components and the operation of those components.
 
 **Implementation**:
-- Real-time monitoring: openclaw-telemetry, SIEM (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml))
+- Real-time monitoring: telemetry tooling when integrated, SIEM (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml)) <!-- FIX: C5-9 -->
 - Metrics: CPU, memory, disk, API usage, error rates, latency
 - Alerting: PagerDuty for P0/P1 issues, email for P2/P3
 - Dashboards: Grafana (accessible to operations team)

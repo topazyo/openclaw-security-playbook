@@ -115,7 +115,7 @@ Is this informational OR
 
 **Automated Detection**:
 ```bash
-# Review recent anomalies from openclaw-telemetry logs
+# Review recent anomalies from telemetry logs
 python scripts/monitoring/anomaly_detector.py \
   --logfile ~/.openclaw/logs/telemetry.jsonl \
   --output-json
@@ -247,7 +247,7 @@ python scripts/incident-response/notification-manager.py \
 | **DoS Attack** | `iptables -I INPUT -s 203.0.113.45 -j DROP` |
 | **MCP Server Compromise** | `systemctl stop openclaw-mcp-server; iptables -I INPUT -p tcp --dport 3000 -j DROP` |
 
-**Automated Containment** (if openclaw-shield is deployed):
+**Automated Containment** (if approved runtime or gateway enforcement controls are deployed): <!-- FIX: C5-9 -->
 ```yaml
 # Containment rules triggered automatically
 # See: configs/examples/with-community-tools.yml

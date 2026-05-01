@@ -246,8 +246,8 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 
 **Implementation**:
 - [Acceptable Use Policy](../policies/acceptable-use-policy.md) (SEC-005) defines acceptable/prohibited activities
-- Technical enforcement: openclaw-shield blocks prohibited prompts
-- Monitoring: openclaw-telemetry detects policy violations
+- Technical enforcement: runtime, gateway, or external prompt-enforcement controls can block prohibited prompts when configured <!-- FIX: C5-9 -->
+- Monitoring: telemetry tooling can detect policy violations when integrated <!-- FIX: C5-9 -->
 - Consequences: Progressive discipline (verbal warning → written warning → termination)
 
 **Evidence**:
@@ -325,7 +325,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 - **Email**: Encrypted email for Restricted data (PGP or S/MIME)
 - **Third-party transfer**: Data Processing Agreements (DPA) required, secure file transfer (SFTP, S3 pre-signed URLs)
 
-**DLP**: openclaw-shield blocks transfer of Restricted data without approval
+**DLP**: runtime, gateway, or external DLP controls can block transfer of Restricted data without approval when configured <!-- FIX: C5-9 -->
 
 **Evidence**:
 - TLS configuration audits
@@ -545,7 +545,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 
 **Implementation**:
 - 6-phase incident response lifecycle (see [Incident Response Policy](../policies/incident-response-policy.md)):
-  1. **Detection**: Automated alerts (SIEM, openclaw-telemetry)
+  1. **Detection**: Automated alerts (SIEM, telemetry tooling when integrated) <!-- FIX: C5-9 -->
   2. **Analysis**: Triage, classification, impact assessment
   3. **Containment**: Isolate affected systems (network, credentials)
   4. **Eradication**: Remove malware, patch vulnerabilities, rotate credentials
@@ -705,13 +705,13 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Implementation**:
 - [Data Classification Policy](../policies/data-classification.md) classifies PII as Restricted
 - PII handling: Minimize collection, encrypt in transit/rest, delete when no longer needed
-- AI-specific: PII redaction in prompts (openclaw-shield detects and redacts), conversation history classified
+- AI-specific: PII redaction in prompts via runtime, gateway, or external redaction controls when configured; conversation history classified <!-- FIX: C5-9 -->
 - GDPR compliance: See [GDPR Compliance](./gdpr-compliance.md)
 - Data subject rights: Access, rectification, erasure, portability (procedures documented)
 
 **Evidence**:
 - PII inventory (data mapping)
-- PII redaction logs (openclaw-shield)
+- PII redaction logs (from runtime, gateway, or external redaction controls when configured) <!-- FIX: C5-9 -->
 - Data subject rights requests (handled within 30 days)
 - GDPR compliance attestation
 
@@ -1334,12 +1334,12 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Implementation**:
 - PII masking: Logs mask email addresses (u***@example.com), credit cards (****1234)
 - Test data: Production data masked when copied to staging (fake-generator)
-- AI data: openclaw-shield redacts PII from prompts
+- AI data: runtime, gateway, or external redaction controls can redact PII from prompts when configured <!-- FIX: C5-9 -->
 
 **Evidence**:
 - Log masking configuration
 - Test data masking scripts
-- PII redaction logs (openclaw-shield)
+- PII redaction logs (from runtime, gateway, or external redaction controls when configured) <!-- FIX: C5-9 -->
 
 ---
 
@@ -1348,13 +1348,13 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Data leakage prevention measures are applied to systems, networks, and other devices that process, store, or transmit sensitive information.
 
 **Implementation**:
-- DLP tool: openclaw-shield blocks credential exfiltration in prompts
+- DLP tool: runtime, gateway, or external DLP controls can block credential exfiltration in prompts when configured <!-- FIX: C5-9 -->
 - Network DLP: Firewall blocks unauthorized data transfer (outbound rules)
 - Email DLP: Encrypted email required for Restricted data
 - Monitoring: Alerts on suspected data exfiltration attempts
 
 **Evidence**:
-- DLP block logs (openclaw-shield)
+- DLP block logs (from runtime, gateway, or external DLP controls when configured) <!-- FIX: C5-9 -->
 - Firewall rules (outbound restrictions)
 - DLP alerts (investigated)
 
@@ -1420,7 +1420,7 @@ This document maps ClawdBot/OpenClaw security controls to ISO 27001:2022 Annex A
 **Control Objective**: Networks, systems, and applications are monitored for anomalous behavior and appropriate actions taken.
 
 **Implementation**:
-- Real-time monitoring: openclaw-telemetry, SIEM (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml))
+- Real-time monitoring: telemetry tooling when integrated, SIEM (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml)) <!-- FIX: C5-9 -->
 - Anomaly detection: Behavioral analytics (unusual API usage, abnormal prompt patterns)
 - Alerting: PagerDuty for critical alerts, email for warnings
 - Response: Security analyst reviews alerts (daily), automated containment for critical threats

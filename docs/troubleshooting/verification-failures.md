@@ -731,35 +731,37 @@ docker inspect clawdbot-production --format='{{.HostConfig.NanoCpus}}'
 
 ## Layer 4: Runtime Enforcement Issues
 
-### Issue: openclaw-shield Not Responding
+### Issue: External Runtime Enforcement Service Not Responding <!-- FIX: C5-9 -->
+
+> EXTERNAL / NOT INCLUDED: The commands below apply only if you separately deployed a runtime enforcement service. This repository does not bundle one. <!-- FIX: C5-9 -->
 
 **Symptom:**
 ```
-❌ FAIL: openclaw-shield is not responding on http://localhost:8080
+❌ FAIL: external runtime enforcement service is not responding on http://localhost:8080
 ```
 
-**Cause:** Shield service not running or misconfigured
+**Cause:** External runtime enforcement service not running or misconfigured <!-- FIX: C5-9 -->
 
 **Solution:**
 ```bash
-# 1. Check if shield is running
-docker ps | grep openclaw-shield
+# 1. Check if the external service is running
+docker ps | grep your-runtime-enforcement-service
 # Or
-systemctl status openclaw-shield
+systemctl status your-runtime-enforcement-service
 
-# 2. If not running, start it
-# Docker
+# 2. If not running, start it according to your vendor or internal deployment instructions
+# Example Docker pattern
 docker run -d \
-  --name openclaw-shield \
+  --name your-runtime-enforcement-service \
   -p 127.0.0.1:8080:8080 \
-  knostic/openclaw-shield:latest
+  your-registry/your-runtime-enforcement-service:latest
 
-# From source
-cd ~/openclaw-shield
+# Example source checkout pattern
+cd ~/your-runtime-enforcement-service
 npm install
 npm start &
 
-# 3. Verify shield is accessible
+# 3. Verify the service is accessible
 curl http://localhost:8080/health
 # Should return: {"status": "healthy"}
 
@@ -771,9 +773,9 @@ curl -X POST http://localhost:8080/api/v1/guard \
 # Should return detection result
 
 # 5. Check logs for errors
-docker logs openclaw-shield
+docker logs your-runtime-enforcement-service
 # Or
-journalctl -u openclaw-shield -n 50
+journalctl -u your-runtime-enforcement-service -n 50
 ```
 
 ---

@@ -83,7 +83,7 @@ This threat model uses the **STRIDE** framework:
 ┌─────────────────────────────────────────────────────────────────┐
 │                    ClawdBot Agent (Core)                         │
 │  ┌─────────────────────────────────────────────────────┐        │
-│  │  Runtime Enforcement (Layer 4 - openclaw-shield)    │        │
+│  │  Runtime Enforcement (Layer 4 - optional tooling)   │        │
 │  │  • Prompt injection detection                       │        │
 │  │  • PII/credential redaction                         │        │
 │  │  • Tool execution allowlisting                      │        │
@@ -136,7 +136,7 @@ This threat model uses the **STRIDE** framework:
 
 | Threat | Description | Impact | Mitigation |
 |--------|-------------|--------|------------|
-| **Prompt Injection** | Malicious prompts alter agent behavior | High | Input sanitization, delimiter stripping, openclaw-shield (see [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)) |
+| **Prompt Injection** | Malicious prompts alter agent behavior | High | Input sanitization, delimiter stripping, Layer 4 runtime enforcement (see [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)) | <!-- FIX: C5-9 -->
 | **Conversation History Poisoning** | Attacker modifies stored conversation data | Medium | Encrypted storage, integrity checksums, access controls |
 | **RAG Database Poisoning** | Malicious documents injected into vector DB | High | Document validation, provenance tracking (see [Scenario 006](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)) |
 | **Skill Code Tampering** | Installed skills modified post-installation | Medium | Integrity monitoring, GPG signatures (Layer 5, see [05-supply-chain-security.md](../guides/05-supply-chain-security.md)) |
@@ -148,7 +148,7 @@ This threat model uses the **STRIDE** framework:
 |--------|-------------|--------|----------|
 | **Unlogged Actions** | Attacker actions not captured in audit trail | Medium | Comprehensive logging to immutable destination (see [monitoring-stack.yml](../../configs/examples/monitoring-stack.yml)) |
 | **Log Tampering** | Attacker deletes/modifies logs | Medium | Remote syslog, SIEM integration, log signing |
-| **Credential Usage Tracking** | No audit trail for credential access | Low | OS keychain access logging, openclaw-telemetry |
+| **Credential Usage Tracking** | No audit trail for credential access | Low | OS keychain access logging, telemetry forwarding to centralized monitoring | <!-- FIX: C5-9 -->
 
 ### I - Information Disclosure
 
@@ -158,7 +158,7 @@ This threat model uses the **STRIDE** framework:
 | **Backup File Persistence** | Editor backup files contain credentials | Critical | Automated cleanup (see [02-credential-isolation.md](../guides/02-credential-isolation.md#backup-file-management)) |
 | **Conversation Leakage** | Stored conversations expose sensitive data | High | PII redaction, encryption at rest (see [scenario-006](../../examples/scenarios/scenario-006-credential-theft-conversation-history.md)) |
 | **Skill Data Exfiltration** | Malicious skill exfiltrates data | High | Network policies, output filtering (see [scenario-005](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)) |
-| **Log Data Exposure** | Logs contain PII/credentials | Medium | Output redaction (openclaw-shield), log sanitization |
+| **Log Data Exposure** | Logs contain PII/credentials | Medium | Output redaction, log sanitization | <!-- FIX: C5-9 -->
 | **Error Message Leakage** | Stack traces expose system details | Low | Generic error messages, secure error handling |
 
 ### D - Denial of Service
@@ -177,7 +177,7 @@ This threat model uses the **STRIDE** framework:
 |--------|-------------|--------|------------|
 | **Skill Permission Escalation** | Skill gains unauthorized permissions | High | Allowlist enforcement, permission validation (see [allowlist.json](../../configs/skill-policies/allowlist.json)) |
 | **Container Escape** | Attacker breaks out of Docker sandbox | High | Non-root user, capability dropping, seccomp (see [Dockerfile.hardened](../../scripts/hardening/docker/Dockerfile.hardened)) |
-| **Prompt Injection → Code Execution** | Prompt bypasses tool restrictions | Critical | Tool allowlisting, input validation (openclaw-shield) |
+| **Prompt Injection → Code Execution** | Prompt bypasses tool restrictions | Critical | Tool allowlisting, input validation, Layer 4 runtime enforcement | <!-- FIX: C5-9 -->
 | **Lateral Movement** | Compromised agent accesses other systems | Medium | Network segmentation, principle of least privilege |
 | **Credential Access via Skill** | Skill reads credentials from agent memory | Critical | Credential isolation, skill sandboxing (see [scenario-005](../../examples/scenarios/scenario-005-credential-theft-via-skill.md)) |
 
@@ -197,7 +197,7 @@ This threat model uses the **STRIDE** framework:
 - **Attack Vector**: Indirect prompt injection via emails, documents
 - **Likelihood**: Medium
 - **Impact**: Data exfiltration, privilege escalation
-- **Mitigation**: Layer 4 (openclaw-shield), see [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)
+- **Mitigation**: Layer 4 runtime enforcement controls, see [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md) <!-- FIX: C5-9 -->
 
 **3. Supply Chain Compromise via Malicious Skills**
 - **Attack Vector**: Typosquatted npm packages, compromised repositories

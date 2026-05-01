@@ -58,7 +58,7 @@
 - **[Supply Chain Security Guide](../../docs/guides/05-supply-chain-security.md)** - Layer 5: Skill integrity, manifest validation, SBOM generation
 - **[Skill Manifest Tool](../../scripts/supply-chain/skill_manifest.py)** - Integrity verification and dangerous pattern detection
 - **[Skill Integrity Monitor](../../scripts/supply-chain/skill_integrity_monitor.sh)** - Continuous monitoring for skill changes
-- **[Community Tools - openclaw-detect](../../docs/guides/08-community-tools-integration.md#openclaw-detect)** - Shadow AI detection, unapproved skill discovery
+- **[Community Tools - Optional Skill Discovery](../../docs/guides/08-community-tools-integration.md)** - Shadow AI detection and unapproved skill discovery when external tooling is deployed <!-- FIX: C5-9 -->
 
 ---
 
@@ -66,9 +66,9 @@
 
 ### High-Confidence Indicators (Immediate Response)
 
-1. **openclaw-detect Shadow AI Alerts**
+1. **Shadow AI Alerts** <!-- FIX: C5-9 -->
    
-   openclaw-detect identifies unapproved skills executing on agents via EDR/file monitoring.
+  External detection tooling can identify unapproved skills executing on agents via EDR/file monitoring when deployed. <!-- FIX: C5-9 -->
    
    **Example Alert**:
    ```json
@@ -109,7 +109,7 @@
       - Dangerous patterns detected: os.system(), eval(), subprocess.Popen()
    ```
 
-3. **Anomalous Skill Behavior** (openclaw-telemetry)
+3. **Anomalous Skill Behavior** (telemetry pipeline) <!-- FIX: C5-9 -->
    
    ```json
    {
@@ -228,7 +228,7 @@
 1. **Confirm the Alert**
    
    ```bash
-   # Check openclaw-detect for skill detections
+  # Check external detection service for skill detections
    curl -X GET "https://detect.openclaw.ai/api/detections/recent?hours=1&type=unauthorized_skill" \
      -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
    
@@ -800,7 +800,7 @@
    */15 * * * * root /opt/openclaw/scripts/supply-chain/skill_integrity_monitor.sh --alert-on-change
    EOF
    
-   # Enable openclaw-detect shadow AI detection
+   # Enable external shadow AI detection
    curl -X PATCH "https://detect.openclaw.ai/config" \
      -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
@@ -870,8 +870,8 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 2. **Timeline**
    ```
    2026-02-14 14:20:00 UTC - Malicious skill installed on agent-prod-12 by user alice@openclaw.ai
-   2026-02-14 14:22:30 UTC - openclaw-detect identifies unauthorized skill execution
-   2026-02-14 14:25:15 UTC - openclaw-telemetry detects anomalous network connections to attacker.com
+  2026-02-14 14:22:30 UTC - external detection service identifies unauthorized skill execution <!-- FIX: C5-9 -->
+  2026-02-14 14:25:15 UTC - telemetry detects anomalous network connections to attacker.com <!-- FIX: C5-9 -->
    2026-02-14 14:30:00 UTC - Security analyst receives alert, begins response
    2026-02-14 14:35:00 UTC - Skill blocked globally, running processes killed (SLA: 20min, Actual: 15min) ✅
    2026-02-14 14:50:00 UTC - Affected agents isolated, forensics collection started
@@ -904,8 +904,8 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
    
    | Defense Layer | Status | Effectiveness |
    |---------------|--------|---------------|
-   | **Layer 5 - Supply Chain Security** | Partial | openclaw-detect identified skill post-installation, but no pre-installation check ⚠️ |
-   | **Layer 6 - Behavioral Monitoring** | Working | openclaw-telemetry detected anomaly within 5 minutes ✅ |
+  | **Layer 5 - Supply Chain Security** | Partial | External detection identified the skill post-installation, but no pre-installation check ⚠️ | <!-- FIX: C5-9 -->
+  | **Layer 6 - Behavioral Monitoring** | Working | Telemetry detected anomaly within 5 minutes ✅ | <!-- FIX: C5-9 -->
    | **Layer 2 - Network Segmentation** | Working | Blocked data exfiltration to attacker.com ✅ |
    | **Layer 7 - Organizational Controls** | Missing | No skill approval process, users can install arbitrary skills ❌ |
    
@@ -927,8 +927,8 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 7. **Lessons Learned**
    
    **What Went Well** ✅:
-   - openclaw-detect identified unapproved skill quickly (2 minutes after execution)
-   - openclaw-telemetry behavioral anomaly detection caught exfiltration attempts
+  - External detection identified an unapproved skill quickly (2 minutes after execution) <!-- FIX: C5-9 -->
+  - Telemetry-based behavioral anomaly detection caught exfiltration attempts <!-- FIX: C5-9 -->
    - Network segmentation prevented successful data exfiltration
    - Incident response procedures effective (contained within 15 minutes)
    

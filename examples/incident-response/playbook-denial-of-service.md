@@ -116,7 +116,7 @@
      jq '.items[] | select(.status.containerStatuses[]?.lastState.terminated.reason == "OOMKilled") | .metadata.name'
    ```
    
-   **openclaw-telemetry Alert**:
+  **Telemetry Alert**: <!-- FIX: C5-9 -->
    ```json
    {
      "timestamp": "2026-02-14T18:42:10Z",
@@ -146,7 +146,7 @@
    '
    ```
    
-   **openclaw-shield Rate Limit Alert**:
+  **Runtime Enforcement Rate Limit Alert**: <!-- FIX: C5-9 -->
    ```json
    {
      "timestamp": "2026-02-14T18:40:00Z",
@@ -297,7 +297,7 @@ ss -o state established '( dport = :80 or dport = :443 )' | \
 
 **Detection**:
 ```bash
-# openclaw-telemetry resource anomaly detection
+# External telemetry resource anomaly detection
 curl -X GET "https://telemetry.openclaw.ai/api/anomalies?type=resource_exhaustion&hours=1" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
@@ -696,7 +696,7 @@ Use the standardized template: **[reporting-template.md](reporting-template.md)*
 
 2. **Timeline**
    ```
-   2026-02-14 18:40:00 UTC - openclaw-shield detects abnormal request rate (8500 req/s vs 150 baseline)
+  2026-02-14 18:40:00 UTC - runtime enforcement detects abnormal request rate (8500 req/s vs 150 baseline) <!-- FIX: C5-9 -->
    2026-02-14 18:42:10 UTC - Resource exhaustion alerts trigger (CPU 98.7%, memory 94.3%)
    2026-02-14 18:45:22 UTC - Service degradation confirmed (HTTP 5xx rate 73%, response time 12.4s)
    2026-02-14 18:47:00 UTC - Incident Commander initiates response, classifies as P1-High

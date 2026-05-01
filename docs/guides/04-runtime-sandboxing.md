@@ -624,7 +624,7 @@ services:
 - **Quick Start:** [01-quick-start.md](01-quick-start.md)
 - **Network Segmentation:** [03-network-segmentation.md](03-network-segmentation.md)
 - **Supply Chain Security:** [05-supply-chain-security.md](05-supply-chain-security.md)
-- **Community Tools (openclaw-shield):** [08-community-tools-integration.md](08-community-tools-integration.md)
+- **Optional External Integrations (Not Bundled):** [08-community-tools-integration.md](08-community-tools-integration.md) <!-- FIX: C5-9 -->
 
 ---
 
