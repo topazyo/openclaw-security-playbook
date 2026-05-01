@@ -82,6 +82,13 @@ class ComplianceReporter:
         return normalized_controls  # FIX: C5-finding-4
 
     @staticmethod
+    def _validate_explicit_status(mapping_name: str, controls: list[ControlRecord]) -> None:  # FIX: C5-finding-4
+        if any("status" not in control for control in controls):  # FIX: C5-finding-4
+            raise ValueError(  # FIX: C5-finding-4
+                f"{mapping_name} mapping schema drift: expected explicit status for each control"  # FIX: C5-finding-4
+            )  # FIX: C5-finding-4
+
+    @staticmethod
     def _normalize_mapping_controls(mapping_name: str, mapping: dict[str, Any]) -> list[ControlRecord]:  # FIX: C5-finding-4
         controls: list[ControlRecord] = []  # FIX: C5-finding-4
         for control_id, details in mapping.items():
@@ -95,10 +102,7 @@ class ComplianceReporter:
         if not controls:
             raise ValueError(f"{mapping_name} mapping is empty or invalid")
 
-        if any("status" not in control for control in controls):
-            raise ValueError(
-                f"{mapping_name} mapping schema drift: expected explicit status for each control"
-            )
+        ComplianceReporter._validate_explicit_status(mapping_name, controls)  # FIX: C5-finding-4
 
         return controls
 
@@ -126,10 +130,7 @@ class ComplianceReporter:
         if not controls:
             raise ValueError(f"{mapping_name} mapping is empty or invalid")
 
-        if any("status" not in control for control in controls):  # FIX: C5-finding-5
-            raise ValueError(  # FIX: C5-finding-5
-                f"{mapping_name} mapping schema drift: expected explicit status for each control"  # FIX: C5-finding-5
-            )  # FIX: C5-finding-5
+        ComplianceReporter._validate_explicit_status(mapping_name, controls)  # FIX: C5-finding-4
 
         return controls
     
