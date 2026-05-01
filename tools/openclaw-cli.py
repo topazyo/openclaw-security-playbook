@@ -960,12 +960,46 @@ def compliance(ctx, framework, output):
         report = compliance_reporter.generate_report(framework=framework)
     except (FileNotFoundError, ValueError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
+
+    if not isinstance(report, builtins.dict):  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException("Compliance report must be a JSON object")  # FIX: C5-finding-4  # FIX: C5-finding-5
+
+    required_summary_keys = ["implemented_count", "pending_count", "compliance_percentage"]  # FIX: C5-finding-4  # FIX: C5-finding-5
+    missing_summary_keys = [key for key in required_summary_keys if key not in report]  # FIX: C5-finding-4  # FIX: C5-finding-5
+    if missing_summary_keys:  # FIX: C5-finding-4  # FIX: C5-finding-5
+        missing = ", ".join(missing_summary_keys)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException(f"Compliance report missing required summary fields: {missing}")  # FIX: C5-finding-4  # FIX: C5-finding-5
+
+    if not isinstance(report.get("controls"), builtins.list):  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException("Compliance report controls must be a list")  # FIX: C5-finding-4  # FIX: C5-finding-5
+
+    implemented_count = report["implemented_count"]  # FIX: C5-finding-4  # FIX: C5-finding-5
+    pending_count = report["pending_count"]  # FIX: C5-finding-4  # FIX: C5-finding-5
+    compliance_percentage = report["compliance_percentage"]  # FIX: C5-finding-4  # FIX: C5-finding-5
+    if (  # FIX: C5-finding-4  # FIX: C5-finding-5
+        isinstance(implemented_count, bool)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or not isinstance(implemented_count, builtins.int)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or implemented_count < 0  # FIX: C5-finding-4  # FIX: C5-finding-5
+    ):  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException("Compliance report implemented_count must be a nonnegative integer")  # FIX: C5-finding-4  # FIX: C5-finding-5
+    if (  # FIX: C5-finding-4  # FIX: C5-finding-5
+        isinstance(pending_count, bool)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or not isinstance(pending_count, builtins.int)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or pending_count < 0  # FIX: C5-finding-4  # FIX: C5-finding-5
+    ):  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException("Compliance report pending_count must be a nonnegative integer")  # FIX: C5-finding-4  # FIX: C5-finding-5
+    if (  # FIX: C5-finding-4  # FIX: C5-finding-5
+        isinstance(compliance_percentage, bool)  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or not isinstance(compliance_percentage, (builtins.int, builtins.float))  # FIX: C5-finding-4  # FIX: C5-finding-5
+        or not 0 <= compliance_percentage <= 100  # FIX: C5-finding-4  # FIX: C5-finding-5
+    ):  # FIX: C5-finding-4  # FIX: C5-finding-5
+        raise click.ClickException("Compliance report compliance_percentage must be a number from 0 to 100")  # FIX: C5-finding-4  # FIX: C5-finding-5
     
     # Display control status
     click.echo(f"\n[*] Control Status:")
-    click.echo(f"  - Implemented: {report['implemented_count']}")
-    click.echo(f"  -Pending: {report['pending_count']}")
-    click.echo(f"  - Compliance: {report['compliance_percentage']}%")
+    click.echo(f"  - Implemented: {implemented_count}")  # FIX: C5-finding-4  # FIX: C5-finding-5
+    click.echo(f"  - Pending: {pending_count}")  # FIX: C5-finding-4  # FIX: C5-finding-5
+    click.echo(f"  - Compliance: {compliance_percentage}%")  # FIX: C5-finding-4  # FIX: C5-finding-5
     
     if safe_output:
         safe_output.parent.mkdir(parents=True, exist_ok=True)
