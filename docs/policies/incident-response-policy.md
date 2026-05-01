@@ -87,7 +87,7 @@ This policy ensures:
 - MCP server compromise ([scenario-003](../../examples/scenarios/scenario-003-mcp-server-compromise.md))
 - Unauthorized access to confidential data
 - Failed container escape attempt (detected)
-- Suspicious behavioral anomalies (openclaw-telemetry alerts)
+- Suspicious behavioral anomalies (telemetry alerts when integrated) <!-- FIX: C5-9 -->
 
 **Response Team**: Core security team + on-call engineer
 **Communication**: Security team + engineering lead
@@ -104,7 +104,7 @@ This policy ensures:
 - Failed authentication attempts (below lockout threshold)
 - Non-production data exposure
 - Policy violations (skill not in allowlist)
-- Denied prompt injection attempts (blocked by openclaw-shield)
+- Denied prompt injection attempts (blocked by runtime, gateway, or external enforcement controls when configured) <!-- FIX: C5-9 -->
 - Configuration drift from security baseline
 
 **Response Team**: Security team + system owner
@@ -193,7 +193,7 @@ This policy ensures:
 **Goal**: Identify security incidents as quickly as possible.
 
 **Detection Sources**:
-- **Automated Monitoring**: openclaw-telemetry, SIEM alerts, IDS/IPS
+- **Automated Monitoring**: telemetry tooling when integrated, SIEM alerts, IDS/IPS <!-- FIX: C5-9 -->
 - **User Reports**: Security@ email, Slack #security channel
 - **Security Scans**: [verify_openclaw_security.sh](../../scripts/verification/verify_openclaw_security.sh)
 - **Third-Party Notifications**: Vulnerability disclosures, threat intelligence
@@ -378,7 +378,7 @@ This policy ensures:
 - Security control improvements
 
 **Example Action Items (from [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)):
-- [ ] Deploy openclaw-shield (Layer 4) - Owner: DevSecOps, Due: 2 weeks
+- [ ] Deploy approved runtime or gateway enforcement controls if required (Layer 4) - Owner: DevSecOps, Due: 2 weeks <!-- FIX: C5-9 -->
 - [ ] Add email parsing to prompt injection rules - Owner: Security Analyst, Due: 1 week
 - [ ] Conduct prompt injection training for engineers - Owner: Security Team, Due: 1 month
 - [ ] Update incident playbook with learnings - Owner: IC, Due: 1 week
@@ -471,7 +471,7 @@ Sincerely,
 - If >72 hours, provide reason for delay
 
 **OpenClaw Implementation**:
-- Automated detection via openclaw-telemetry (real-time alerts)
+- Automated detection via telemetry tooling when integrated (real-time alerts) <!-- FIX: C5-9 -->
 - Evidence collection preserved (see [collect_evidence.sh](../../scripts/forensics/collect_evidence.sh))
 - Notification draft generated from [reporting-template.md](../../examples/incident-response/reporting-template.md)
 - Legal reviews before submission

@@ -9,6 +9,9 @@ difficulty: Intermediate
 
 This guide documents optional third-party integrations that may complement this repository.
 
+> **EXTERNAL / NOT INCLUDED** <!-- FIX: C5-9 -->
+> This guide is the canonical exception location for references to third-party integration names that are not shipped by this repository. Treat every tool-specific section below as external-only guidance, not as bundled functionality. <!-- FIX: C5-9 -->
+
 This repository does not vendor, pin, or verify releases for `openclaw-detect`, `openclaw-telemetry`, `openclaw-shield`, or `clawguard`. Treat them as external dependencies with their own trust, review, and approval requirements.
 
 ## Platform Notes
@@ -38,7 +41,7 @@ What this repository provides directly:
 - Incident-response and forensics tooling under `scripts/incident-response/` and `scripts/forensics/`
 - Reference configuration patterns under `configs/`
 
-What this repository does not provide directly:
+**EXTERNAL / NOT INCLUDED in this repository:** <!-- FIX: C5-9 -->
 
 - Vendored copies of `openclaw-detect`
 - Vendored copies of `openclaw-telemetry`
@@ -48,7 +51,9 @@ What this repository does not provide directly:
 
 ## Tool Roles
 
-### openclaw-detect
+All named tools in this section are external references only. <!-- FIX: C5-9 -->
+
+### openclaw-detect (EXTERNAL / NOT INCLUDED) <!-- FIX: C5-9 -->
 
 Potential role: endpoint discovery and shadow AI inventory.
 
@@ -58,7 +63,7 @@ Repo-native fallback:
 - Detection content in `detections/`
 - Verification workflows in `.github/workflows/`
 
-### openclaw-telemetry
+### openclaw-telemetry (EXTERNAL / NOT INCLUDED) <!-- FIX: C5-9 -->
 
 Potential role: structured behavioral telemetry forwarding and tamper-evident logging.
 
@@ -68,7 +73,7 @@ Repo-native fallback:
 - `scripts/forensics/verify_hash_chain.py`
 - `docs/guides/07-detection-and-hunting.md`
 
-### openclaw-shield
+### openclaw-shield (EXTERNAL / NOT INCLUDED) <!-- FIX: C5-9 -->
 
 Potential role: runtime prompt-injection blocking, output filtering, and tool enforcement.
 
@@ -79,7 +84,7 @@ Repo-native fallback:
 - `docs/guides/04-runtime-sandboxing.md`
 - `docs/guides/05-supply-chain-security.md`
 
-### clawguard
+### clawguard (EXTERNAL / NOT INCLUDED) <!-- FIX: C5-9 -->
 
 Potential role: JavaScript or TypeScript guardrails outside the Python/OpenClaw-focused tooling in this repository.
 

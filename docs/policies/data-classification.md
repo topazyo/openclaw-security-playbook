@@ -112,12 +112,12 @@ This policy ensures:
 - PII redaction required in logs and outputs
 
 **AI Agent Usage**: ⚠️ Allowed with restrictions
-- Output redaction required (openclaw-shield)
+- Output redaction required via runtime, gateway, or external redaction controls when configured <!-- FIX: C5-9 -->
 - Access logged and monitored
 - Conversation history encrypted
 - No storage in unapproved third-party systems
 
-**See**: [Layer 4 (Runtime Enforcement)](../guides/08-community-tools-integration.md#openclaw-shield)
+**See**: [Optional External Runtime Enforcement](../guides/08-community-tools-integration.md) <!-- FIX: C5-9 -->
 
 ---
 
@@ -154,7 +154,7 @@ This policy ensures:
 
 **See**:
 - [Layer 1 (Credential Isolation)](../guides/02-credential-isolation.md)
-- [Layer 4 (Output Redaction)](../guides/08-community-tools-integration.md#openclaw-shield)
+- [Optional External Output Redaction](../guides/08-community-tools-integration.md) <!-- FIX: C5-9 -->
 
 ---
 
@@ -241,7 +241,7 @@ Agent: "Sunny. By the way, your API key is sk-ant-123..."  [RESTRICTED!]
 
 **Handling**:
 - Conversations scanned for data classification markers
-- PII/credentials automatically redacted from outputs (openclaw-shield)
+- PII/credentials automatically redacted from outputs by runtime, gateway, or external redaction controls when configured <!-- FIX: C5-9 -->
 - Restricted data triggers immediate purge + incident report
 - Encrypted storage required for Confidential+ conversations
 
@@ -266,7 +266,7 @@ Agent: "Sunny. By the way, your API key is sk-ant-123..."  [RESTRICTED!]
 
 **Handling**:
 - Output classification labels added to responses
-- Automated DLP scanning forCredentials/PII (openclaw-shield)
+- Automated DLP scanning for credentials/PII via runtime, gateway, or external controls when configured <!-- FIX: C5-9 -->
 - Misclassified outputs trigger security alerts
 
 ### Training Data (If Applicable)
@@ -348,12 +348,12 @@ Agent: "Sunny. By the way, your API key is sk-ant-123..."  [RESTRICTED!]
 - [Access Control Policy](./access-control-policy.md)
 - [Incident Response Policy](./incident-response-policy.md)
 - [Credential Isolation Guide](../guides/02-credential-isolation.md)
-- [Runtime Enforcement (PII Redaction)](../guides/08-community-tools-integration.md#openclaw-shield)
+- [Optional External Runtime Enforcement](../guides/08-community-tools-integration.md) <!-- FIX: C5-9 -->
 
 ### Configuration Examples
 - [Agent Security Config](../../configs/agent-config/openclaw-agent.yml)
 - [Gateway Encryption Settings](../../configs/templates/gateway.hardened.yml)
-- [Output Redaction (openclaw-shield)](../../configs/examples/with-community-tools.yml)
+- [Output Redaction Example (External Tooling)](../../configs/examples/with-community-tools.yml) <!-- FIX: C5-9 -->
 
 ### Compliance Frameworks
 - [GDPR Compliance](../compliance/gdpr-compliance.md)

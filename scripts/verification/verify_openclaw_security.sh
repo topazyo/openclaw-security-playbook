@@ -298,7 +298,7 @@ fi
 echo ""
 
 # Check 4: Runtime Enforcement
-echo "[4/7] Checking runtime enforcement (openclaw-shield)..."
+echo "[4/7] Checking runtime enforcement (external runtime enforcer, if integrated)..."  # FIX: C5-9
 if [ -f ~/.openclaw/config/shield/config.yml ]; then
     if grep -q "enabled: true" ~/.openclaw/config/shield/config.yml; then
         echo -e "${GREEN}✓ Shield configuration found and enabled${NC}"
@@ -364,12 +364,9 @@ if [ $CRITICAL_ISSUES -gt 0 ]; then
     echo -e "${RED}✗ CRITICAL ISSUES DETECTED${NC}"
     echo "  Address critical issues immediately before continuing operation."
     echo ""
-    echo "For comprehensive production security, also deploy:"
-    echo "  • openclaw-shield (runtime security enforcement)"
-    echo "  • openclaw-telemetry (behavioral monitoring)"
-    echo "  • openclaw-detect (shadow AI discovery)"
+    echo "For comprehensive production security, also deploy optional community tools:"  # FIX: C5-9
+    echo "  See: docs/guides/08-community-tools-integration.md"  # FIX: C5-9
     echo ""
-    echo "See: docs/guides/07-community-tools-integration.md"
     exit 1
 elif [ $WARNINGS -gt 0 ]; then
     echo ""
@@ -379,11 +376,8 @@ else
     echo ""
     echo -e "${GREEN}✓ All checks passed!${NC}"
     echo ""
-    echo "Consider enhancing security with community tools:"
-    echo "  • openclaw-shield: Runtime security enforcement"
-    echo "  • openclaw-telemetry: Enterprise behavioral monitoring"
-    echo "  • openclaw-detect: Shadow AI discovery"
+    echo "Consider enhancing security with optional community tools:"  # FIX: C5-9
+    echo "  See: docs/guides/08-community-tools-integration.md"  # FIX: C5-9
     echo ""
-    echo "See: docs/guides/07-community-tools-integration.md"
     exit 0
 fi

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-String -Pattern \"mcp\")",
+      "Bash(gh issue *)"
+    ]
+  }
+}

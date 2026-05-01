@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_timeline.sh — Reconstruct attack timeline from openclaw-telemetry logs
+# build_timeline.sh — Reconstruct attack timeline from structured telemetry log files  # FIX: C5-9
 #
 # USAGE: ./build_timeline.sh --incident-dir ~/openclaw-incident-TIMESTAMP
 #
@@ -16,7 +16,7 @@ NC='\033[0m'
 
 print_help() {
     cat <<'EOF'
-build_timeline.sh — Reconstruct attack timeline from openclaw-telemetry logs
+build_timeline.sh — Reconstruct attack timeline from structured telemetry log files  # FIX: C5-9
 
 Usage:
   ./scripts/forensics/build_timeline.sh --incident-dir <path>
