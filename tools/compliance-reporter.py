@@ -61,7 +61,7 @@ class ComplianceReporter:
     def _calculate_statement_summary(statement: ControlRecord) -> tuple[int, int, float]:  # FIX: C5-finding-5
         implemented = statement.get("implemented")  # FIX: C5-finding-5
         pending = statement.get("planned")  # FIX: C5-finding-5
-        if not isinstance(implemented, int) or not isinstance(pending, int):  # FIX: C5-finding-5
+        if not isinstance(implemented, int) or not isinstance(pending, int) or isinstance(implemented, bool) or isinstance(pending, bool):  # FIX: C5-finding-5
             raise ValueError("ISO27001 statement_of_applicability requires integer implemented and planned counts")  # FIX: C5-finding-5
 
         applicable = implemented + pending  # FIX: C5-finding-5
@@ -159,10 +159,21 @@ class ComplianceReporter:
             "compliance_percentage": percentage,
         }
     
+    def _validate_iso27001_summary_counts(self, controls: list[ControlRecord], implemented: int, pending: int) -> None:  # FIX: C5-finding-5
+        expected_total = implemented + pending  # FIX: C5-finding-5
+        actual_total = len(controls)  # FIX: C5-finding-5
+        if actual_total != expected_total:  # FIX: C5-finding-5
+            raise ValueError(  # FIX: C5-finding-5
+                "ISO27001 controls count mismatch: "  # FIX: C5-finding-5
+                f"statement summary expects {expected_total} controls "  # FIX: C5-finding-5
+                f"(implemented={implemented}, pending={pending}) but loaded {actual_total}"  # FIX: C5-finding-5
+            )  # FIX: C5-finding-5
+
     def _generate_iso27001_report(self) -> ComplianceReport:  # FIX: C5-finding-4
         """Generate ISO 27001 compliance report."""
         controls = self._load_iso27001_controls()
         implemented, pending, percentage = self._load_iso27001_statement_summary()  # FIX: C5-finding-5
+        self._validate_iso27001_summary_counts(controls, implemented, pending)  # FIX: C5-finding-5
         
         return {
             "framework": "ISO 27001:2022",
@@ -262,7 +273,9 @@ class ComplianceReporter:
                 if not isinstance(compliance_mapping, dict):  # FIX: C5-finding-4
                     raise ValueError(f"GDPR compliance mapping is invalid: {relative_path}:{section_name}")  # FIX: C5-finding-4
                 compliance_mapping = cast(dict[str, Any], compliance_mapping)  # FIX: C5-finding-4
-
+                    status = details.get("gdpr_status", "pending")  # FIX: C5-finding-4
+                    if not isinstance(status, str):  # FIX: C5-finding-4
+                        raise ValueError(f"GDPR status must be a string: {relative_path}:{section_name}")  # FIX: C5-finding-4
                 gdpr_articles = compliance_mapping.get("GDPR", [])  # FIX: C5-finding-4
                 if not gdpr_articles:  # FIX: C5-finding-4
                     continue  # FIX: C5-finding-4
