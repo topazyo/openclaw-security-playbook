@@ -6,9 +6,9 @@ env:
 on:
   pull_request:
     paths:
-      - 'configs/**'
-      - 'docs/policies/**'
-      - 'configs/organization-policies/**'
+      - "configs/**"
+      - "docs/policies/**"
+      - "configs/organization-policies/**"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -58,7 +58,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install yamllint
         run: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Lint YAML files
         run: |
-          yamllint -c .yamllint configs/
+          yamllint -c .yamllint.yml configs/
 
       - name: Validate agent config
         run: |
@@ -86,7 +86,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -121,7 +121,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -156,9 +156,9 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            
+
             let comment = '## 📋 Compliance Check Results\n\n';
-            
+
             // SOC 2 report
             const soc2 = JSON.parse(fs.readFileSync('soc2-report.json', 'utf8'));
             comment += `### SOC 2 Type II\n`;
@@ -170,7 +170,7 @@ jobs:
               comment += `- ✅ All controls implemented\n`;
             }
             comment += '\n';
-            
+
             // ISO 27001 report
             const iso = JSON.parse(fs.readFileSync('iso27001-report.json', 'utf8'));
             comment += `### ISO 27001:2022\n`;
@@ -181,10 +181,10 @@ jobs:
             } else {
               comment += `- ✅ All controls implemented\n`;
             }
-            
+
             comment += '\n---\n';
             comment += '📊 [View detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n';
-            
+
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
