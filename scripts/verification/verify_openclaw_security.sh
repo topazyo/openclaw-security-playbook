@@ -358,7 +358,7 @@ if [ -f "$_TELEMETRY_LOG" ]; then  # FIX: C5-M-02
         if [ "$_LOG_MTIME" -gt 0 ]; then                                             # FIX: C5-M-02 — skip age calc when stat failed (mtime=0 means epoch, not a real timestamp)
             _NOW=$(date +%s)                                                         # FIX: C5-M-02
             _AGE=$(( _NOW - _LOG_MTIME ))                                            # FIX: C5-M-02
-            if [ "$_AGE" -le "$_TELEMETRY_MAX_AGE_SECONDS" ] && [ "$_AGE" -ge 0 ]; then # FIX: C5-M-02
+            if [ "$_TELEMETRY_CONFIGURED" = true ] && [ "$_AGE" -le "$_TELEMETRY_MAX_AGE_SECONDS" ] && [ "$_AGE" -ge 0 ]; then # FIX: C5-M-02 — active requires both config AND fresh log
                 _TELEMETRY_ACTIVE=true                                               # FIX: C5-M-02
             fi                                                                       # FIX: C5-M-02
         fi  # FIX: C5-M-02
