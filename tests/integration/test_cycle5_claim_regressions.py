@@ -32,6 +32,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from unittest.mock import Mock, call, patch
 
@@ -731,3 +732,126 @@ class TestDependencyAuditShClaim:
         assert "FAIL" in proc.stderr, (
             f"Script must print 'FAIL' on a red run; stderr: {proc.stderr!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# FIX: C5-M-02 — verify_openclaw_security.sh Check 6 telemetry state tests
+# ---------------------------------------------------------------------------
+
+_VERIFY_SECURITY_SCRIPT = _REPO_ROOT / "scripts" / "verification" / "verify_openclaw_security.sh"
+
+
+@pytest.mark.skipif(_BASH_PATH is None, reason="bash not available")
+@pytest.mark.skipif(not _VERIFY_SECURITY_SCRIPT.exists(), reason="verify_openclaw_security.sh not found")
+class TestTelemetryCheck6States:
+    """Check 6 of verify_openclaw_security.sh — all five telemetry states.
+
+    Runs only the Check 6 block extracted from the script so Docker/gateway
+    infrastructure is not required.  Each test controls ~/.openclaw/ via a
+    tmp HOME directory and asserts the correct output marker and WARNINGS delta.
+    """
+
+    @staticmethod
+    def _build_script(*, config: bool, log_age_seconds: int | None) -> bytes:
+        """Build a self-contained bash script: fixture setup + Check 6 block.
+
+        All filesystem operations happen inside bash so there is no
+        Windows/WSL DrvFS boundary to cross.
+        """
+        script = _VERIFY_SECURITY_SCRIPT.read_text(encoding="utf-8")
+        start = script.index("# Check 6: Monitoring")
+        end = script.index("# Check 7:")
+        check6_block = script[start:end].rstrip()
+
+        setup_lines = [
+            "RED='' YELLOW='' GREEN='' NC=''",
+            "WARNINGS=0",
+            "HOME=$(mktemp -d)",
+            "mkdir -p \"$HOME/.openclaw/config/telemetry\" \"$HOME/.openclaw/logs\"",
+        ]
+        if config:
+            setup_lines.append("echo 'enabled: true' > \"$HOME/.openclaw/config/telemetry/config.yml\"")
+        if log_age_seconds is not None:
+            setup_lines.append("echo '{\"event\":\"startup\"}' > \"$HOME/.openclaw/logs/telemetry.jsonl\"")
+            if log_age_seconds > 0:
+                # backdate the log's mtime so Check 6 sees it as stale
+                setup_lines.append(
+                    f'touch -d "@$(( $(date +%s) - {log_age_seconds} ))" "$HOME/.openclaw/logs/telemetry.jsonl"'
+                )
+
+        trailer = '\nprintf "WARNINGS=%d\\n" "$WARNINGS"\nrm -rf "$HOME"\n'
+        return ("\n".join(setup_lines) + "\n" + check6_block + trailer).encode()  # FIX: C5-M-02
+
+    def _run(self, *, config: bool, log_age_seconds: int | None) -> tuple[str, int]:
+        proc = subprocess.run(
+            [_BASH_PATH, "-s"],
+            input=self._build_script(config=config, log_age_seconds=log_age_seconds),
+            capture_output=True,
+            check=False,
+        )
+        output = proc.stdout.decode("utf-8", errors="replace")
+        warnings_line = next((l for l in output.splitlines() if l.startswith("WARNINGS=")), "WARNINGS=0")
+        warnings = int(warnings_line.split("=", 1)[1])
+        return output, warnings
+
+    def test_check6_active_config_and_fresh_log(self):
+        """CLAIM: config + log written within 3600 s → green pass, WARNINGS unchanged."""
+        output, warnings = self._run(config=True, log_age_seconds=0)
+        assert "actively writing" in output, f"Expected active marker; got: {output!r}"
+        assert warnings == 0, f"Expected 0 warnings for active telemetry; got {warnings}"
+
+    def test_check6_stale_log_triggers_warning(self):
+        """CLAIM: config + log older than 3600 s → WARNING about stale log."""
+        output, warnings = self._run(config=True, log_age_seconds=7200)
+        assert "stale" in output.lower(), f"Expected stale marker; got: {output!r}"
+        assert warnings == 1, f"Expected 1 warning for stale log; got {warnings}"
+
+    def test_check6_configured_no_log_triggers_warning(self):
+        """CLAIM: config present but no log → WARNING about not verifiably active."""
+        output, warnings = self._run(config=True, log_age_seconds=None)
+        assert "not verifiably active" in output, f"Expected not-verifiably-active marker; got: {output!r}"
+        assert warnings == 1, f"Expected 1 warning for config-only; got {warnings}"
+
+    def test_check6_log_without_config_triggers_warning(self):
+        """CLAIM: log present but no config → WARNING about unverifiable state."""
+        output, warnings = self._run(config=False, log_age_seconds=0)
+        assert "no config" in output.lower(), f"Expected no-config marker; got: {output!r}"
+        assert warnings == 1, f"Expected 1 warning for log-without-config; got {warnings}"
+
+    def test_check6_neither_config_nor_log_triggers_warning(self):
+        """CLAIM: no config and no log → WARNING that monitoring state is unverifiable."""
+        output, warnings = self._run(config=False, log_age_seconds=None)
+        assert "unverifiable" in output.lower(), f"Expected unverifiable marker; got: {output!r}"
+        assert warnings == 1, f"Expected 1 warning for no telemetry at all; got {warnings}"
+
+    def test_check6_regression_stat_fallback_zero_mtime_is_not_active(self):
+        """REGRESSION: mtime=0 (stat fallback) must NOT be classified as active.
+
+        Pre-fix: _LOG_MTIME=0 → _AGE=_NOW (~1.7B s) was ≥0 so the log was
+        misclassified as stale.  After the _LOG_MTIME -gt 0 guard, _AGE stays
+        at -1 and falls to the configured-but-unverifiable branch instead.
+        """
+        script = _VERIFY_SECURITY_SCRIPT.read_text(encoding="utf-8")
+        start = script.index("# Check 6: Monitoring")
+        end = script.index("# Check 7:")
+        check6_block = script[start:end].rstrip()
+        # Create a fresh log then immediately backdate it to epoch 0
+        setup = (
+            "RED='' YELLOW='' GREEN='' NC=''\n"
+            "WARNINGS=0\n"
+            "HOME=$(mktemp -d)\n"
+            "mkdir -p \"$HOME/.openclaw/config/telemetry\" \"$HOME/.openclaw/logs\"\n"
+            "echo 'enabled: true' > \"$HOME/.openclaw/config/telemetry/config.yml\"\n"
+            "echo '{\"event\":\"startup\"}' > \"$HOME/.openclaw/logs/telemetry.jsonl\"\n"
+            "touch -d '@0' \"$HOME/.openclaw/logs/telemetry.jsonl\"\n"  # force mtime=0
+        )
+        trailer = '\nprintf "WARNINGS=%d\\n" "$WARNINGS"\nrm -rf "$HOME"\n'
+        fragment = (setup + check6_block + trailer).encode()
+        proc = subprocess.run([_BASH_PATH, "-s"], input=fragment, capture_output=True, check=False)
+        output = proc.stdout.decode("utf-8", errors="replace")
+        warnings_line = next((l for l in output.splitlines() if l.startswith("WARNINGS=")), "WARNINGS=0")
+        warnings = int(warnings_line.split("=", 1)[1])
+        assert "actively writing" not in output, (
+            "A log with mtime=0 (stat fallback) must NOT be classified as active"
+        )
+        assert warnings == 1, f"Expected 1 warning when mtime=0; got {warnings}"  # FIX: C5-M-02

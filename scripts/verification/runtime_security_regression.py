@@ -222,7 +222,7 @@ def resolve_bash_executable() -> str:
 
 
 def resolve_git_bash_command(name: str) -> str | None:
-    candidates = []
+    candidates: list[Path] = []
     for git_root in GIT_WINDOWS_ROOTS:
         candidates.extend(
             [
@@ -286,6 +286,11 @@ def write_fixture_home(home_dir: Path, scenario: ScenarioDefinition) -> None:
     (config_dir / SKILLS_CONFIG_FILE).write_text(build_skills_config(scenario), encoding="utf-8")
     (shield_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
     (telemetry_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
+    if scenario.name == "secure":  # FIX: C5-M-02 — secure fixture must have a fresh log so Check 6 sees active monitoring
+        (logs_dir / "telemetry.jsonl").write_text(
+            json.dumps({"event": "startup", "ts": int(time.time())}) + "\n",
+            encoding="utf-8",
+        )  # FIX: C5-M-02
 
 
 def generate_certificate(cert_dir: Path) -> tuple[Path, Path]:
@@ -394,7 +399,7 @@ def archive_result(
     if inspect_output.returncode == 0:
         (scenario_dir / "docker-inspect.json").write_text(inspect_output.stdout, encoding="utf-8")
 
-    manifest = {
+    manifest: dict[str, Any] = {
         "scenario": asdict(scenario),
         "verifier_exit_code": exit_code,
         "verification_errors": verification_errors,

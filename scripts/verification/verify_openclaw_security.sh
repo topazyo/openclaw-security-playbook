@@ -34,7 +34,7 @@
 #     Supports Intune, Jamf, JumpCloud, Kandji, Workspace ONE
 #
 # INTEGRATION GUIDE:
-#   docs/guides/07-community-tools-integration.md
+#   docs/guides/08-community-tools-integration.md  # FIX: C5-M-05
 #
 # COMBINED CONFIGURATION:
 #   configs/examples/with-community-tools.yml
@@ -333,13 +333,54 @@ fi
 echo ""
 
 # Check 6: Monitoring
+# FIX: C5-M-02 — distinguish configured, active, and unverifiable telemetry states
+# instead of treating any file presence as an active-monitoring success.
 echo "[6/7] Checking telemetry/monitoring configuration..."
-if [ -f ~/.openclaw/config/telemetry/config.yml ] || [ -f ~/.openclaw/logs/telemetry.jsonl ]; then
-    echo -e "${GREEN}✓ Telemetry artifact detected (config or telemetry log)${NC}"
-else
-    echo -e "${YELLOW}⚠ WARNING: No telemetry configuration/log detected${NC}"
-    WARNINGS=$((WARNINGS + 1))
-fi
+_TELEMETRY_CFG=~/.openclaw/config/telemetry/config.yml  # FIX: C5-M-02
+_TELEMETRY_LOG=~/.openclaw/logs/telemetry.jsonl          # FIX: C5-M-02
+_TELEMETRY_MAX_AGE_SECONDS=3600                          # FIX: C5-M-02 — log must have been written within this window to count as active
+
+_TELEMETRY_CONFIGURED=false  # FIX: C5-M-02
+_TELEMETRY_ACTIVE=false      # FIX: C5-M-02
+_AGE=-1                       # FIX: C5-M-02 — sentinel; only valid after log mtime check
+
+if [ -f "$_TELEMETRY_CFG" ]; then  # FIX: C5-M-02
+    _TELEMETRY_CONFIGURED=true     # FIX: C5-M-02
+fi                                 # FIX: C5-M-02
+
+if [ -f "$_TELEMETRY_LOG" ]; then  # FIX: C5-M-02
+    # Check whether the log has been written to within the staleness window.
+    # stat -c %Y gives mtime in epoch seconds on Linux; macOS needs stat -f %m.
+    if command -v stat >/dev/null 2>&1; then                                         # FIX: C5-M-02
+        _LOG_MTIME=$(stat -c %Y "$_TELEMETRY_LOG" 2>/dev/null \
+                     || stat -f %m "$_TELEMETRY_LOG" 2>/dev/null \
+                     || echo 0)                                                       # FIX: C5-M-02
+        if [ "$_LOG_MTIME" -gt 0 ]; then                                             # FIX: C5-M-02 — skip age calc when stat failed (mtime=0 means epoch, not a real timestamp)
+            _NOW=$(date +%s)                                                         # FIX: C5-M-02
+            _AGE=$(( _NOW - _LOG_MTIME ))                                            # FIX: C5-M-02
+            if [ "$_TELEMETRY_CONFIGURED" = true ] && [ "$_AGE" -le "$_TELEMETRY_MAX_AGE_SECONDS" ] && [ "$_AGE" -ge 0 ]; then # FIX: C5-M-02 — active requires both config AND fresh log
+                _TELEMETRY_ACTIVE=true                                               # FIX: C5-M-02
+            fi                                                                       # FIX: C5-M-02
+        fi  # FIX: C5-M-02
+    fi  # FIX: C5-M-02
+fi  # FIX: C5-M-02
+
+# FIX: C5-M-02 — report the correct state; config-only presence is NOT active monitoring
+if [ "$_TELEMETRY_ACTIVE" = true ]; then                                              # FIX: C5-M-02
+    echo -e "${GREEN}✓ Telemetry is configured and actively writing logs (log age ${_AGE}s ≤ ${_TELEMETRY_MAX_AGE_SECONDS}s)${NC}"  # FIX: C5-M-02
+elif [ "$_TELEMETRY_CONFIGURED" = true ] && [ -f "$_TELEMETRY_LOG" ]; then           # FIX: C5-M-02
+    echo -e "${YELLOW}⚠ WARNING: Telemetry log is stale (age ${_AGE}s > ${_TELEMETRY_MAX_AGE_SECONDS}s); active monitoring cannot be confirmed${NC}"  # FIX: C5-M-02
+    WARNINGS=$((WARNINGS + 1))                                                        # FIX: C5-M-02
+elif [ "$_TELEMETRY_CONFIGURED" = true ]; then                                        # FIX: C5-M-02
+    echo -e "${YELLOW}⚠ WARNING: Telemetry config present but no telemetry log found; configured but not verifiably active${NC}"  # FIX: C5-M-02
+    WARNINGS=$((WARNINGS + 1))                                                        # FIX: C5-M-02
+elif [ -f "$_TELEMETRY_LOG" ]; then                                                   # FIX: C5-M-02
+    echo -e "${YELLOW}⚠ WARNING: Telemetry log found but no config; state is unverifiable${NC}"  # FIX: C5-M-02
+    WARNINGS=$((WARNINGS + 1))                                                        # FIX: C5-M-02
+else                                                                                  # FIX: C5-M-02
+    echo -e "${YELLOW}⚠ WARNING: No telemetry configuration or log detected; monitoring state is unverifiable${NC}"  # FIX: C5-M-02
+    WARNINGS=$((WARNINGS + 1))                                                        # FIX: C5-M-02
+fi  # FIX: C5-M-02
 
 echo ""
 
