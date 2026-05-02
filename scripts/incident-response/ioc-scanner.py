@@ -7,9 +7,13 @@ Attack Vectors: APT detection, malware identification, C2 communication
 Compliance: SOC 2 CC7.2, ISO 27001 A.12.2.1
 
 Capabilities:
-- IP reputation checks (AbuseIPDB, VirusTotal)
+- IP reputation checks (AbuseIPDB)
 - File hash scanning (VirusTotal, SHA-256)
-- Domain analysis (WHOIS, DNS, certificate transparency)
+- Domain analysis (DNS resolution, suspicious TLD detection, IP reputation of resolved address)
+
+NOT IMPLEMENTED (unsupported integrations — not wired):
+- WHOIS lookup
+- Certificate transparency checks
 - YARA rule matching
 - Threat intelligence feed integration
 
@@ -19,10 +23,10 @@ Usage:
     python3 ioc-scanner.py --domain malicious.example.com
     python3 ioc-scanner.py --file /path/to/suspicious_file
 
-Dependencies: requests, yara-python
+Dependencies: requests
 
 Related: forensics-collector.py, auto-containment.py
-"""
+"""  # FIX: C5-H-02
 
 import argparse
 import hashlib
@@ -202,21 +206,30 @@ class IOCScanner:
             return result
     
     def analyze_domain(self, domain: str) -> Dict:
-        """Analyze domain for malicious indicators"""
+        """Analyze domain for malicious indicators.
+
+        Implemented checks: DNS resolution, IP reputation of resolved address,
+        suspicious TLD detection.
+
+        Unsupported checks (not wired — produce explicit 'unsupported' state):
+        - WHOIS domain age lookup
+        - Certificate transparency log search
+        """  # FIX: C5-H-02
         logger.info(f"Analyzing domain: {domain}")
-        
+
         result = {
             "domain": domain,
             "is_malicious": False,
             "indicators": [],
             "status": "success",
+            "unsupported_checks": ["whois", "certificate_transparency"],  # FIX: C5-H-02
         }
-        
+
         # DNS resolution
         try:
             ip_address = socket.gethostbyname(domain)
             result["resolved_ip"] = ip_address
-            
+
             # Check resolved IP reputation
             ip_result = self.check_ip_reputation(ip_address)
             if ip_result.get("status") in {"error", "skipped"}:
@@ -229,15 +242,15 @@ class IOCScanner:
             result["status"] = "error"
             result["dns_status"] = "No DNS record found"
             result["indicators"].append("DNS lookup failed")
-        
+
         # Check for suspicious TLDs
         suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz']
         if any(domain.endswith(tld) for tld in suspicious_tlds):
             result["indicators"].append("Suspicious TLD")
-        
-        # Check domain age (would require WHOIS API)
-        # Placeholder for WHOIS integration
-        
+
+        # WHOIS and certificate transparency checks are NOT implemented.  # FIX: C5-H-02
+        # They are listed in result["unsupported_checks"] above.          # FIX: C5-H-02
+
         if result["is_malicious"]:
             self.results["iocs_found"].append({
                 "type": "malicious_domain",
@@ -252,7 +265,12 @@ class IOCScanner:
         return result
     
     def scan_file(self, file_path: Path) -> Dict:
-        """Scan file and calculate hash"""
+        """Scan file by calculating SHA-256 hash and checking it against VirusTotal.
+
+        Unsupported checks (not wired — produce explicit 'unsupported' state):
+        - YARA rule matching
+        - Threat intelligence feed lookup
+        """  # FIX: C5-H-02
         logger.info(f"Scanning file: {file_path}")
         
         if not file_path.exists():
@@ -281,6 +299,7 @@ class IOCScanner:
                 "size_bytes": file_path.stat().st_size,
                 "virustotal_result": vt_result,
                 "status": vt_result.get("status", "success") if isinstance(vt_result, dict) else "success",
+                "unsupported_checks": ["yara", "threat_feeds"],  # FIX: C5-H-02
             }
             
         except Exception as e:
@@ -290,8 +309,14 @@ class IOCScanner:
             return result
     
     def generate_report(self, output_path: str = None):
-        """Generate IOC scan report"""
-        
+        """Generate IOC scan report.
+
+        The report preserves the scan's non-success status so callers can detect
+        failures and unsupported integration states without reading individual
+        scan_results entries.  Unsupported integrations are listed explicitly —
+        they do not contribute to threat_score and are not presented as findings.
+        """  # FIX: C5-H-02
+
         # Calculate overall threat level
         if self.results["threat_score"] > 200:
             threat_level = "CRITICAL"
@@ -301,27 +326,43 @@ class IOCScanner:
             threat_level = "MEDIUM"
         else:
             threat_level = "LOW"
-        
-        self.results["overall_threat_level"] = threat_level
-        
+
+        self.results["overall_threat_level"] = threat_level  # FIX: C5-H-02
+
+        # Collect all unsupported checks declared across individual scan results.  # FIX: C5-H-02
+        all_unsupported: list = []  # FIX: C5-H-02
+        for scan_result in self.results.get("scan_results", []):  # FIX: C5-H-02
+            all_unsupported.extend(scan_result.get("unsupported_checks", []))  # FIX: C5-H-02
+        # De-duplicate while preserving declaration order.  # FIX: C5-H-02
+        seen: set = set()  # FIX: C5-H-02
+        deduplicated_unsupported: list = []  # FIX: C5-H-02
+        for check in all_unsupported:  # FIX: C5-H-02
+            if check not in seen:  # FIX: C5-H-02
+                seen.add(check)  # FIX: C5-H-02
+                deduplicated_unsupported.append(check)  # FIX: C5-H-02
+        self.results["unsupported_checks"] = deduplicated_unsupported  # FIX: C5-H-02
+
         if output_path:
             with open(output_path, 'w') as f:
                 json.dump(self.results, f, indent=2)
-            logger.info(f"✓ Report saved: {output_path}")
-        
-        # Print summary
+            logger.info(f"Report saved: {output_path}")
+
+        # Print summary — machine-readable status on the first line after header.  # FIX: C5-H-02
         print("\n" + "=" * 80)
         print("IOC Scan Summary")
         print("=" * 80)
+        print(f"Status: {self.results['status']}")  # FIX: C5-H-02
         print(f"Threat Level: {threat_level}")
         print(f"Threat Score: {self.results['threat_score']}")
         print(f"IOCs Found: {len(self.results['iocs_found'])}")
-        
+        if deduplicated_unsupported:  # FIX: C5-H-02
+            print(f"Unsupported checks (not performed): {', '.join(deduplicated_unsupported)}")  # FIX: C5-H-02
+
         if self.results["iocs_found"]:
             print("\nDetected IOCs:")
             for ioc in self.results["iocs_found"]:
                 print(f"  - {ioc['type']}: {ioc['value']} (confidence: {ioc.get('confidence', 'N/A')})")
-        
+
         print("=" * 80)
 
 
