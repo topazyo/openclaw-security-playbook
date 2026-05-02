@@ -238,8 +238,11 @@ def resolve_yara_command() -> str | None:
 def evaluate_yara_case(case: dict[str, Any], yara_command: str | None, require_yara: bool) -> ReplayResult:
     if not yara_command:
         if require_yara:
-            return ReplayResult(case["name"], "yara", False, "yara command not available")
-        return ReplayResult(case["name"], "yara", True, "skipped: yara command not available")
+            return ReplayResult(case["name"], "yara", False, "yara command not available")  # FIX: C5-M-01
+        # FIX: C5-M-01 — returning passed=True here was a false-pass: YARA rules were never evaluated.
+        # A skipped-but-unchecked YARA case is not a pass; it is a coverage gap that must surface as
+        # a non-pass so callers cannot treat the run as a clean full-coverage result.
+        return ReplayResult(case["name"], "yara", False, "coverage-incomplete: yara command not available (use --skip-yara to opt out explicitly or --require-yara to hard-fail)")  # FIX: C5-M-01
 
     rule_path = REPO_ROOT / case["rule"]
     fixture_path = REPO_ROOT / case["fixture"]
@@ -267,16 +270,28 @@ def evaluate_yara_case(case: dict[str, Any], yara_command: str | None, require_y
 
 def run_validation(cases_path: Path, *, skip_yara: bool, require_yara: bool) -> list[ReplayResult]:
     cases = load_cases(cases_path)
-    yara_command = None if skip_yara else resolve_yara_command()
+    yara_command = None if skip_yara else resolve_yara_command()  # FIX: C5-M-01
     results: list[ReplayResult] = []
+    yara_cases_present = False  # FIX: C5-M-01
     for case in cases:
         kind = case["kind"]
         if kind == "sigma":
             results.append(evaluate_sigma_case(case))
         elif kind == "yara":
+            yara_cases_present = True  # FIX: C5-M-01
             results.append(evaluate_yara_case(case, yara_command, require_yara))
         else:
             raise ValueError(f"Unsupported replay case kind: {kind}")
+    # FIX: C5-M-01 — when YARA cases exist but YARA is not available and not explicitly skipped,
+    # append a top-level coverage-incomplete sentinel so callers see a definitive non-pass state
+    # even if the case list happens to be empty or the caller does not inspect per-case results.
+    if yara_cases_present and not skip_yara and not yara_command:  # FIX: C5-M-01
+        results.append(ReplayResult(  # FIX: C5-M-01
+            "_yara_coverage",  # FIX: C5-M-01
+            "yara",  # FIX: C5-M-01
+            False,  # FIX: C5-M-01
+            "coverage-incomplete: one or more YARA cases were not executed because yara is unavailable",  # FIX: C5-M-01
+        ))  # FIX: C5-M-01
     return results
 
 
@@ -320,7 +335,15 @@ def main(argv: list[str] | None = None) -> int:
     cases_path = Path(args.cases)
     yara_command = None if args.skip_yara else resolve_yara_command()
     results = run_validation(cases_path, skip_yara=args.skip_yara, require_yara=args.require_yara)
-    failures = [result for result in results if not result.passed]
+    failures = [result for result in results if not result.passed]  # FIX: C5-M-01
+    # FIX: C5-M-01 — a coverage-incomplete result (passed=False, name="_yara_coverage") is now
+    # included in failures when YARA is unavailable without --skip-yara, so the exit code is 2
+    # (distinct from a test-assertion failure at exit 1) and downstream automation cannot
+    # misread the run as a clean full-coverage pass.
+    coverage_incomplete = any(  # FIX: C5-M-01
+        result.name == "_yara_coverage" and not result.passed  # FIX: C5-M-01
+        for result in results  # FIX: C5-M-01
+    )  # FIX: C5-M-01
 
     if args.archive_root:
         archive_results(
@@ -336,6 +359,9 @@ def main(argv: list[str] | None = None) -> int:
         status = "PASS" if result.passed else "FAIL"
         print(f"[{status}] {result.kind} {result.name}: {result.details}")
 
+    if coverage_incomplete:  # FIX: C5-M-01
+        print("[COVERAGE-INCOMPLETE] YARA cases were not executed; pass --skip-yara to opt out or --require-yara to hard-fail")  # FIX: C5-M-01
+        return 2  # FIX: C5-M-01 — exit 2 = coverage incomplete (not a test failure, not a clean pass)
     return 1 if failures else 0
 
 
