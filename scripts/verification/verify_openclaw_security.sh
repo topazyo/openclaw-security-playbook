@@ -34,7 +34,7 @@
 #     Supports Intune, Jamf, JumpCloud, Kandji, Workspace ONE
 #
 # INTEGRATION GUIDE:
-#   docs/guides/08-community-tools-integration.md  ## FIX: C5-M-05
+#   docs/guides/08-community-tools-integration.md  # FIX: C5-M-05
 #
 # COMBINED CONFIGURATION:
 #   configs/examples/with-community-tools.yml
@@ -355,11 +355,13 @@ if [ -f "$_TELEMETRY_LOG" ]; then  # FIX: C5-M-02
         _LOG_MTIME=$(stat -c %Y "$_TELEMETRY_LOG" 2>/dev/null \
                      || stat -f %m "$_TELEMETRY_LOG" 2>/dev/null \
                      || echo 0)                                                       # FIX: C5-M-02
-        _NOW=$(date +%s)                                                             # FIX: C5-M-02
-        _AGE=$(( _NOW - _LOG_MTIME ))                                                # FIX: C5-M-02
-        if [ "$_AGE" -le "$_TELEMETRY_MAX_AGE_SECONDS" ] && [ "$_AGE" -ge 0 ]; then # FIX: C5-M-02
-            _TELEMETRY_ACTIVE=true                                                   # FIX: C5-M-02
-        fi                                                                           # FIX: C5-M-02
+        if [ "$_LOG_MTIME" -gt 0 ]; then                                             # FIX: C5-M-02 — skip age calc when stat failed (mtime=0 means epoch, not a real timestamp)
+            _NOW=$(date +%s)                                                         # FIX: C5-M-02
+            _AGE=$(( _NOW - _LOG_MTIME ))                                            # FIX: C5-M-02
+            if [ "$_AGE" -le "$_TELEMETRY_MAX_AGE_SECONDS" ] && [ "$_AGE" -ge 0 ]; then # FIX: C5-M-02
+                _TELEMETRY_ACTIVE=true                                               # FIX: C5-M-02
+            fi                                                                       # FIX: C5-M-02
+        fi  # FIX: C5-M-02
     fi  # FIX: C5-M-02
 fi  # FIX: C5-M-02
 
