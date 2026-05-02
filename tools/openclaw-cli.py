@@ -15,7 +15,7 @@ Subcommands:
   simulate   - Simulate security incidents for testing
 
 Usage:
-  openclaw-cli scan --type vulnerability --target production
+  openclaw-cli scan vulnerability --target production  # FIX: C5-L-01
   openclaw-cli playbook list
   openclaw-cli playbook execute playbook-credential-theft --severity P0
   openclaw-cli playbook execute IRP-001 --severity P0          # same, by Playbook ID
@@ -639,14 +639,30 @@ def vulnerability(ctx, target, output, profile, strict, artifacts_dir):
     for w in result.get("warnings", []):
         click.secho(f"[!] {w}", fg="yellow")
 
-    if safe_output:
-        click.secho(f"\n[\u2713] Scan complete \u2192 {safe_output}", fg="green")
-    else:
-        click.secho("[\u2713] Scan complete", fg="green")
+    # Check for failed tools first \u2014 must not print success before this gate.   # FIX: C5-H-01
+    if summary["failed_tools"]:  # FIX: C5-H-01
+        click.secho(f"[\u2717] Failed tools: {', '.join(summary['failed_tools'])}", fg="red")  # FIX: C5-H-01
+        ctx.exit(1)  # FIX: C5-H-01
+        return  # FIX: C5-H-01
 
-    if summary["failed_tools"]:
-        click.secho(f"[\u2717] Failed tools: {', '.join(summary['failed_tools'])}", fg="red")
-        ctx.exit(1)
+    # Required tools skipped = coverage is incomplete; this is not a clean pass.  # FIX: C5-H-01
+    required_skipped = summary.get("required_tools_skipped", [])  # FIX: C5-H-01
+    if required_skipped:  # FIX: C5-H-01
+        click.secho(  # FIX: C5-H-01
+            f"[\u2717] Scan incomplete \u2014 required tools were skipped: "  # FIX: C5-H-01
+            f"{', '.join(required_skipped)}. "  # FIX: C5-H-01
+            "Run with --strict to treat this as a hard failure, "  # FIX: C5-H-01
+            "or install the missing tools for full coverage.",  # FIX: C5-H-01
+            fg="red",  # FIX: C5-H-01
+        )  # FIX: C5-H-01
+        ctx.exit(1)  # FIX: C5-H-01
+        return  # FIX: C5-H-01
+
+    # All required tools ran \u2014 full coverage achieved.                          # FIX: C5-H-01
+    if safe_output:  # FIX: C5-H-01
+        click.secho(f"\n[\u2713] Scan complete \u2192 {safe_output}", fg="green")  # FIX: C5-H-01
+    else:  # FIX: C5-H-01
+        click.secho("[\u2713] Scan complete", fg="green")  # FIX: C5-H-01
 
 
 @scan.command()
