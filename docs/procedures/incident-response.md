@@ -207,18 +207,27 @@ python scripts/incident-response/notification-manager.py \
 
 ```bash
 # Full forensic collection (use for P0/P1)
-./scripts/incident-response/forensics-collector.py \
-  --incident-id SEC-INC-2026-042 \
-  --output /evidence/SEC-INC-2026-042/ \
-  --collect all
+# Supported flags: --incident, --level {full,quick,network}, --no-memory, --no-network
+# Evidence is written to $EVIDENCE_DIR/<incident-id>/<timestamp>/ (set EVIDENCE_DIR env var or default /var/lib/openclaw/forensics)
+sudo python3 scripts/incident-response/forensics-collector.py \
+  --incident SEC-INC-2026-042 \
+  --level full <!-- FIX: C5-H-07 -->
 
-# Artifacts collected:
-# - Running processes (ps aux snapshot)
-# - Network connections (netstat, ss)
-# - Docker container state (docker inspect)
-# - Log files (last 7 days)
-# - Configuration files (with secrets redacted)
-# - Memory dump (optional, for P0 only)
+# Quick collection (no memory dump) — suitable for P2/P3
+python3 scripts/incident-response/forensics-collector.py \
+  --incident SEC-INC-2026-042 \
+  --level quick \
+  --no-memory <!-- FIX: C5-H-07 -->
+
+# Artifacts collected by --level full:
+# - Disk partition metadata (NOT a full disk image)
+# - Running process list with network connections
+# - Active network connections
+# - Log files (journalctl + /var/log/openclaw/)
+# - Network packet capture via tcpdump (when available)
+# - Memory dump via LiME (when available, requires root)
+# - Chain-of-custody manifest with SHA-256 checksums
+# NOTE: Full disk imaging (dd) and cryptographic signing are NOT performed <!-- FIX: C5-H-03 -->
 ```
 
 **Evidence Chain of Custody**:

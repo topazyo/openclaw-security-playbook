@@ -8,17 +8,20 @@ Compliance: SOC 2 CC7.3, ISO 27001 A.16.1.7, GDPR Article 33
 
 Collects:
 - Memory dumps (LiME kernel module)
-- Disk images (dd with progress)
+- Disk partition metadata (device, mount, usage — NOT full disk images)  # FIX: C5-H-03
 - Log files (journalctl, /var/log)
-- Network captures (tcpdump)
+- Network captures (tcpdump, when available)
 - Process list and network connections
 - File system metadata
 
 Evidence Features:
-- SHA-256 checksums for integrity
-- Cryptographic signatures (tamper-evident)
+- SHA-256 checksums for integrity (NOT cryptographic signing)  # FIX: C5-H-03
 - Chain of custody manifest
 - Timestamp preservation (UTC normalized)
+
+NOTE: This collector does NOT perform full disk imaging (dd) and does NOT
+apply cryptographic signatures to evidence files. It collects disk partition
+metadata and computes SHA-256 checksums only.  # FIX: C5-H-03
 
 Usage:
     python3 forensics-collector.py --incident INC-2024-001 --level full
@@ -179,8 +182,13 @@ class ForensicsCollector:
         return False
     
     def collect_disk_metadata(self) -> bool:
-        """Collect disk metadata (not full image - too large)"""
-        logger.info("Collecting disk metadata...")
+        """Collect disk partition metadata (device, mount point, filesystem, usage).
+
+        NOTE: This function does NOT create disk images. It collects partition
+        metadata only (psutil.disk_partitions + disk_usage). No dd imaging is
+        performed.  # FIX: C5-H-03
+        """
+        logger.info("Collecting disk metadata (partition metadata only, no disk imaging)...")  # FIX: C5-H-03
         
         output_file = self.evidence_dir / "disk-metadata.json"
         
@@ -213,8 +221,8 @@ class ForensicsCollector:
         self.add_evidence_item(
             "disk_metadata",
             output_file,
-            "Disk partitions and usage statistics",
-            {"tool": "psutil"}
+            "Disk partition metadata and usage statistics (NOT a disk image)",  # FIX: C5-H-03
+            {"tool": "psutil", "collection_type": "metadata_only"}  # FIX: C5-H-03
         )
         
         return True
@@ -347,12 +355,28 @@ class ForensicsCollector:
         return collection_succeeded  # FIX: C5-finding-3
     
     def collect_network_capture(self, duration: int = 60) -> bool:
-        """Collect network packet capture"""
+        """Collect network packet capture using tcpdump.
+
+        Returns True when a capture file is successfully produced.
+        Returns False and records an explicit degraded-state entry in the
+        manifest when tcpdump is unavailable or fails.  # FIX: C5-M-04
+        """
         logger.info(f"Collecting network traffic ({duration}s)...")
-        
-        if not shutil.which("tcpdump"):
-            logger.warning("tcpdump not available, skipping network capture")
-            return False
+
+        if not shutil.which("tcpdump"):  # FIX: C5-M-04
+            logger.warning(  # FIX: C5-M-04
+                "tcpdump not available — network capture DEGRADED: "  # FIX: C5-M-04
+                "packet-level traffic was NOT captured"  # FIX: C5-M-04
+            )  # FIX: C5-M-04
+            self.manifest["evidence_items"].append({  # FIX: C5-M-04
+                "name": "network_capture",  # FIX: C5-M-04
+                "file_path": None,  # FIX: C5-M-04
+                "description": "DEGRADED — tcpdump not available; network packet capture was NOT performed",  # FIX: C5-M-04
+                "status": "degraded",  # FIX: C5-M-04
+                "reason": "tcpdump binary not found on PATH",  # FIX: C5-M-04
+                "collected_at": datetime.now(timezone.utc).isoformat(),  # FIX: C5-M-04
+            })  # FIX: C5-M-04
+            return False  # FIX: C5-M-04
         
         output_file = self.evidence_dir / "network-capture.pcap"
         
@@ -372,9 +396,17 @@ class ForensicsCollector:
                 {"tool": "tcpdump", "duration_seconds": duration}
             )
             return True
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, PermissionError) as e:
-            logger.warning(f"Failed to collect network capture: {e}")
-            return False
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, PermissionError) as e:  # FIX: C5-M-04
+            logger.warning(f"Failed to collect network capture: {e}")  # FIX: C5-M-04
+            self.manifest["evidence_items"].append({  # FIX: C5-M-04
+                "name": "network_capture",  # FIX: C5-M-04
+                "file_path": None,  # FIX: C5-M-04
+                "description": f"FAILED — tcpdump ran but did not complete successfully: {e}",  # FIX: C5-M-04
+                "status": "failed",  # FIX: C5-M-04
+                "reason": str(e),  # FIX: C5-M-04
+                "collected_at": datetime.now(timezone.utc).isoformat(),  # FIX: C5-M-04
+            })  # FIX: C5-M-04
+            return False  # FIX: C5-M-04
     
     def save_manifest(self):
         """Save chain of custody manifest"""
@@ -445,7 +477,7 @@ class ForensicsCollector:
         logger.info(f"Incident ID: {self.incident_id}")  # FIX: C5-finding-3
         logger.info(f"Evidence Directory: {self.evidence_dir}")  # FIX: C5-finding-3
         logger.info(f"Items Collected: {len(self.manifest['evidence_items'])}")  # FIX: C5-finding-3
-        logger.info(f"Total Size: {sum(item['file_size_bytes'] for item in self.manifest['evidence_items']) / 1024 / 1024:.2f} MB")  # FIX: C5-finding-3
+        logger.info(f"Total Size: {sum(item.get('file_size_bytes', 0) for item in self.manifest['evidence_items']) / 1024 / 1024:.2f} MB")  # FIX: C5-finding-3 FIX: C5-M-04
         logger.info("=" * 80)  # FIX: C5-finding-3
         if failed_steps:  # FIX: C5-finding-3
             raise RuntimeError(f"Incomplete forensic collection: {', '.join(failed_steps)}")  # FIX: C5-finding-3
