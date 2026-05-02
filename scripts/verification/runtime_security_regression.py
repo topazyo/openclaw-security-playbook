@@ -286,6 +286,11 @@ def write_fixture_home(home_dir: Path, scenario: ScenarioDefinition) -> None:
     (config_dir / SKILLS_CONFIG_FILE).write_text(build_skills_config(scenario), encoding="utf-8")
     (shield_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
     (telemetry_dir / "config.yml").write_text("enabled: true\n", encoding="utf-8")
+    if scenario.name == "secure":  # FIX: C5-M-02 — secure fixture must have a fresh log so Check 6 sees active monitoring
+        (logs_dir / "telemetry.jsonl").write_text(
+            json.dumps({"event": "startup", "ts": int(time.time())}) + "\n",
+            encoding="utf-8",
+        )  # FIX: C5-M-02
 
 
 def generate_certificate(cert_dir: Path) -> tuple[Path, Path]:
