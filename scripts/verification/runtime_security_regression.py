@@ -222,7 +222,7 @@ def resolve_bash_executable() -> str:
 
 
 def resolve_git_bash_command(name: str) -> str | None:
-    candidates = []
+    candidates: list[Path] = []
     for git_root in GIT_WINDOWS_ROOTS:
         candidates.extend(
             [
@@ -399,7 +399,7 @@ def archive_result(
     if inspect_output.returncode == 0:
         (scenario_dir / "docker-inspect.json").write_text(inspect_output.stdout, encoding="utf-8")
 
-    manifest = {
+    manifest: dict[str, Any] = {
         "scenario": asdict(scenario),
         "verifier_exit_code": exit_code,
         "verification_errors": verification_errors,
