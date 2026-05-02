@@ -121,7 +121,7 @@ run_capture "capture network routes" "${INCIDENT_DIR}/network/routes.txt" netsta
 
 run_capture "capture process tree" "${INCIDENT_DIR}/process/process-tree.txt" ps auxf
 agent_process_capture_rc=0                                                       ## FIX: C5-H-06
-ps aux | grep -E "(openclaw|moltbot|clawdbot|node)" > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null || agent_process_capture_rc=$?  ## FIX: C5-H-06
+{ ps aux | grep -E "(openclaw|moltbot|clawdbot|node)" > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null; } || agent_process_capture_rc=$?  ## FIX: C5-H-06
 if [ "${agent_process_capture_rc}" -gt 1 ]; then
     : > "${INCIDENT_DIR}/process/agent-processes.txt"
     record_warning "Failed to capture filtered agent process list (exit ${agent_process_capture_rc})"
