@@ -28,6 +28,7 @@ This policy defines the procedures and responsibilities for detecting, respondin
 ## Purpose
 
 This policy ensures:
+
 - Rapid detection and response to security incidents
 - Minimized impact and recovery time
 - Preservation of evidence for forensic analysis
@@ -40,6 +41,7 @@ This policy ensures:
 ## Scope
 
 **In Scope:**
+
 - Security incidents affecting ClawdBot/OpenClaw deployments
 - Data breaches involving AI agent systems
 - Compromise of credentials or API keys
@@ -50,6 +52,7 @@ This policy ensures:
 - Infrastructure compromises (MCP servers, gateways)
 
 **Out of Scope:**
+
 - General IT incidents (handled by IT Operations)
 - Anthropic Claude API outages (vendor responsibility)
 - User error without security impact (handled by Support)
@@ -63,6 +66,7 @@ This policy ensures:
 **Definition**: Immediate threat to production systems or data; active exploitation.
 
 **Examples**:
+
 - Active data exfiltration in progress
 - Production credentials compromised
 - Ransomware/destructive attack
@@ -82,6 +86,7 @@ This policy ensures:
 **Definition**: Significant security concern; potential for escalation to P0.
 
 **Examples**:
+
 - Successful prompt injection attack ([scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md))
 - Malicious skill installation ([scenario-002](../../examples/scenarios/scenario-002-malicious-skill-deployment.md))
 - MCP server compromise ([scenario-003](../../examples/scenarios/scenario-003-mcp-server-compromise.md))
@@ -100,6 +105,7 @@ This policy ensures:
 **Definition**: Security vulnerability or policy violation requiring attention.
 
 **Examples**:
+
 - Plaintext credentials found in config files
 - Failed authentication attempts (below lockout threshold)
 - Non-production data exposure
@@ -118,6 +124,7 @@ This policy ensures:
 **Definition**: Minor security concern; informational only.
 
 **Examples**:
+
 - Security scan findings (informational)
 - Expired certificates (non-production)
 - Outdated dependencies (no known exploits)
@@ -134,6 +141,7 @@ This policy ensures:
 ### Incident Commander (IC)
 
 **Responsibilities**:
+
 - Own the incident response from detection to resolution
 - Decide on containment, eradication, and recovery actions
 - Coordinate response team activities
@@ -145,6 +153,7 @@ This policy ensures:
 ### Security Analyst
 
 **Responsibilities**:
+
 - Monitor security alerts and logs
 - Triage and categorize incidents
 - Perform initial investigation
@@ -154,6 +163,7 @@ This policy ensures:
 ### Engineering Team
 
 **Responsibilities**:
+
 - Implement containment measures (firewall blocks, container kills)
 - Perform forensic analysis
 - Deploy fixes and patches
@@ -163,6 +173,7 @@ This policy ensures:
 ### Legal / Privacy Officer
 
 **Responsibilities**:
+
 - Advise on regulatory notification requirements
 - Review external communications
 - Coordinate with law enforcement if criminal activity
@@ -171,6 +182,7 @@ This policy ensures:
 ### CISO / CTO
 
 **Responsibilities**:
+
 - Executive oversight for P0/P1 incidents
 - Approve major response decisions (shutdowns, notifications)
 - Communicate with board and executives
@@ -179,6 +191,7 @@ This policy ensures:
 ### Communications / PR
 
 **Responsibilities**:
+
 - Draft customer communications
 - Coordinate public disclosure (if required)
 - Manage media inquiries
@@ -193,6 +206,7 @@ This policy ensures:
 **Goal**: Identify security incidents as quickly as possible.
 
 **Detection Sources**:
+
 - **Automated Monitoring**: telemetry tooling when integrated, SIEM alerts, IDS/IPS <!-- FIX: C5-9 -->
 - **User Reports**: Security@ email, Slack #security channel
 - **Security Scans**: [verify_openclaw_security.sh](../../scripts/verification/verify_openclaw_security.sh)
@@ -200,6 +214,7 @@ This policy ensures:
 - **Audit Log Review**: Quarterly access reviews
 
 **Actions**:
+
 1. Security analyst receives alert or report
 2. Initial triage: Is this a security incident? (Yes → proceed, No → close)
 3. Categorize severity (P0/P1/P2/P3)
@@ -215,6 +230,7 @@ This policy ensures:
 **Goal**: Understand the scope, impact, and root cause.
 
 **Questions to Answer**:
+
 - What happened? (attack vector, timeline)
 - What was affected? (systems, data, users)
 - How did it happen? (vulnerability exploited, misconfiguration)
@@ -222,12 +238,12 @@ This policy ensures:
 - What data was accessed/exfiltrated?
 
 **Actions**:
+
 1. **Collect Evidence**:
    ```bash
    # Preserve evidence before containment changes the host state
    ./scripts/forensics/collect_evidence.sh
    ```
-   
 2. **Review Logs**:
    - Authentication logs (failed logins, MFA bypasses)
    - Authorization logs (privilege escalation attempts)
@@ -236,6 +252,7 @@ This policy ensures:
    - Telemetry data (anomalies, behavioral changes)
 
 3. **Document Timeline** (see [reporting-template.md](../../examples/incident-response/reporting-template.md)):
+
    ```
    T-0: Initial compromise (attacker gains access)
    T+2h: Persistence established (malicious skill installed)
@@ -258,6 +275,7 @@ This policy ensures:
 **Goal**: Stop the bleeding; prevent further damage.
 
 **Short-Term Containment** (immediate, may be non-ideal):
+
 - Block attacker IP addresses at firewall
 - Kill compromised containers
 - Revoke compromised API keys
@@ -265,6 +283,7 @@ This policy ensures:
 - Enable additional logging/monitoring
 
 **Long-Term Containment** (more permanent):
+
 - Deploy fixes for exploited vulnerabilities
 - Rotate all potentially compromised credentials
 - Rebuild compromised systems from clean images
@@ -272,20 +291,22 @@ This policy ensures:
 
 **Containment Actions by Incident Type**:
 
-| Incident Type | Containment Actions |
-|---------------|---------------------|
-| **Credential Exfiltration** | 1. Rotate API keys immediately<br>2. Check for unauthorized usage (audit logs)<br>3. Block attacker IPs<br>4. See [Playbook 1](../../examples/incident-response/playbook-credential-theft.md) |
-| **Prompt Injection** | 1. Enable stricter input validation<br>2. Block specific patterns<br>3. Roll back to safe conversation state<br>4. See [Playbook 2](../../examples/incident-response/playbook-prompt-injection.md) |
-| **Malicious Skill** | 1. Quarantine skill (move to `/quarantine`)<br>2. Kill skill processes<br>3. Check for persistence (cron, startup scripts)<br>4. See [Playbook 3](../../examples/incident-response/playbook-skill-compromise.md) |
-| **Container Escape** | 1. Kill container immediately<br>2. Isolate host from network<br>3. Image forensics<br>4. Review seccomp/AppArmor logs |
+| Incident Type               | Containment Actions                                                                                                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Credential Exfiltration** | 1. Rotate API keys immediately<br>2. Check for unauthorized usage (audit logs)<br>3. Block attacker IPs<br>4. See [Playbook 1](../../examples/incident-response/playbook-credential-theft.md)                    |
+| **Prompt Injection**        | 1. Enable stricter input validation<br>2. Block specific patterns<br>3. Roll back to safe conversation state<br>4. See [Playbook 2](../../examples/incident-response/playbook-prompt-injection.md)               |
+| **Malicious Skill**         | 1. Quarantine skill (move to `/quarantine`)<br>2. Kill skill processes<br>3. Check for persistence (cron, startup scripts)<br>4. See [Playbook 3](../../examples/incident-response/playbook-skill-compromise.md) |
+| **Container Escape**        | 1. Kill container immediately<br>2. Isolate host from network<br>3. Image forensics<br>4. Review seccomp/AppArmor logs                                                                                           |
 
 **Automated Containment**:
-```python
-# scripts/incident-response/auto-containment.py
+
+```bash
+# FIX: C5-Batch-G — replaced unsupported --incident-type/--affected-resources/rotate+block
+# with the real flags accepted by auto-containment.py
 ./scripts/incident-response/auto-containment.py \
-  --incident-type credential-theft \
-  --affected-resources "api-key-abc123" \
-  --action rotate+block
+  --incident INC-2024-001 \
+  --target user:suspicious-user \
+  --action revoke-credentials
 ```
 
 **SLA**: P0 contained within 1 hour, P1 within 4 hours
@@ -297,6 +318,7 @@ This policy ensures:
 **Goal**: Remove the threat completely.
 
 **Actions**:
+
 1. **Remove Malicious Components**:
    - Uninstall malicious skills
    - Delete backdoors and persistence mechanisms
@@ -328,7 +350,9 @@ This policy ensures:
 **Goal**: Restore normal operations safely.
 
 **Actions**:
+
 1. **Restore from Backups** (if needed):
+
    ```bash
    ./configs/examples/backup-restore.sh restore \
      --backup-id backup-2026-02-13 \
@@ -350,6 +374,7 @@ This policy ensures:
    - Customers (if affected): Status page update, direct notification
 
 **Validation**:
+
 - All systems operational
 - No anomalies detected for 24 hours
 - Security baseline restored
@@ -361,6 +386,7 @@ This policy ensures:
 **Goal**: Learn from the incident; prevent recurrence.
 
 **Post-Incident Review (PIR) Meeting** (within 5 business days):
+
 - Attendees: Incident commander, response team, engineering, management
 - Duration: 60-90 minutes
 - Agenda:
@@ -370,20 +396,23 @@ This policy ensures:
   4. Root cause analysis (5 Whys)
   5. Action items with owners and deadlines
 
-**PIR Output**: 
+**PIR Output**:
+
 - Incident report (see [reporting-template.md](../../examples/incident-response/reporting-template.md))
 - Action items tracked in JIRA/GitHub
 - Runbook updates
 - Policy/procedure changes
 - Security control improvements
 
-**Example Action Items (from [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)):
+\*\*Example Action Items (from [scenario-001](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)):
+
 - [ ] Deploy approved runtime or gateway enforcement controls if required (Layer 4) - Owner: DevSecOps, Due: 2 weeks <!-- FIX: C5-9 -->
 - [ ] Add email parsing to prompt injection rules - Owner: Security Analyst, Due: 1 week
 - [ ] Conduct prompt injection training for engineers - Owner: Security Team, Due: 1 month
 - [ ] Update incident playbook with learnings - Owner: IC, Due: 1 week
 
 **Metrics**:
+
 - Time to detect (TTD)
 - Time to contain (TTC)
 - Time to recover (TTR)
@@ -398,15 +427,18 @@ This policy ensures:
 ### Internal Communication
 
 **Security Team**:
+
 - Slack: #security-incidents (real-time coordination)
 - Email: security@company.com (formal notifications)
 - PagerDuty: On-call rotation for P0/P1
 
 **Engineering / Operations**:
+
 - Incident updates every 2 hours (P0), every 4 hours (P1)
 - Status: "Investigating", "Contained", "Eradicating", "Recovered"
 
 **Executive Team**:
+
 - P0: Immediate notification (phone call within 15 minutes)
 - P1: Email within 1 hour, daily updates
 - P2/P3: Weekly summary email
@@ -414,6 +446,7 @@ This policy ensures:
 ### External Communication
 
 **Customers**:
+
 - **Data Breach**: Notification required if PII/regulated data exposed
   - Timeline: GDPR = 72 hours, CCPA/state laws vary
   - Channel: Email, in-app notification, status page
@@ -421,16 +454,19 @@ This policy ensures:
 - **Service Disruption**: Status page update (no sensitive details)
 
 **Regulatory Authorities**:
+
 - **GDPR**: Data Protection Authority (DPA) notification within 72 hours (Article 33)
 - **State Breach Laws**: Varies by state (e.g., California = "without unreasonable delay")
 - Coordinated by Legal/Privacy Officer
 
 **Media / Public**:
+
 - All media inquiries routed to Communications/PR
 - No public statement without CISO + CEO approval
 - Focus: What happened (high-level), what we're doing, how we're protecting customers
 
 **Template Communication**:
+
 ```
 Subject: Security Incident Notification - [Incident ID]
 
@@ -466,11 +502,13 @@ Sincerely,
 ### GDPR Article 33: Notification of Data Breach
 
 **Requirements**:
+
 - Notify supervisory authority (DPA) within 72 hours
 - Include: Nature of breach, categories/number of affected individuals, consequences, measures taken
 - If >72 hours, provide reason for delay
 
 **OpenClaw Implementation**:
+
 - Automated detection via telemetry tooling when integrated (real-time alerts) <!-- FIX: C5-9 -->
 - Evidence collection preserved (see [collect_evidence.sh](../../scripts/forensics/collect_evidence.sh))
 - Notification draft generated from [reporting-template.md](../../examples/incident-response/reporting-template.md)
@@ -479,11 +517,13 @@ Sincerely,
 ### SOC 2 Type II
 
 **Controls**:
+
 - CC7.3: Incidents are detected and communicated to appropriate personnel
 - CC7.4: System incidents are analyzed to identify root cause
 - CC7.5: Corrective actions are taken to remediate incidents
 
 **Evidence**:
+
 - Incident tickets (JIRA with full timeline)
 - Post-incident review reports
 - Action item tracking (completion verified)
@@ -492,12 +532,14 @@ Sincerely,
 ### ISO 27001
 
 **Standards**:
+
 - A.16.1.1: Responsibilities and procedures for incident management
 - A.16.1.4: Assessment of and decision on information security events
 - A.16.1.5: Response to information security incidents
 - A.16.1.6: Learning from information security incidents
 
 **Evidence**:
+
 - This policy (defined procedures)
 - Incident response playbooks
 - PIR reports with lessons learned
@@ -508,30 +550,35 @@ Sincerely,
 ## References
 
 ### Internal Documentation
+
 - [Incident Response Guide](../guides/06-incident-response.md) - Detailed procedures
 - [Incident Report Template](../../examples/incident-response/reporting-template.md)
 - [Access Control Policy](./access-control-policy.md)
 - [Data Classification Policy](./data-classification.md)
 
 ### Response Playbooks
+
 - [Playbook: Credential Exfiltration](../../examples/incident-response/playbook-credential-theft.md)
 - [Playbook: Prompt Injection](../../examples/incident-response/playbook-prompt-injection.md)
 - [Playbook: Malicious Skill](../../examples/incident-response/playbook-skill-compromise.md)
 - [Playbook: Data Breach](../../examples/incident-response/playbook-data-breach.md)
 
 ### Real-World Scenarios
+
 - [Scenario 001: Indirect Prompt Injection](../../examples/scenarios/scenario-001-indirect-prompt-injection-attack.md)
 - [Scenario 002: Malicious Skill Deployment](../../examples/scenarios/scenario-002-malicious-skill-deployment.md)
 - [Scenario 003: MCP Server Compromise](../../examples/scenarios/scenario-003-mcp-server-compromise.md)
 - [Scenarios 004-007](../../examples/scenarios/)
 
 ### Automation Scripts
+
 - [Auto-Containment](../../scripts/incident-response/auto-containment.py)
 - [Evidence Collection](../../scripts/forensics/collect_evidence.sh)
 - [Timeline Builder](../../scripts/forensics/build_timeline.sh)
 - [Notification Manager](../../scripts/incident-response/notification-manager.py)
 
 ### External Resources
+
 - [NIST SP 800-61r2: Computer Security Incident Handling Guide](https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final)
 - [SANS Incident Response Process](https://www.sans.org/security-resources/posters/incident-response-process-step-by-step/170/download)
 - [GDPR Article 33: Breach Notification](https://gdpr-info.eu/art-33-gdpr/)

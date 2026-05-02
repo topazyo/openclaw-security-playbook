@@ -6,22 +6,23 @@ Purpose: Immediately contain threats by isolating compromised resources
 Attack Vectors: Lateral movement, data exfiltration, privilege escalation
 Compliance: SOC 2 CC7.3, ISO 27001 A.16.1.5
 
-Containment Actions:
-- AWS security group lockdown (revoke all ingress/egress)
-- IAM credential revocation (delete access keys)
-- EC2 snapshot (preserve for forensics)
-- VPC network isolation (move to quarantine subnet)
-- Docker container isolation (network disconnect)
-- Process termination (kill malicious processes)
+Containment Actions (implemented):
+- AWS security group lockdown (apply quarantine SG; create deny-all SG if none configured)  # FIX: C5-Batch-G
+- IAM credential revocation (deactivate access keys + attach deny-all inline policy)  # FIX: C5-Batch-G
+- EC2 snapshot (preserve volumes for forensics)
+- Docker container isolation (disconnect all networks + apply quarantine label)
+- IP address blocking (add deny entries to emergency network ACL)  # FIX: C5-Batch-G
+- Domain blocking (add domain to Route53 Resolver DNS firewall list)  # FIX: C5-Batch-G
+- Container isolation (network disconnect + quarantine label; alias for Docker isolation)  # FIX: C5-Batch-G
+- Rate-limit override (write emergency rate-limit profile to config path)  # FIX: C5-Batch-G
 
 Safety Features:
 - Dry-run mode
-- Rollback capability
-- Approval workflow integration
+- Rollback capability (commands recorded in containment report)
 - Audit logging
 
 Usage:
-    python3 auto-containment.py --incident INC-2024-001 --target i-1234567890abcdef0
+    python3 auto-containment.py --incident INC-2024-001 --target i-1234567890abcdef0 --action isolate-ec2
     python3 auto-containment.py --incident INC-2024-001 --target user:suspicious-user --action revoke-credentials
 
 Dependencies: boto3 (AWS SDK), docker
@@ -362,48 +363,52 @@ class ContainmentManager:
             return False
     
     def revoke_iam_credentials(self, username: str) -> bool:
-        """Revoke IAM user access keys"""
-        logger.info(f"Revoking IAM credentials for user: {username}")
+        """Deactivate IAM user access keys and attach a deny-all inline policy.  # FIX: C5-Batch-G
+
+        Keys are set to Status='Inactive' (deactivation), not deleted.  # FIX: C5-Batch-G
+        A deny-all inline policy is also attached to block any residual session tokens.  # FIX: C5-Batch-G
+        """  # FIX: C5-Batch-G
+        logger.info(f"Deactivating IAM credentials for user: {username}")  # FIX: C5-Batch-G
         if self.iam is None:  # FIX: C5-finding-3
             logger.error("boto3 is required for IAM credential revocation")  # FIX: C5-finding-3
             self.log_action("revoke_iam_credentials", username, "failed", {"error": "boto3 is required for IAM credential revocation"})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
-        
+
         try:
             # List access keys
             response = self.iam.list_access_keys(UserName=username)
             access_keys = response['AccessKeyMetadata']
-            
+
             logger.info(f"Found {len(access_keys)} access keys for {username}")
-            
+
             if self.dry_run:
-                logger.info("[DRY-RUN] Would revoke access keys")
+                logger.info("[DRY-RUN] Would deactivate access keys and attach deny-all policy")  # FIX: C5-Batch-G
                 self.log_action("revoke_iam_credentials", username, "dry_run", {
                     "access_key_count": len(access_keys)
                 })
                 return True
-            
-            revoked_keys = []
+
+            deactivated_keys = []  # FIX: C5-Batch-G — renamed from revoked_keys; keys are deactivated, not deleted
             for key_info in access_keys:
                 access_key_id = key_info['AccessKeyId']
-                
-                # Deactivate key
+
+                # Deactivate key (Status='Inactive'); key is NOT deleted
                 self.iam.update_access_key(
                     UserName=username,
                     AccessKeyId=access_key_id,
                     Status='Inactive'
                 )
-                
+
                 logger.info(f"✓ Deactivated access key: {access_key_id}")
-                revoked_keys.append(access_key_id)
-                
+                deactivated_keys.append(access_key_id)  # FIX: C5-Batch-G
+
                 self.rollback_commands.append({
                     "action": "reactivate_access_key",
                     "username": username,
                     "access_key_id": access_key_id
                 })
-            
-            # Attach deny-all policy
+
+            # Attach deny-all inline policy to block residual session tokens
             deny_policy = {
                 "Version": "2012-10-17",
                 "Statement": [{
@@ -412,9 +417,9 @@ class ContainmentManager:
                     "Resource": "*"
                 }]
             }
-            
+
             policy_name = f"IncidentDeny-{self.incident_id}"
-            
+
             try:
                 self.iam.put_user_policy(
                     UserName=username,
@@ -424,17 +429,17 @@ class ContainmentManager:
                 logger.info(f"✓ Applied deny-all policy: {policy_name}")
             except Exception as e:
                 logger.warning(f"Failed to apply deny policy: {e}")
-            
+
             self.log_action("revoke_iam_credentials", username, "success", {
-                "revoked_keys": revoked_keys,
+                "deactivated_keys": deactivated_keys,  # FIX: C5-Batch-G
                 "deny_policy": policy_name
             })
-            
-            logger.info(f"✓ IAM credentials revoked for {username}")
+
+            logger.info(f"✓ IAM credentials deactivated for {username}")  # FIX: C5-Batch-G
             return True
-            
+
         except Exception as e:
-            logger.error(f"Failed to revoke IAM credentials: {e}")
+            logger.error(f"Failed to deactivate IAM credentials: {e}")  # FIX: C5-Batch-G
             self.log_action("revoke_iam_credentials", username, "failed", {"error": str(e)})
             return False
     
@@ -533,29 +538,52 @@ Examples:
     # Isolate compromised EC2 instance
     python3 auto-containment.py --incident INC-2024-001 \\
         --target i-1234567890abcdef0 --action isolate-ec2
-    
-    # Revoke IAM credentials
+
+    # Deactivate IAM credentials (sets keys Inactive + attaches deny-all policy)
     python3 auto-containment.py --incident INC-2024-001 \\
         --target user:suspicious-user --action revoke-credentials
-    
+
     # Isolate Docker container
     python3 auto-containment.py --incident INC-2024-001 \\
         --target container:abc123 --action isolate-docker
-    
-    # Dry-run
+
+    # Block attacker IP via network ACL
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --ip-address 198.51.100.42 --duration 7d \\
+        --reason "Credential exfiltration attempt" --action block_ip
+
+    # Block attacker domain via Route53 Resolver DNS firewall
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --domain attacker.example.com --reason "C2 domain" --action block_domain
+
+    # Isolate a named container (network disconnect + quarantine label)
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --container-id agent-prod-42 --action isolate_container
+
+    # Apply aggressive rate-limit override profile
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --mode aggressive --limits '{\"per_ip_per_minute\":10}' --action update_rate_limits
+
+    # Dry-run any action
     python3 auto-containment.py --incident INC-2024-001 \\
         --target i-1234567890abcdef0 --action isolate-ec2 --dry-run
 
 Environment Variables:
-    AWS_REGION             AWS region (default: us-east-1)
-    QUARANTINE_SUBNET_ID   Quarantine subnet ID for isolated instances
-    QUARANTINE_SG_ID       Quarantine security group ID (deny-all)
+    AWS_REGION                  AWS region (default: us-east-1)
+    QUARANTINE_SG_ID            Quarantine security group ID (deny-all); created on-the-fly if unset
+    BLOCK_NETWORK_ACL_ID        Network ACL used for IP blocking; defaults to VPC default ACL
+    DNS_FIREWALL_DOMAIN_LIST_ID Route53 Resolver domain list for domain blocking; created if absent
+    RATE_LIMIT_CONFIG_PATH      File path for rate-limit override profile
 
-Actions:
-    isolate-ec2           Isolate EC2 instance (snapshot + SG lockdown)
-    revoke-credentials    Revoke IAM user access keys
-    isolate-docker        Disconnect Docker container from networks
-        """
+Actions (all implemented):
+    isolate-ec2           Snapshot volumes + apply quarantine SG  # FIX: C5-Batch-G
+    revoke-credentials    Deactivate IAM access keys + attach deny-all policy  # FIX: C5-Batch-G
+    isolate-docker        Disconnect Docker container from all networks  # FIX: C5-Batch-G
+    block_ip              Add deny entries to emergency network ACL  # FIX: C5-Batch-G
+    block_domain          Add domain to Route53 Resolver DNS firewall list  # FIX: C5-Batch-G
+    isolate_container     Network disconnect + quarantine label (Docker)  # FIX: C5-Batch-G
+    update_rate_limits    Write emergency rate-limit override profile  # FIX: C5-Batch-G
+        """  # FIX: C5-Batch-G
     )
     
     parser.add_argument(
