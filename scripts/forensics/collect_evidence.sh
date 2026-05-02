@@ -2,7 +2,11 @@
 # collect_evidence.sh — OpenClaw Incident Evidence Preservation
 #
 # USAGE: ./collect_evidence.sh [--containment]
-#   --containment: Also stop the agent and block network after evidence collection
+#   --containment: Also stop the agent's services/containers after evidence  ## FIX: C5-H-06
+#                  collection. This does NOT block network traffic — apply   ## FIX: C5-H-06
+#                  iptables/ufw rules separately if network containment is   ## FIX: C5-H-06
+#                  required (see docs/guides/06-incident-response.md         ## FIX: C5-H-06
+#                  Playbook 1 Step 1.2).                                     ## FIX: C5-H-06
 #
 # Run this BEFORE stopping the agent process to preserve in-memory state.
 # Part of: https://github.com/topazyo/openclaw-security-playbook
@@ -23,13 +27,19 @@ Usage:
   ./scripts/forensics/collect_evidence.sh [--containment] [--help|-h]
 
 Options:
-  --containment   Also stop agent services after evidence collection
+  --containment   After evidence collection, attempt to stop the moltbot and
+                  openclaw systemd services and the clawdbot Docker container.
+                  Each stop attempt that fails is recorded as a warning and
+                  causes a non-zero exit. This flag does NOT block network
+                  traffic — use iptables/ufw separately if network
+                  containment is required.
   --help, -h      Show this help message and exit
 
 Exit codes:
     0  Successful execution (no critical issues, no warnings)
     1  Critical findings detected during collection
-    2  Warnings detected or invalid arguments
+    2  Warnings detected (including failed containment commands) or
+       invalid arguments
 
 Run this before stopping the agent process to preserve volatile state.
 EOF
@@ -110,8 +120,8 @@ run_append_capture "capture established TCP connections via lsof" "${INCIDENT_DI
 run_capture "capture network routes" "${INCIDENT_DIR}/network/routes.txt" netstat -rn
 
 run_capture "capture process tree" "${INCIDENT_DIR}/process/process-tree.txt" ps auxf
-ps aux | grep -E "(openclaw|moltbot|clawdbot|node)" > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null
-agent_process_capture_rc=$?
+agent_process_capture_rc=0                                                       ## FIX: C5-H-06
+ps aux | grep -E "(openclaw|moltbot|clawdbot|node)" > "${INCIDENT_DIR}/process/agent-processes.txt" 2>/dev/null || agent_process_capture_rc=$?  ## FIX: C5-H-06
 if [ "${agent_process_capture_rc}" -gt 1 ]; then
     : > "${INCIDENT_DIR}/process/agent-processes.txt"
     record_warning "Failed to capture filtered agent process list (exit ${agent_process_capture_rc})"
@@ -207,8 +217,8 @@ else
     record_warning "Failed to capture crontab entries (crontab command unavailable)"
 fi
 
-systemctl list-units --type=service | grep -iE "(openclaw|moltbot|clawdbot)" > "${INCIDENT_DIR}/filesystem/systemd-services.txt" 2>/dev/null
-systemd_services_rc=$?
+systemd_services_rc=0                                                            ## FIX: C5-H-06
+{ systemctl list-units --type=service 2>/dev/null | grep -iE "(openclaw|moltbot|clawdbot)" > "${INCIDENT_DIR}/filesystem/systemd-services.txt" 2>/dev/null; } || systemd_services_rc=$?  ## FIX: C5-H-06
 if [ "${systemd_services_rc}" -gt 1 ]; then
     : > "${INCIDENT_DIR}/filesystem/systemd-services.txt"
     record_warning "Failed to capture systemd service inventory (exit ${systemd_services_rc})"
@@ -228,17 +238,18 @@ echo "  5. Run check_credential_scope.sh to assess what was exposed"
 echo ""
 
 if [ "${CONTAINMENT}" = true ]; then
-    echo "[+] Running containment (--containment flag set)..."
-    if ! systemctl stop moltbot 2>/dev/null; then
-        record_warning "Failed to stop moltbot during containment"
+    echo "[+] Running containment (--containment flag set)..."                ## FIX: C5-H-06
+    echo "    Note: stops services/containers only — does NOT block network." ## FIX: C5-H-06
+    if ! systemctl stop moltbot 2>/dev/null; then                             ## FIX: C5-H-06
+        record_warning "Failed to stop moltbot during containment"            ## FIX: C5-H-06
     fi
-    if ! systemctl stop openclaw 2>/dev/null; then
-        record_warning "Failed to stop openclaw during containment"
+    if ! systemctl stop openclaw 2>/dev/null; then                            ## FIX: C5-H-06
+        record_warning "Failed to stop openclaw during containment"           ## FIX: C5-H-06
     fi
-    if ! docker stop clawdbot 2>/dev/null; then
-        record_warning "Failed to stop clawdbot during containment"
+    if ! docker stop clawdbot 2>/dev/null; then                               ## FIX: C5-H-06
+        record_warning "Failed to stop clawdbot during containment"           ## FIX: C5-H-06
     fi
-    echo "    Agent stopped."
+    echo "    Containment step finished (service/container stop attempted)."  ## FIX: C5-H-06
 fi
 
 echo ""

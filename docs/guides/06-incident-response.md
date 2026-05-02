@@ -17,18 +17,22 @@ This guide provides actionable incident response playbooks for AI agent security
 
 > **Document type — Learning Guide**  
 > This is the educational reference guide covering incident response concepts, classification, and example response patterns. It is intentionally self-contained for learning purposes.
+>
 > - **Operational runbook** (emergency contacts, escalation matrix, SLAs, and playbook index): see [docs/procedures/incident-response.md](../procedures/incident-response.md).
 > - **Standalone executable playbooks** (IRP-001 – IRP-004, with full dependency notices): see [examples/incident-response/](../../examples/incident-response/).
 
 ## Platform Notes
 
 ### Linux
+
 Use commands as written for Docker, `iptables`, and forensic collection.
 
 ### macOS
+
 Prefer equivalent `pf`/system tooling where Linux-specific networking commands differ.
 
 ### Windows
+
 Use PowerShell equivalents and WSL2 where bash-oriented commands are required.
 
 ## Table of Contents
@@ -49,12 +53,12 @@ Use PowerShell equivalents and WSL2 where bash-oriented commands are required.
 
 ### Severity Levels
 
-| Level | Description | Response Time | Examples |
-|-------|-------------|---------------|----------|
-| **P0 - Critical** | Active exploitation, data exfiltration | Immediate (5 min) | Credentials being exfiltrated, ongoing breach |
-| **P1 - High** | High risk of exploitation, system compromise | 15 minutes | Malicious skill detected, unauthorized access attempts |
-| **P2 - Medium** | Potential security weakness, no active exploit | 1 hour | Configuration drift, missing security controls |
-| **P3 - Low** | Security hygiene, best practice violations | 1 business day | Outdated dependencies, log gaps |
+| Level             | Description                                    | Response Time     | Examples                                               |
+| ----------------- | ---------------------------------------------- | ----------------- | ------------------------------------------------------ |
+| **P0 - Critical** | Active exploitation, data exfiltration         | Immediate (5 min) | Credentials being exfiltrated, ongoing breach          |
+| **P1 - High**     | High risk of exploitation, system compromise   | 15 minutes        | Malicious skill detected, unauthorized access attempts |
+| **P2 - Medium**   | Potential security weakness, no active exploit | 1 hour            | Configuration drift, missing security controls         |
+| **P3 - Low**      | Security hygiene, best practice violations     | 1 business day    | Outdated dependencies, log gaps                        |
 
 ### Incident Types
 
@@ -69,6 +73,7 @@ Use PowerShell equivalents and WSL2 where bash-oriented commands are required.
 ## Playbook 1: Credential Exfiltration
 
 ### Symptoms
+
 - Alert: "Skill sent data to non-whitelisted endpoint"
 - Unusual API usage patterns
 - Network traffic to unknown IPs
@@ -76,6 +81,7 @@ Use PowerShell equivalents and WSL2 where bash-oriented commands are required.
 ### Phase 1: Containment (5-10 minutes)
 
 #### Step 1.1: Isolate the Agent
+
 ```bash
 # Stop ClawdBot immediately
 docker stop clawdbot-production
@@ -85,6 +91,7 @@ ps aux | grep -i claw
 ```
 
 #### Step 1.2: Block Network Access
+
 ```bash
 # Block all traffic
 sudo iptables -I INPUT -s <AGENT_IP> -j DROP
@@ -92,6 +99,7 @@ sudo iptables -I OUTPUT -d <AGENT_IP> -j DROP
 ```
 
 #### Step 1.3: Revoke Credentials
+
 - Anthropic: https://console.anthropic.com/settings/keys
 - OpenAI: https://platform.openai.com/api-keys
 - AWS: IAM Console
@@ -137,6 +145,7 @@ docker start clawdbot-production
 ## Playbook 2: Prompt Injection Attack
 
 ### Symptoms
+
 - Agent performs unexpected actions
 - Tool execution logs show suspicious commands
 - Alert: "Potential prompt injection detected"
@@ -194,6 +203,7 @@ shield:
 ## Playbook 3: Unauthorized Network Access
 
 ### Symptoms
+
 - Alert: "Gateway accessed from non-VPN IP"
 - Failed authentication from unexpected source
 
@@ -224,6 +234,7 @@ jq 'select(.source_ip=="<ATTACKER_IP>" and .auth_status=="success")' \
 ## Playbook 4: Malicious Skill Installation
 
 ### Symptoms
+
 - Alert: "Skill integrity check failed"
 - New skill appears in directory
 
@@ -268,23 +279,71 @@ git clone https://github.com/anthropic-ai/openclaw-skills ~/.openclaw/skills
 
 ## Evidence Collection
 
+<!-- FIX: C5-H-06,L-03 -->
+
 ### Automated Evidence Collection Script
 
 ```bash
 # Use the canonical collection script from this repository
 ./scripts/forensics/collect_evidence.sh
 
-# Optional: collect evidence and then run containment
+# Optional: collect evidence and then attempt to stop the agent's
+# services/containers (moltbot + openclaw via systemctl, clawdbot via docker).
+# This does NOT block network traffic — apply iptables/ufw rules separately
+# if network containment is required (see Playbook 1, Step 1.2 above).
 ./scripts/forensics/collect_evidence.sh --containment
 ```
 
-**Verify:** Expected output:
+**Verify:** The script always prints the `Evidence collection complete:` banner
+and the numbered next-steps block. On a host without `tcpdump`, telemetry
+hash-chain inputs, crontab, or the named systemd/docker services, expect
+warning lines and a non-zero exit — that is the script's honest signal that
+something it tried to capture or stop was not present.
+
+Successful run (no critical findings, no warnings) — exit code `0`:
+
 ```text
-Evidence collection complete: /home/<user>/openclaw-incident-YYYYMMDD-HHMMSS
-Next steps:
+============================================================
+ Evidence collection complete: /home/<user>/openclaw-incident-YYYYMMDD-HHMMSS
+============================================================
+
+ Next steps:
   1. Review SOUL.md files for injected instructions
   2. Check hash chain report for log tampering
+  3. If backup credential files found: rotate at providers FIRST
+  4. Run build_timeline.sh to reconstruct attack sequence
+  5. Run check_credential_scope.sh to assess what was exposed
+
+============================================================
+ Evidence Collection Summary
+============================================================
+ Critical issues: 0
+ Warnings: 0
 ```
+
+Run with warnings (e.g. missing telemetry hash-chain inputs, or `--containment`
+attempted on a host without the moltbot/openclaw/clawdbot services) — exit
+code `2`:
+
+```text
+[WARN] No telemetry hash-chain inputs found
+...
+[+] Running containment (--containment flag set)...
+    Note: stops services/containers only — does NOT block network.
+[WARN] Failed to stop moltbot during containment
+[WARN] Failed to stop openclaw during containment
+[WARN] Failed to stop clawdbot during containment
+    Containment step finished (service/container stop attempted).
+
+============================================================
+ Evidence Collection Summary
+============================================================
+ Critical issues: 0
+ Warnings: 4
+```
+
+If backup credential files are found or the telemetry hash chain is broken,
+the script exits `1` with a `Critical issues:` count greater than zero.
 
 ---
 
@@ -338,6 +397,7 @@ Date: [Date]
 Attendees: [Names]
 
 ## Incident Summary
+
 - Type: [Type]
 - Severity: P[0-3]
 - Duration: [Hours]
@@ -345,32 +405,36 @@ Attendees: [Names]
 
 ## Timeline
 
-| Time | Event | Action | By Whom |
-|------|-------|--------|---------|
-| 01:30 | Alert | Acknowledged | John |
-| 01:35 | Containment | Stopped agent | John |
+| Time  | Event       | Action        | By Whom |
+| ----- | ----------- | ------------- | ------- |
+| 01:30 | Alert       | Acknowledged  | John    |
+| 01:35 | Containment | Stopped agent | John    |
 
 ## What Went Well
+
 - Alert fired promptly
 - Runbook was clear
 - Fast containment
 
 ## What Went Wrong
+
 - Root cause identification took too long
 - No automated rollback
 - Manual evidence collection
 
 ## Root Cause
+
 [Detailed explanation]
 
 ## Action Items
 
-| Action | Owner | Due Date | Priority |
-|--------|-------|----------|----------|
-| Deploy shield | DevOps | 2026-02-16 | P0 |
-| Automated rollback | Eng | 2026-02-20 | P1 |
+| Action             | Owner  | Due Date   | Priority |
+| ------------------ | ------ | ---------- | -------- |
+| Deploy shield      | DevOps | 2026-02-16 | P0       |
+| Automated rollback | Eng    | 2026-02-20 | P1       |
 
 ## Metrics
+
 - Time to Detect: 2 min
 - Time to Contain: 10 min
 - Time to Resolve: 90 min
