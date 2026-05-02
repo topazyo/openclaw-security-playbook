@@ -270,10 +270,14 @@ Provisioning can be automated via `configs/monitoring-config/grafana-dashboards.
 
 **Prometheus Alerts** are routed via Alertmanager:
 
-- **CRITICAL (P0)**: PagerDuty + Slack #security-incidents + CISO email
-- **HIGH (P1)**: Slack #security-alerts + security team email
-- **MEDIUM (P2)**: Security team email (batched every 15min)
-- **LOW (P3)**: Ops team email (batched daily)
+<!-- FIX: C5-L-02 — removed unimplemented email routing claims; notification-manager.py does not wire SMTP -->
+- **CRITICAL (P0)**: PagerDuty + Slack #security-incidents
+- **HIGH (P1)**: Slack #security-incidents
+- **MEDIUM (P2)**: Jira ticket update
+- **LOW (P3)**: Jira ticket update
+
+> **Note**: Email routing (CISO email, security-team email) is not implemented in `notification-manager.py`.
+> SMTP must be wired before email delivery is available. See `send_email_notification()` for the integration contract.
 
 **Common Alerts**:
 
@@ -326,8 +330,10 @@ openclaw-cli scan compliance --policy SEC-005  # Incident response
 **Article 32**: Security of processing (encryption, MFA, monitoring)
 
 **Data Breach Notification**:
-- Automated via `notification-manager.py` (72-hour notification requirement)
+<!-- FIX: C5-L-02 — removed false GDPR automation claim; breach tracking is not implemented -->
 - Breach notification template: `examples/incident-response/reporting-template.md`
+- **72-hour notification requirement (Article 33)**: Must be filed manually using the template above.
+  `notification-manager.py` does not implement GDPR breach tracking or automated DPA notification.
 
 ---
 

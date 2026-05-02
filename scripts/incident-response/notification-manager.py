@@ -190,12 +190,27 @@ class NotificationManager:
             self.notifications_sent.append({"channel": "pagerduty", "status": "failed", "error": str(e)})
             return False
     
-    def send_email_notification(self, recipients: List[str]) -> bool:
-        """Send email notification"""
-        logger.info(f"Email notification (not implemented - would send to {recipients})")
-        # Note: Email sending requires SMTP configuration
-        # Implementation would use smtplib here
-        return True
+    def send_email_notification(self, recipients: List[str]) -> bool:  # FIX: C5-H-05
+        """
+        Send email notification to the given recipients.
+
+        REAL IMPLEMENTATION REQUIRES:
+        - EMAIL_SMTP_SERVER env var (SMTP host, e.g. smtp.gmail.com)
+        - EMAIL_SMTP_PORT env var (default 587)
+        - EMAIL_SMTP_USER / EMAIL_SMTP_PASSWORD env vars for auth
+        - EMAIL_FROM env var for the From address
+        - Returns: True if all recipients received the message, False on partial
+          failure, raises on configuration error.
+
+        Email sending via SMTP is not wired. This is an explicit failure —
+        not a silent pass.
+        """
+        raise NotImplementedError(  # FIX: C5-H-05
+            "send_email_notification: SMTP send path is not implemented. "
+            f"Message was NOT delivered to {recipients}. "
+            "Configure EMAIL_SMTP_SERVER, EMAIL_SMTP_USER, and EMAIL_SMTP_PASSWORD "
+            "and wire smtplib before calling this function."
+        )
     
     def update_jira_ticket(self, comment: str) -> bool:
         """Add comment to Jira ticket"""
@@ -244,10 +259,10 @@ class NotificationManager:
         """Send notifications to all configured channels"""  # FIX: C5-finding-3
         logger.info(f"Sending notifications for {self.incident_id}")  # FIX: C5-finding-3
         delivery_results = []  # FIX: C5-finding-3
-        
+
         # Slack  # FIX: C5-finding-3
         delivery_results.append(("slack", self.send_slack_notification(message)))  # FIX: C5-finding-3
-        
+
         # PagerDuty (for CRITICAL/HIGH only)  # FIX: C5-finding-3
         if create_pagerduty and self.severity in ["CRITICAL", "HIGH"]:  # FIX: C5-finding-3
             delivery_results.append((  # FIX: C5-finding-3
@@ -257,13 +272,23 @@ class NotificationManager:
                     description=message  # FIX: C5-finding-3
                 )  # FIX: C5-finding-3
             ))  # FIX: C5-finding-3
-        
+
         # Jira  # FIX: C5-finding-3
         delivery_results.append(("jira", self.update_jira_ticket(message)))  # FIX: C5-finding-3
-        
+
+        # Email — explicitly handle the unwired state; NotImplementedError is a delivery failure,  # FIX: C5-H-05
+        # not a crash. Callers must see this as False, not as an unhandled exception.  # FIX: C5-H-05
+        try:  # FIX: C5-H-05
+            email_recipients = [EMAIL_FROM]  # FIX: C5-H-05
+            email_delivered = self.send_email_notification(email_recipients)  # FIX: C5-H-05
+        except NotImplementedError as exc:  # FIX: C5-H-05
+            logger.warning(f"Email channel not available: {exc}")  # FIX: C5-H-05
+            email_delivered = False  # FIX: C5-H-05
+        delivery_results.append(("email", email_delivered))  # FIX: C5-H-05
+
         # Summary  # FIX: C5-finding-3
         success_count = sum(1 for _channel, delivered in delivery_results if delivered)  # FIX: C5-finding-3
-        logger.info(f"✓ Notifications sent: {success_count}/{len(delivery_results)}")  # FIX: C5-finding-3
+        logger.info(f"Notifications sent: {success_count}/{len(delivery_results)}")  # FIX: C5-finding-3
         return success_count > 0  # FIX: C5-finding-3
 
 
