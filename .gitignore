@@ -71,7 +71,6 @@ Cycle 4 Audit Seed Plan.md
 .github/agents/*
 .github/audit/*
 .claude/*
-.omc/*
 CLAUDE.md
 .mcp.json
 setup-claude-config.sh
