@@ -60,7 +60,7 @@ rule OpenClaw_Skill_Dangerous_Patterns
         $trusted5    = "openai.com" ascii nocase
 
     condition:
-        ((any of ($eval, $inner_html, $exec_call, $child_proc, $eval_ws, $ihtml_ws)) and $fetch_url and not any of ($trusted*)) or $base64_exec  // FIX: C5-10
+        (any of ($eval, $inner_html, $exec_call, $child_proc, $eval_ws, $ihtml_ws, $base64_exec)) and $fetch_url and not any of ($trusted*)  // FIX: C5-H-01
 }
 
 rule OpenClaw_SOUL_Injection_Persistence
