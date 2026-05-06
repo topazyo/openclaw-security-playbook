@@ -21,11 +21,15 @@ detection:
     SkillName: 'webhook_sender'
   selection_target:
     Url|contains: 'internal-rabbitmq.clawdbot.local:15672/api/queues/admin-agent-queue/publish'
-  selection_payload:
-    RequestBody|contains|all:
-      - '"from":"approval-agent-01"'
-      - '"action":"create_admin_user"'
-  condition: selection_skill and selection_target and selection_payload
+  selection_payload_from: # FIX: C5-H-06
+    RequestBody|contains: # FIX: C5-H-06
+      - '"from":"approval-agent-01"' # FIX: C5-H-06
+      - '"from": "approval-agent-01"' # FIX: C5-H-06
+  selection_payload_action: # FIX: C5-H-06
+    RequestBody|contains: # FIX: C5-H-06
+      - '"action":"create_admin_user"' # FIX: C5-H-06
+      - '"action": "create_admin_user"' # FIX: C5-H-06
+  condition: selection_skill and selection_target and selection_payload_from and selection_payload_action # FIX: C5-H-06
 falsepositives:
   - Approved integration testing that publishes signed administrative queue messages
 level: critical
