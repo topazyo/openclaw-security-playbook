@@ -1,6 +1,3 @@
-# Local audit and debt tracking files
-AUDIT_ROADMAP.md
-DEBT_INVENTORY_ACTIVE.md
 # Credentials and secrets
 *.bak
 *.bak.*
