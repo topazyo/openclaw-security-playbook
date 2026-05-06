@@ -19,9 +19,6 @@ logsource:
 detection:
   selection_endpoint:
     RequestPath: '/api/download'
-  selection_query_file: # FIX: C5-H-03
-    QueryString|contains: # FIX: C5-H-03
-      - 'file=' # FIX: C5-H-03
   selection_query_traversal: # FIX: C5-H-03
     QueryString|contains: # FIX: C5-H-03
       - '../' # FIX: C5-H-03 — literal Unix traversal
@@ -36,7 +33,7 @@ detection:
       - '%2E%2E%5C' # FIX: C5-H-03 — dot-dot encoded, backslash encoded (upper)
       - '..%5c' # FIX: C5-H-03 — backslash encoded only (lower)
       - '..%5C' # FIX: C5-H-03 — backslash encoded only (upper)
-  condition: selection_endpoint and selection_query_file and selection_query_traversal # FIX: C5-H-03
+  condition: selection_endpoint and selection_query_traversal # FIX: C5-H-03
 falsepositives:
   - Security testing against a staging MCP server
 level: critical

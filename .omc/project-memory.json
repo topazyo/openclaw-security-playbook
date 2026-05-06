@@ -1,0 +1,306 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778020565153,
+  "projectRoot": "C:\\Users\\Topaz\\Github\\openclaw-security-playbook",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml",
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "cd \"C:\\Users\\Topaz\\Github\\openclaw-security-playbook\" && python -m pytest tests/ -x -q --tb=short 2>&1 | tail -30",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "archive": {
+      "path": "archive",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778020565137,
+      "keyFiles": []
+    },
+    "configs": {
+      "path": "configs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778020565138,
+      "keyFiles": []
+    },
+    "detections": {
+      "path": "detections",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778020565138,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1778020565139,
+      "keyFiles": []
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1778020565139,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1778020565140,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778020565140,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1778020565141,
+      "keyFiles": []
+    },
+    "tmp": {
+      "path": "tmp",
+      "purpose": null,
+      "fileCount": 17,
+      "lastAccessed": 1778020565141,
+      "keyFiles": [
+        "bandit-low-pass-2.json",
+        "bandit-low-pass-3.json",
+        "bandit-low-pass-final.json",
+        "bandit-low-pass.json",
+        "create_cycle5_batch_issues.ps1"
+      ]
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778020565141,
+      "keyFiles": [
+        "certificate-manager.py",
+        "compliance-reporter.py",
+        "config-migrator.py",
+        "incident-simulator.py",
+        "openclaw-cli.py"
+      ]
+    },
+    "training": {
+      "path": "training",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778020565142,
+      "keyFiles": [
+        "developer-guide.md",
+        "security-training.md"
+      ]
+    },
+    "configs\\examples": {
+      "path": "configs\\examples",
+      "purpose": "Example code",
+      "fileCount": 6,
+      "lastAccessed": 1778020565142,
+      "keyFiles": [
+        "backup-restore.sh",
+        "docker-compose-full-stack.yml",
+        "monitoring-stack.yml"
+      ]
+    },
+    "docs\\api": {
+      "path": "docs\\api",
+      "purpose": "API routes",
+      "fileCount": 1,
+      "lastAccessed": 1778020565143,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "tests\\fixtures": {
+      "path": "tests\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 1,
+      "lastAccessed": 1778020565144,
+      "keyFiles": [
+        "seeded-cve-requirements.txt"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "detections\\ioc\\ioc-openclaw.yar",
+      "accessCount": 3,
+      "lastAccessed": 1778021028393,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\verification\\validate_detection_rules.py",
+      "accessCount": 3,
+      "lastAccessed": 1778021055876,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\verification\\validate_detection_replay.py",
+      "accessCount": 3,
+      "lastAccessed": 1778021056519,
+      "type": "file"
+    },
+    {
+      "path": "detections\\sigma\\openclaw-mcp-path-traversal.yml",
+      "accessCount": 3,
+      "lastAccessed": 1778021060244,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\replay_cases.json",
+      "accessCount": 3,
+      "lastAccessed": 1778021065465,
+      "type": "file"
+    },
+    {
+      "path": "detections\\sigma\\openclaw-runtime-hardening-drift.yml",
+      "accessCount": 3,
+      "lastAccessed": 1778021087568,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\yara-malicious-skill.md",
+      "accessCount": 1,
+      "lastAccessed": 1778021004451,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\yara-malicious-skill-benign-totp.md",
+      "accessCount": 1,
+      "lastAccessed": 1778021005414,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\yara-malicious-skill-benign-ssh.md",
+      "accessCount": 1,
+      "lastAccessed": 1778021006323,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\yara-malicious-skill-evasion-whitespace.md",
+      "accessCount": 1,
+      "lastAccessed": 1778021006667,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\verification",
+      "accessCount": 1,
+      "lastAccessed": 1778021019206,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 1,
+      "lastAccessed": 1778021023998,
+      "type": "directory"
+    },
+    {
+      "path": "tests\\security\\test_evasion_hardening.py",
+      "accessCount": 1,
+      "lastAccessed": 1778021027676,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 1,
+      "lastAccessed": 1778021029129,
+      "type": "directory"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\mcp-path-traversal-positive.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021032694,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\mcp-path-traversal-negative.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021033184,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\mcp-path-traversal-evasion.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021033543,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\runtime-hardening-drift-negative.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021065917,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\runtime-hardening-drift-positive.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021066612,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\runtime-hardening-drift-negative-equals-form.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021099179,
+      "type": "file"
+    },
+    {
+      "path": "tests\\security\\fixtures\\detection-replay\\runtime-hardening-drift-negative-mixed-form.json",
+      "accessCount": 1,
+      "lastAccessed": 1778021102345,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
