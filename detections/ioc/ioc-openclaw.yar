@@ -87,9 +87,9 @@ rule OpenClaw_SOUL_Injection_Persistence
         $b64        = /[A-Za-z0-9+\/]{60,}={0,2}/  ascii
 
     condition:
-        any of ($override1, $override2, $override3, $override4) or // FIX: C5-H-02
-        (any of ($schedule1, $schedule2, $schedule3) and any of ($exfil1, $exfil2, $exfil3)) or // FIX: C5-H-02
-        ($b64 and (any of ($override1, $override2, $override3, $override4) or any of ($schedule1, $schedule2, $schedule3))) // FIX: C5-H-02
+        any of ($override1, $override2, $override3, $override4) or
+        (any of ($schedule1, $schedule2, $schedule3) and any of ($exfil1, $exfil2, $exfil3)) or
+        $b64
 }
 
 rule OpenClaw_Gateway_Exposed_Config
