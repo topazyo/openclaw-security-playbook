@@ -19,11 +19,24 @@ logsource:
 detection:
   selection_endpoint:
     RequestPath: '/api/download'
-  selection_query:
-    QueryString|contains|all:
-      - 'file='
-      - '../'
-  condition: selection_endpoint and selection_query
+  selection_query_file: # FIX: C5-H-03
+    QueryString|contains: # FIX: C5-H-03
+      - 'file=' # FIX: C5-H-03
+  selection_query_traversal: # FIX: C5-H-03
+    QueryString|contains: # FIX: C5-H-03
+      - '../' # FIX: C5-H-03 — literal Unix traversal
+      - '..\' # FIX: C5-H-03 — literal Windows traversal
+      - '%2e%2e/' # FIX: C5-H-03 — dot-dot encoded, slash literal (lower)
+      - '%2E%2E/' # FIX: C5-H-03 — dot-dot encoded, slash literal (upper)
+      - '%2e%2e%2f' # FIX: C5-H-03 — dot-dot and slash both encoded (lower)
+      - '%2E%2E%2F' # FIX: C5-H-03 — dot-dot and slash both encoded (upper)
+      - '..%2f' # FIX: C5-H-03 — slash encoded only (lower)
+      - '..%2F' # FIX: C5-H-03 — slash encoded only (upper)
+      - '%2e%2e%5c' # FIX: C5-H-03 — dot-dot encoded, backslash encoded (lower)
+      - '%2E%2E%5C' # FIX: C5-H-03 — dot-dot encoded, backslash encoded (upper)
+      - '..%5c' # FIX: C5-H-03 — backslash encoded only (lower)
+      - '..%5C' # FIX: C5-H-03 — backslash encoded only (upper)
+  condition: selection_endpoint and selection_query_file and selection_query_traversal # FIX: C5-H-03
 falsepositives:
   - Security testing against a staging MCP server
 level: critical
