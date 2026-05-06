@@ -68,8 +68,10 @@ Cycle 2 Audit Roadmap.md
 Cycle 2 Batch Execution Plan.md
 Cycle 3 Audit Seed Plan.md
 Cycle 4 Audit Seed Plan.md
-.github/agents/*
-.github/audit/*
+.github/chatmodes/openclaw-audit.chatmode.md
+.github/chat-modes/openclaw-audit.chatmode.md
+.github/agents/openclaw-audit.chatmode.md
+.github/audit/findings-2026-04-24.md
 .claude/*
 CLAUDE.md
 .mcp.json
