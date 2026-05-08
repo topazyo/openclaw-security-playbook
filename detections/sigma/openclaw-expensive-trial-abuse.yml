@@ -5,6 +5,7 @@ description: >
   Detects trial-account chat requests that combine the most expensive model,
   near-maximum context size, and maximum output budget. This is a replay-backed
   proxy for the scenario 007 resource exhaustion attack path.
+  Threshold values: EstimatedInputTokens >= 190000; MaxTokens >= 4000.  # FIX: C5-H-05
 references:
   - https://github.com/topazyo/openclaw-security-playbook
 author: openclaw-security-playbook
@@ -24,8 +25,8 @@ detection:
     UserTier: 'trial'
   selection_expensive:
     Model: 'claude-3-opus'
-    EstimatedInputTokens: 195000
-    MaxTokens: 4096
+    EstimatedInputTokens|gte: 190000  # FIX: C5-H-05
+    MaxTokens|gte: 4000  # FIX: C5-H-05
   condition: selection_endpoint and selection_trial and selection_expensive
 falsepositives:
   - Explicit load testing executed under a documented trial-abuse simulation
