@@ -148,8 +148,10 @@ jobs:
       - name: Calculate compliance percentage
         id: compliance
         run: |
-          COMPLIANCE=$(python -c "import json; report = json.load(open('soc2-report.json')); print(report['compliance_percentage'])")
-          echo "percentage=$COMPLIANCE" >> $GITHUB_OUTPUT
+          SOC2=$(python -c "import json; report = json.load(open('soc2-report.json')); print(report['compliance_percentage'])") # FIX: C5-H-10
+          ISO27001=$(python -c "import json; report = json.load(open('iso27001-report.json')); print(report['compliance_percentage'])") # FIX: C5-H-10
+          echo "soc2_percentage=$SOC2" >> $GITHUB_OUTPUT # FIX: C5-H-10
+          echo "iso27001_percentage=$ISO27001" >> $GITHUB_OUTPUT # FIX: C5-H-10
 
       - name: Comment compliance status on PR
         if: github.event_name == 'pull_request'
@@ -195,10 +197,19 @@ jobs:
 
       - name: Fail if compliance below 95%
         run: |
-          COMPLIANCE=${{ steps.compliance.outputs.percentage }}
-          if (( $(echo "$COMPLIANCE < 95" | bc -l) )); then
-            echo "❌ Compliance percentage ($COMPLIANCE%) is below required threshold (95%)"
-            exit 1
-          else
-            echo "✅ Compliance percentage ($COMPLIANCE%) meets threshold"
-          fi
+          SOC2=${{ steps.compliance.outputs.soc2_percentage }} # FIX: C5-H-10
+          ISO27001=${{ steps.compliance.outputs.iso27001_percentage }} # FIX: C5-H-10
+          FAILED=0 # FIX: C5-H-10
+          if (( $(echo "$SOC2 < 95" | bc -l) )); then # FIX: C5-H-10
+            echo "❌ SOC2 below 95% (got ${SOC2}%)" # FIX: C5-H-10
+            FAILED=1 # FIX: C5-H-10
+          fi # FIX: C5-H-10
+          if (( $(echo "$ISO27001 < 95" | bc -l) )); then # FIX: C5-H-10
+            echo "❌ ISO27001 below 95% (got ${ISO27001}%)" # FIX: C5-H-10
+            FAILED=1 # FIX: C5-H-10
+          fi # FIX: C5-H-10
+          if [ "$FAILED" -eq 0 ]; then # FIX: C5-H-10
+            echo "✅ SOC2 (${SOC2}%) and ISO27001 (${ISO27001}%) both meet the 95% threshold" # FIX: C5-H-10
+          else # FIX: C5-H-10
+            exit 1 # FIX: C5-H-10
+          fi # FIX: C5-H-10
