@@ -34,7 +34,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy vulnerability scanner (filesystem)
+        id: trivy-fs
         uses: aquasecurity/trivy-action@0.35.0
+        continue-on-error: true # FIX: C5-H-09
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -42,13 +44,32 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           ignore-unfixed: true
+          exit-code: '1' # FIX: C5-H-09
+<<<<<<< HEAD
+
+      # Gate sits IMMEDIATELY after the scan so no build/image step can run on
+      # a vulnerable filesystem context. SARIF upload follows with `if: always()`
+      # so the Security tab still receives results even when the gate fails.
+      - name: Gate on Trivy filesystem findings  # FIX: C5-H-09
+        if: steps.trivy-fs.outcome == 'failure' # FIX: C5-H-09
+        run: | # FIX: C5-H-09
+          echo "Trivy filesystem scan found CRITICAL/HIGH vulnerabilities. Failing the job." >&2 # FIX: C5-H-09
+          exit 1 # FIX: C5-H-09
+=======
+>>>>>>> e07adfdeee91b9bd62e58003e449f1b9575c1ce8
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always()  # FIX: C5-H-09 — runs even when gate failed, preserving Security tab visibility
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy'
+
+      - name: Gate on Trivy filesystem findings
+        if: steps.trivy-fs.outcome == 'failure' # FIX: C5-H-09
+        run: | # FIX: C5-H-09
+          echo "Trivy filesystem scan found CRITICAL/HIGH vulnerabilities. Failing the job." >&2 # FIX: C5-H-09
+          exit 1 # FIX: C5-H-09
 
       - name: Build playbook image for Trivy
         shell: bash
@@ -105,6 +126,7 @@ jobs:
           image-ref: 'openclaw-playbook:latest'
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          exit-code: '1' # FIX: C5-H-09
 
       - name: Run Trivy for gateway image
         uses: aquasecurity/trivy-action@0.35.0
@@ -113,6 +135,7 @@ jobs:
           image-ref: 'clawdbot-gateway:ci'
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          exit-code: '1' # FIX: C5-H-09
 
       - name: Run Trivy for agent image
         uses: aquasecurity/trivy-action@0.35.0
@@ -121,6 +144,7 @@ jobs:
           image-ref: 'clawdbot-agent:ci'
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          exit-code: '1' # FIX: C5-H-09
 
   bandit-scan:
     name: Bandit Python Security Scan
@@ -289,22 +313,48 @@ jobs:
           path: ./results
 
       - name: Generate summary
+        env:
+          TRIVY_JOB_RESULT: ${{ needs.trivy-scan.result }} # FIX: C5-H-09
         run: |
-          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Trivy Scan" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Completed" >> $GITHUB_STEP_SUMMARY
+<<<<<<< HEAD
+          case "$TRIVY_JOB_RESULT" in # FIX: C5-H-09
+            success) # FIX: C5-H-09
+              echo "No CRITICAL/HIGH findings detected." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+              ;; # FIX: C5-H-09
+            failure) # FIX: C5-H-09
+              echo "FINDINGS DETECTED: Trivy reported CRITICAL/HIGH vulnerabilities. See Security tab for details." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+              ;; # FIX: C5-H-09
+            cancelled) # FIX: C5-H-09
+              echo "Scan CANCELLED before completion. No verdict on CRITICAL/HIGH findings — re-run before relying on this badge." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+              ;; # FIX: C5-H-09
+            skipped) # FIX: C5-H-09
+              echo "Scan SKIPPED. No verdict on CRITICAL/HIGH findings — gate not exercised." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+              ;; # FIX: C5-H-09
+            *) # FIX: C5-H-09
+              echo "Scan finished with unexpected status: $TRIVY_JOB_RESULT. Treat as inconclusive." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+              ;; # FIX: C5-H-09
+          esac # FIX: C5-H-09
+=======
+          if [ "$TRIVY_JOB_RESULT" = "success" ]; then # FIX: C5-H-09
+            echo "No CRITICAL/HIGH findings detected." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+          else # FIX: C5-H-09
+            echo "FINDINGS DETECTED: Trivy reported CRITICAL/HIGH vulnerabilities (job result: $TRIVY_JOB_RESULT). See Security tab for details." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
+          fi # FIX: C5-H-09
+>>>>>>> e07adfdeee91b9bd62e58003e449f1b9575c1ce8
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Bandit Python Security Scan" >> $GITHUB_STEP_SUMMARY
           if [ -f ./results/bandit-results.json ]; then
-            echo "✅ Completed" >> $GITHUB_STEP_SUMMARY
+            echo "Completed" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+            echo "Failed" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Dependency Audits" >> $GITHUB_STEP_SUMMARY
           if [ -f ./results/pip-audit.json ]; then
-            echo "✅ pip-audit completed" >> $GITHUB_STEP_SUMMARY
+            echo "pip-audit completed" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Comment on PR
