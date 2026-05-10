@@ -426,7 +426,11 @@ EOF
     # Enable IP forwarding
     info "Enabling IP forwarding..."
     echo 1 > /proc/sys/net/ipv4/ip_forward
-    grep -qxF 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf  ## FIX: C5-M-05
+    # Atomically append ip_forward if absent; flock prevents races when multiple ## FIX: C5-M-05
+    # processes run concurrently, and touch ensures the file exists before grep. ## FIX: C5-M-05
+    touch /etc/sysctl.conf ## FIX: C5-M-05
+    flock /etc/sysctl.conf bash -c \ ## FIX: C5-M-05
+        'grep -qxF "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf' ## FIX: C5-M-05
     sysctl -p > /dev/null
 
     # Configure firewall
