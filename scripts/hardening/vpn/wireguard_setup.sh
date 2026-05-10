@@ -386,6 +386,12 @@ configure_server() {
     local server_vpn_ip
     server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
 
+    # Validate WG_INTERFACE before heredoc interpolation to prevent injection ## FIX: C5-M-04
+    if [[ ! "$WG_INTERFACE" =~ ^[a-zA-Z0-9_-]{1,15}$ ]]; then ## FIX: C5-M-04
+        echo "ERROR: WG_INTERFACE '${WG_INTERFACE}' is not a valid Linux interface name (must match ^[a-zA-Z0-9_-]{1,15}$)" >&2 ## FIX: C5-M-04
+        exit 1 ## FIX: C5-M-04
+    fi ## FIX: C5-M-04
+
     # Create server configuration
     info "Creating server configuration: $CONFIG_DIR/${WG_INTERFACE}.conf"
 
@@ -420,7 +426,7 @@ EOF
     # Enable IP forwarding
     info "Enabling IP forwarding..."
     echo 1 > /proc/sys/net/ipv4/ip_forward
-    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+    grep -qxF 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf  ## FIX: C5-M-05
     sysctl -p > /dev/null
 
     # Configure firewall
