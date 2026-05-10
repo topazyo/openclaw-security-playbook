@@ -388,7 +388,7 @@ configure_server() {
 
     # Validate WG_INTERFACE before heredoc interpolation to prevent injection ## FIX: C5-M-04
     if [[ ! "$WG_INTERFACE" =~ ^[a-zA-Z0-9_-]{1,15}$ ]]; then ## FIX: C5-M-04
-        echo "ERROR: WG_INTERFACE '${WG_INTERFACE}' is not a valid Linux interface name (must match ^[a-zA-Z0-9_-]{1,15}$)" >&2 ## FIX: C5-M-04
+        echo "ERROR: WG_INTERFACE must be a valid Linux interface name (1-15 alphanumeric characters, hyphens, or underscores)" >&2 ## FIX: C5-M-04
         exit 1 ## FIX: C5-M-04
     fi ## FIX: C5-M-04
 
