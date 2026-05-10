@@ -76,7 +76,7 @@ class TestRTOVerification:
         manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
         start_time = datetime.now(timezone.utc)  # FIX: C5-finding-3
 
-        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
             metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
 
         duration = (datetime.now(timezone.utc) - start_time).total_seconds() / 3600  # FIX: C5-finding-3
@@ -94,7 +94,7 @@ class TestRPOVerification:
         backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
         manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
 
-        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "verify_database_records", return_value={"users": 10}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=Mock(returncode=0)):  # FIX: C5-finding-3
             metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
 
         assert metrics.rpo_minutes == backup_config["rpo_minutes"]  # FIX: C5-finding-3
@@ -366,7 +366,7 @@ class TestIntegrityChecks:
             backup_type=module.BackupType.DATABASE.value,  # FIX: C5-finding-3
             created_at=datetime.now(timezone.utc).isoformat(),  # FIX: C5-finding-3
             source_system="openclaw-db-us-west-2",  # FIX: C5-finding-3
-            files={backup_path.name: module.BackupVerifier._calculate_file_checksum(str(backup_path))},  # FIX: C5-finding-3
+            files={backup_path.name: module.BackupVerifier.calculate_file_checksum(str(backup_path))},  # FIX: C5-finding-3
             size_bytes=backup_path.stat().st_size,  # FIX: C5-finding-3
             compression="gzip",  # FIX: C5-finding-3
             encryption="none",  # FIX: C5-finding-3

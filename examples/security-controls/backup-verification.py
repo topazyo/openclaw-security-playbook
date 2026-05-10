@@ -183,8 +183,8 @@ class BackupVerifier:
             ... else:
             ...     print(f"✗ Backup corrupted: {errors}")
         """
-        errors = []
-        
+        errors: list[str] = []
+
         # Check backup file exists
         if not os.path.exists(backup_path):
             errors.append(f"Backup file not found: {backup_path}")
@@ -211,7 +211,7 @@ class BackupVerifier:
             errors.append(f"No checksum in manifest for: {backup_filename}")
             return False, errors
         
-        actual_checksum = self._calculate_file_checksum(backup_path)
+        actual_checksum = self.calculate_file_checksum(backup_path)
         
         if actual_checksum != expected_checksum:
             errors.append(
@@ -255,8 +255,8 @@ class BackupVerifier:
             ...     'postgresql://${TEST_DB_USER}:${TEST_DB_PASSWORD}@127.0.0.1:5433/openclaw_test'
             ... )
         """
-        errors = []
-        
+        errors: list[str] = []
+
         self.logger.info(f"Verifying database backup: {backup_file}")
         
         # Check file integrity first
@@ -285,7 +285,7 @@ class BackupVerifier:
             # Verify record counts (spot check)
             self.logger.info("Verifying record counts...")
             
-            record_counts = self._verify_database_records(database_url)
+            record_counts = self.verify_database_records(database_url)
             
             for table, count in record_counts.items():
                 self.logger.info(f"  {table}: {count} records")
@@ -301,7 +301,7 @@ class BackupVerifier:
             return False, errors
     
     @staticmethod
-    def _calculate_file_checksum(filepath: str) -> str:
+    def calculate_file_checksum(filepath: str) -> str:
         """Calculate SHA-256 checksum of file."""
         sha256 = hashlib.sha256()
         
@@ -315,18 +315,18 @@ class BackupVerifier:
         return sha256.hexdigest()
     
     @staticmethod
-    def _verify_database_records(database_url: str) -> Dict[str, int]:
+    def verify_database_records(database_url: str) -> Dict[str, int]:
         """
         Query database for record counts.
         
         Returns:
             Dictionary of table_name -> record_count
         """
-        import psycopg2
-        from psycopg2 import sql
-        
-        conn = psycopg2.connect(database_url)
-        cursor = conn.cursor()
+        import psycopg2  # type: ignore[import-untyped]
+        from psycopg2 import sql  # type: ignore[import-untyped]
+
+        conn: Any = psycopg2.connect(database_url)
+        cursor: Any = conn.cursor()
         
         # Get table names
         cursor.execute("""
@@ -341,7 +341,8 @@ class BackupVerifier:
         for table in tables:
             query = sql.SQL("SELECT COUNT(*) FROM {}" ).format(sql.Identifier(table))
             cursor.execute(query)
-            counts[table] = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            counts[table] = row[0] if row is not None else 0
         
         cursor.close()
         conn.close()
@@ -423,7 +424,7 @@ class BackupStrategy:
             created_at=datetime.now(timezone.utc).isoformat(),
             source_system=f"openclaw-db-{self.primary_region}",
             files={
-                os.path.basename(backup_path_gz): BackupVerifier._calculate_file_checksum(backup_path_gz)
+                os.path.basename(backup_path_gz): BackupVerifier.calculate_file_checksum(backup_path_gz)
             },
             size_bytes=os.path.getsize(backup_path_gz),
             compression="gzip",
@@ -452,10 +453,10 @@ class BackupStrategy:
         Returns:
             S3 URI of uploaded backup
         """
-        import boto3
-        
-        s3_client = boto3.client('s3', region_name=self.backup_region)
-        
+        import boto3  # type: ignore[import-untyped]
+
+        s3_client: Any = boto3.client('s3', region_name=self.backup_region)
+
         # S3 key (preserve directory structure)
         filename = os.path.basename(local_backup_path)
         date_prefix = datetime.now(timezone.utc).strftime('%Y/%m/%d')
@@ -500,8 +501,8 @@ class BackupStrategy:
         Returns:
             Dictionary with compliance status
         """
-        import boto3
-        
+        import boto3  # type: ignore[import-untyped]
+
         compliance = {
             '3_copies': False,
             '2_media_types': False,
@@ -537,7 +538,7 @@ class BackupStrategy:
             return False  # FIX: C5-finding-3
 
         def directory_has_local_payload(directory_path: str) -> bool:  # FIX: C5-finding-3
-            for payload_root, _payload_dirs, payload_files in os.walk(directory_path):  # FIX: C5-finding-3
+            for _payload_root, _payload_dirs, payload_files in os.walk(directory_path):  # FIX: C5-finding-3
                 for payload_file in payload_files:  # FIX: C5-finding-3
                     if payload_file not in {'MANIFEST.txt', 'manifest.json'} and not payload_file.endswith('.manifest.json'):  # FIX: C5-finding-3
                         return True  # FIX: C5-finding-3
@@ -547,11 +548,11 @@ class BackupStrategy:
         # Check backup copy 1 (local archive or EBS snapshot)
         # Check backup copy 2 (S3 Glacier)
         
-        s3_client = boto3.client('s3', region_name=self.backup_region)
-        ec2_client = boto3.client('ec2', region_name=self.primary_region)  # FIX: C5-finding-3
-        
+        s3_client: Any = boto3.client('s3', region_name=self.backup_region)
+        ec2_client: Any = boto3.client('ec2', region_name=self.primary_region)  # FIX: C5-finding-3
+
         # List objects in S3 bucket using paginator to retrieve all results
-        paginator = s3_client.get_paginator('list_objects_v2')
+        paginator: Any = s3_client.get_paginator('list_objects_v2')
         paginate_kwargs = {  # FIX: C5-finding-3
             'Bucket': self.s3_backup_bucket,  # FIX: C5-finding-3
             'Prefix': 'database/',  # FIX: C5-finding-3
@@ -741,7 +742,7 @@ class DisasterRecoveryManager:
         # Step 3: Verify data (30 minutes)
         self.logger.info("\n[3/5] Verifying restored data...")
         
-        record_counts = verifier._verify_database_records(target_database_url)
+        record_counts = verifier.verify_database_records(target_database_url)
         
         for table, count in record_counts.items():
             self.logger.info(f"  {table}: {count} records")
@@ -784,17 +785,18 @@ class DisasterRecoveryManager:
     
     def _run_smoke_tests(self, database_url: str):
         """Run smoke tests on restored database."""
-        import psycopg2
-        
-        conn = psycopg2.connect(database_url)
-        cursor = conn.cursor()
+        import psycopg2  # type: ignore[import-untyped]
+
+        conn: Any = psycopg2.connect(database_url)
+        cursor: Any = conn.cursor()
         
         # Test 1: Check critical tables exist
         cursor.execute("""
             SELECT COUNT(*) FROM information_schema.tables
             WHERE table_schema = 'public'
         """)
-        table_count = cursor.fetchone()[0]
+        table_row = cursor.fetchone()
+        table_count = table_row[0] if table_row is not None else 0
         if table_count <= 0:
             raise AssertionError("No tables found in restored database")
         
@@ -802,7 +804,8 @@ class DisasterRecoveryManager:
         # (Example: check users table)
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE created_at IS NOT NULL")
-            user_count = cursor.fetchone()[0]
+            user_row = cursor.fetchone()
+            user_count = user_row[0] if user_row is not None else 0
             self.logger.info(f"  Users with valid timestamps: {user_count}")
         except psycopg2.Error as error:
             self.logger.info(f"  Users table check skipped: {error}")
@@ -960,6 +963,8 @@ def test_rto_compliance():
         meets_rpo=True
     )
     
+    assert metrics.actual_recovery_time is not None
+    assert metrics.actual_data_loss is not None
     if metrics.actual_recovery_time > metrics.rto_hours:
         raise AssertionError("Recovery time exceeded the RTO target")
     if metrics.actual_data_loss > metrics.rpo_minutes:
