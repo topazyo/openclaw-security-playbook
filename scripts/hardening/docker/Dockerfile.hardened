@@ -142,8 +142,8 @@ FROM aquasec/trivy:0.45.0 AS scanner
 COPY --from=app-builder /opt/venv /scan/venv
 COPY --from=app-builder /build/dist /scan/dist
 
-# Run vulnerability scan
-RUN trivy filesystem --severity HIGH,CRITICAL --no-progress --exit-code 0 /scan
+# Run vulnerability scan — exit 1 on HIGH/CRITICAL findings so build fails # FIX: C5-M-09
+RUN trivy filesystem --severity HIGH,CRITICAL --no-progress --exit-code 1 /scan # FIX: C5-M-09
 
 # Generate SBOM (Software Bill of Materials)
 RUN trivy filesystem --format cyclonedx --output /scan/sbom.json /scan
