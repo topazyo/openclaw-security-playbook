@@ -420,7 +420,11 @@ EOF
     # Enable IP forwarding
     info "Enabling IP forwarding..."
     echo 1 > /proc/sys/net/ipv4/ip_forward
-    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+    # Atomically append ip_forward if absent; flock prevents races when multiple ## FIX: C5-M-05
+    # processes run concurrently, and touch ensures the file exists before grep. ## FIX: C5-M-05
+    touch /etc/sysctl.conf ## FIX: C5-M-05
+    flock /etc/sysctl.conf bash -c \ ## FIX: C5-M-05
+        'grep -qxF "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf' ## FIX: C5-M-05
     sysctl -p > /dev/null
 
     # Configure firewall
@@ -996,6 +1000,16 @@ For more information:
 EOF
 }
 
+# Validate WG_INTERFACE once, at script entry, before any operation runs.    ## FIX: C5-M-04
+# Called in main() after arg parsing so start/stop/configure/troubleshoot    ## FIX: C5-M-04
+# all share the same guard rather than relying on per-function checks.        ## FIX: C5-M-04
+validate_wg_interface() { ## FIX: C5-M-04
+    if [[ ! "${WG_INTERFACE}" =~ ^[a-zA-Z0-9_-]{1,15}$ ]]; then ## FIX: C5-M-04
+        echo "ERROR: WG_INTERFACE must be a valid Linux interface name (1-15 alphanumeric characters, hyphens, or underscores)" >&2 ## FIX: C5-M-04
+        exit 1 ## FIX: C5-M-04
+    fi ## FIX: C5-M-04
+} ## FIX: C5-M-04
+
 main() {
     detect_os > /dev/null
 
@@ -1073,6 +1087,8 @@ main() {
                 ;;
         esac
     done
+
+    validate_wg_interface ## FIX: C5-M-04
 
     # Print header
     print_color "$BLUE" "========================================"
