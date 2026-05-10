@@ -734,7 +734,7 @@ class DisasterRecoveryManager:
         if not decompressed_path:  # FIX: C5-M-03
             raise ValueError(f"backup_path {backup_path!r} has no stem before .gz — refusing to decompress")  # FIX: C5-M-03
         with open(decompressed_path, 'wb') as fh:  # FIX: C5-M-14
-            result = subprocess.run(['gunzip', '-c', backup_path], stdout=fh, check=True)  # nosec  # FIX: C5-M-14
+            subprocess.run(['gunzip', '-c', backup_path], stdout=fh, check=True)  # nosec  # FIX: C5-M-14
         
         # Restore to database
         subprocess.run(  # nosec B603 B607
