@@ -99,6 +99,8 @@ def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool
     for modifier in modifiers:
         if modifier in {"contains", "endswith"}:
             operation = modifier
+        elif modifier in {"gte", "lte", "gt", "lt"}:  # FIX: C5-H-05
+            operation = modifier  # FIX: C5-H-05
 
     expected_values: list[Any] = cast(list[Any], expected) if isinstance(expected, list) else [expected]
 
@@ -118,6 +120,28 @@ def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool
         if require_all:
             return all(actual_text.endswith(normalize_text(str(value))) for value in expected_values)
         return any(actual_text.endswith(normalize_text(str(value))) for value in expected_values)
+
+    if operation in {"gte", "lte", "gt", "lt"}:  # FIX: C5-H-05
+        try:  # FIX: C5-H-05
+            actual_num = float(actual)  # FIX: C5-H-05
+        except (TypeError, ValueError):  # FIX: C5-H-05
+            return False  # FIX: C5-H-05
+        results: list[bool] = []  # FIX: C5-H-05
+        for value in expected_values:  # FIX: C5-H-05
+            try:  # FIX: C5-H-05
+                expected_num = float(value)  # FIX: C5-H-05
+            except (TypeError, ValueError):  # FIX: C5-H-05
+                results.append(False)  # FIX: C5-H-05
+                continue  # FIX: C5-H-05
+            if operation == "gte":  # FIX: C5-H-05
+                results.append(actual_num >= expected_num)  # FIX: C5-H-05
+            elif operation == "lte":  # FIX: C5-H-05
+                results.append(actual_num <= expected_num)  # FIX: C5-H-05
+            elif operation == "gt":  # FIX: C5-H-05
+                results.append(actual_num > expected_num)  # FIX: C5-H-05
+            else:  # operation == "lt"  # FIX: C5-H-05
+                results.append(actual_num < expected_num)  # FIX: C5-H-05
+        return all(results) if require_all else any(results)  # FIX: C5-H-05
 
     raise ValueError(f"Unsupported Sigma field modifier chain: {expression}")
 

@@ -13,7 +13,17 @@ __pycache__
 *.pyo
 *.pyd
 *.log
+logs/ # FIX: C5-H-08
 htmlcov
 .coverage
 .tox
 node_modules
+# --- secrets and sensitive files --- # FIX: C5-H-08
+.env # FIX: C5-H-08
+.env.* # FIX: C5-H-08
+secrets/ # FIX: C5-H-08
+credentials/ # FIX: C5-H-08
+.ssh/ # FIX: C5-H-08
+.gnupg/ # FIX: C5-H-08
+*.sqlite # FIX: C5-H-08
+*.db # FIX: C5-H-08

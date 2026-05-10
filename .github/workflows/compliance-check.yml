@@ -148,8 +148,47 @@ jobs:
       - name: Calculate compliance percentage
         id: compliance
         run: |
-          COMPLIANCE=$(python -c "import json; report = json.load(open('soc2-report.json')); print(report['compliance_percentage'])")
-          echo "percentage=$COMPLIANCE" >> $GITHUB_OUTPUT
+          python << 'EOF'
+          import json
+          import sys
+          import os
+          
+          # Check for SOC2 report
+          if not os.path.exists('soc2-report.json'):
+            print("❌ Error: soc2-report.json not found", file=sys.stderr)
+            sys.exit(1)
+          
+          try:
+            with open('soc2-report.json') as f:
+              soc2_report = json.load(f)
+            soc2_percentage = soc2_report.get('compliance_percentage')
+            if soc2_percentage is None:
+              print("❌ Error: 'compliance_percentage' key not found in soc2-report.json", file=sys.stderr)
+              sys.exit(1)
+          except json.JSONDecodeError as e:
+            print(f"❌ Error: Invalid JSON in soc2-report.json: {e}", file=sys.stderr)
+            sys.exit(1)
+          
+          # Check for ISO27001 report
+          if not os.path.exists('iso27001-report.json'):
+            print("❌ Error: iso27001-report.json not found", file=sys.stderr)
+            sys.exit(1)
+          
+          try:
+            with open('iso27001-report.json') as f:
+              iso_report = json.load(f)
+            iso27001_percentage = iso_report.get('compliance_percentage')
+            if iso27001_percentage is None:
+              print("❌ Error: 'compliance_percentage' key not found in iso27001-report.json", file=sys.stderr)
+              sys.exit(1)
+          except json.JSONDecodeError as e:
+            print(f"❌ Error: Invalid JSON in iso27001-report.json: {e}", file=sys.stderr)
+            sys.exit(1)
+          
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"soc2_percentage={soc2_percentage}\n")
+            f.write(f"iso27001_percentage={iso27001_percentage}\n")
+          EOF
 
       - name: Comment compliance status on PR
         if: github.event_name == 'pull_request'
@@ -195,10 +234,35 @@ jobs:
 
       - name: Fail if compliance below 95%
         run: |
-          COMPLIANCE=${{ steps.compliance.outputs.percentage }}
-          if (( $(echo "$COMPLIANCE < 95" | bc -l) )); then
-            echo "❌ Compliance percentage ($COMPLIANCE%) is below required threshold (95%)"
-            exit 1
-          else
-            echo "✅ Compliance percentage ($COMPLIANCE%) meets threshold"
-          fi
+          python << 'EOF'  # FIX: C5-H-10
+          import sys  # FIX: C5-H-10
+          import os  # FIX: C5-H-10
+
+          soc2_raw = "${{ steps.compliance.outputs.soc2_percentage }}"  # FIX: C5-H-10
+          iso27001_raw = "${{ steps.compliance.outputs.iso27001_percentage }}"  # FIX: C5-H-10
+
+          def parse_percentage(value, name):  # FIX: C5-H-10
+              if not value:  # FIX: C5-H-10
+                  print(f"❌ Error: {name} output is missing or empty", file=sys.stderr)  # FIX: C5-H-10
+                  sys.exit(1)  # FIX: C5-H-10
+              try:  # FIX: C5-H-10
+                  return float(value)  # FIX: C5-H-10
+              except ValueError:  # FIX: C5-H-10
+                  print(f"❌ Error: {name} is non-numeric (got: '{value}')", file=sys.stderr)  # FIX: C5-H-10
+                  sys.exit(1)  # FIX: C5-H-10
+
+          soc2 = parse_percentage(soc2_raw, "soc2_percentage")  # FIX: C5-H-10
+          iso27001 = parse_percentage(iso27001_raw, "iso27001_percentage")  # FIX: C5-H-10
+
+          failed = False  # FIX: C5-H-10
+          if soc2 < 95:  # FIX: C5-H-10
+              print(f"❌ SOC2 below 95% (got {soc2}%)")  # FIX: C5-H-10
+              failed = True  # FIX: C5-H-10
+          if iso27001 < 95:  # FIX: C5-H-10
+              print(f"❌ ISO27001 below 95% (got {iso27001}%)")  # FIX: C5-H-10
+              failed = True  # FIX: C5-H-10
+          if not failed:  # FIX: C5-H-10
+              print(f"✅ SOC2 ({soc2}%) and ISO27001 ({iso27001}%) both meet the 95% threshold")  # FIX: C5-H-10
+          else:  # FIX: C5-H-10
+              sys.exit(1)  # FIX: C5-H-10
+          EOF  # FIX: C5-H-10
