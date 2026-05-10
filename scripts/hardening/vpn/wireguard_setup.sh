@@ -386,12 +386,6 @@ configure_server() {
     local server_vpn_ip
     server_vpn_ip=$(echo "$WG_NETWORK" | sed 's|0/24|1/24|')
 
-    # Validate WG_INTERFACE before heredoc interpolation to prevent injection ## FIX: C5-M-04
-    if [[ ! "$WG_INTERFACE" =~ ^[a-zA-Z0-9_-]{1,15}$ ]]; then ## FIX: C5-M-04
-        echo "ERROR: WG_INTERFACE must be a valid Linux interface name (1-15 alphanumeric characters, hyphens, or underscores)" >&2 ## FIX: C5-M-04
-        exit 1 ## FIX: C5-M-04
-    fi ## FIX: C5-M-04
-
     # Create server configuration
     info "Creating server configuration: $CONFIG_DIR/${WG_INTERFACE}.conf"
 
@@ -1006,6 +1000,16 @@ For more information:
 EOF
 }
 
+# Validate WG_INTERFACE once, at script entry, before any operation runs.    ## FIX: C5-M-04
+# Called in main() after arg parsing so start/stop/configure/troubleshoot    ## FIX: C5-M-04
+# all share the same guard rather than relying on per-function checks.        ## FIX: C5-M-04
+validate_wg_interface() { ## FIX: C5-M-04
+    if [[ ! "${WG_INTERFACE}" =~ ^[a-zA-Z0-9_-]{1,15}$ ]]; then ## FIX: C5-M-04
+        echo "ERROR: WG_INTERFACE must be a valid Linux interface name (1-15 alphanumeric characters, hyphens, or underscores)" >&2 ## FIX: C5-M-04
+        exit 1 ## FIX: C5-M-04
+    fi ## FIX: C5-M-04
+} ## FIX: C5-M-04
+
 main() {
     detect_os > /dev/null
 
@@ -1083,6 +1087,8 @@ main() {
                 ;;
         esac
     done
+
+    validate_wg_interface ## FIX: C5-M-04
 
     # Print header
     print_color "$BLUE" "========================================"
