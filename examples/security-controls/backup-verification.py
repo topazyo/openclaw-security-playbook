@@ -730,7 +730,9 @@ class DisasterRecoveryManager:
             raise ValueError(  # FIX: C5-M-03
                 f"Expected .gz backup at {backup_path!r}, got non-.gz path — refusing to decompress to avoid source overwrite"  # FIX: C5-M-03
             )  # FIX: C5-M-03
-        decompressed_path = backup_path[:-3]  # FIX: C5-M-03
+        decompressed_path = backup_path.removesuffix('.gz')  # FIX: C5-M-03
+        if not decompressed_path:  # FIX: C5-M-03
+            raise ValueError(f"backup_path {backup_path!r} has no stem before .gz — refusing to decompress")  # FIX: C5-M-03
         with open(decompressed_path, 'wb') as fh:  # FIX: C5-M-14
             result = subprocess.run(['gunzip', '-c', backup_path], stdout=fh, check=True)  # nosec  # FIX: C5-M-14
         
