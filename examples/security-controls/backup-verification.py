@@ -39,7 +39,7 @@ import json
 import hashlib
 import re  # FIX: C5-finding-3
 import subprocess  # nosec B404
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, cast
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -337,7 +337,7 @@ class BackupVerifier:
         tables = [row[0] for row in cursor.fetchall()]
         
         # Count records in each table
-        counts = {}
+        counts: Dict[str, int] = {}
         for table in tables:
             query = sql.SQL("SELECT COUNT(*) FROM {}" ).format(sql.Identifier(table))
             cursor.execute(query)
@@ -455,7 +455,7 @@ class BackupStrategy:
         """
         import boto3  # type: ignore[import-untyped]
 
-        s3_client: Any = boto3.client('s3', region_name=self.backup_region)
+        s3_client: Any = cast(Any, boto3.client('s3', region_name=self.backup_region))  # type: ignore[misc]
 
         # S3 key (preserve directory structure)
         filename = os.path.basename(local_backup_path)
@@ -527,18 +527,18 @@ class BackupStrategy:
         def manifest_has_local_payload(manifest_data: Any, manifest_path: str) -> bool:  # FIX: C5-finding-3
             if not isinstance(manifest_data, dict):  # FIX: C5-finding-3
                 return False  # FIX: C5-finding-3
-            manifest_files = manifest_data.get('files')  # FIX: C5-finding-3
+            manifest_files: Optional[Dict[str, Any]] = cast(Any, manifest_data).get('files')  # FIX: C5-finding-3
             if isinstance(manifest_files, dict):  # FIX: C5-finding-3
                 manifest_dir = os.path.dirname(manifest_path)  # FIX: C5-finding-3
                 for manifest_file in manifest_files:  # FIX: C5-finding-3
-                    if isinstance(manifest_file, str) and os.path.exists(os.path.join(manifest_dir, manifest_file)):  # FIX: C5-finding-3
+                    if os.path.exists(os.path.join(manifest_dir, manifest_file)):  # FIX: C5-finding-3
                         return True  # FIX: C5-finding-3
             if manifest_path.endswith('.manifest.json'):  # FIX: C5-finding-3
                 return os.path.exists(manifest_path[:-len('.manifest.json')])  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
         def directory_has_local_payload(directory_path: str) -> bool:  # FIX: C5-finding-3
-            for _payload_root, _payload_dirs, payload_files in os.walk(directory_path):  # FIX: C5-finding-3
+            for _, _, payload_files in os.walk(directory_path):  # FIX: C5-finding-3
                 for payload_file in payload_files:  # FIX: C5-finding-3
                     if payload_file not in {'MANIFEST.txt', 'manifest.json'} and not payload_file.endswith('.manifest.json'):  # FIX: C5-finding-3
                         return True  # FIX: C5-finding-3
@@ -548,8 +548,8 @@ class BackupStrategy:
         # Check backup copy 1 (local archive or EBS snapshot)
         # Check backup copy 2 (S3 Glacier)
         
-        s3_client: Any = boto3.client('s3', region_name=self.backup_region)
-        ec2_client: Any = boto3.client('ec2', region_name=self.primary_region)  # FIX: C5-finding-3
+        s3_client: Any = cast(Any, boto3.client('s3', region_name=self.backup_region))  # type: ignore[misc]
+        ec2_client: Any = cast(Any, boto3.client('ec2', region_name=self.primary_region))  # type: ignore[misc]  # FIX: C5-finding-3
 
         # List objects in S3 bucket using paginator to retrieve all results
         paginator: Any = s3_client.get_paginator('list_objects_v2')
@@ -560,7 +560,7 @@ class BackupStrategy:
         account_id = getattr(self, 'account_id', None)  # FIX: C5-finding-3
         if account_id:  # FIX: C5-finding-3
             paginate_kwargs['ExpectedBucketOwner'] = account_id  # FIX: C5-finding-3
-        pages = paginator.paginate(**paginate_kwargs)  # FIX: C5-finding-3
+        pages: Any = paginator.paginate(**paginate_kwargs)  # FIX: C5-finding-3
 
         local_backup_dir = getattr(  # FIX: C5-finding-3
             self,  # FIX: C5-finding-3
@@ -634,7 +634,7 @@ class BackupStrategy:
             candidate_values = [snapshot.get('Description')]  # FIX: C5-finding-3
             for tag in snapshot.get('Tags', []):  # FIX: C5-finding-3
                 if isinstance(tag, dict):  # FIX: C5-finding-3
-                    candidate_values.append(tag.get('Value'))  # FIX: C5-finding-3
+                    candidate_values.append(cast(Any, tag).get('Value'))  # FIX: C5-finding-3
             if any(matches_backup_id(value) for value in candidate_values):  # FIX: C5-finding-3
                 snapshot_exists = True  # FIX: C5-finding-3
                 break  # FIX: C5-finding-3
