@@ -18,17 +18,25 @@ logsource:
   product: linux
 detection:
   selection_skill:
-    SkillName: 'webhook_sender'
+    SkillName: "webhook_sender"
   selection_target:
-    Url|contains: 'internal-rabbitmq.clawdbot.local:15672/api/queues/admin-agent-queue/publish'
+    Url|contains: "internal-rabbitmq.clawdbot.local:15672/api/queues/admin-agent-queue/publish"
   selection_payload_from: # FIX: C5-H-06
     RequestBody|contains: # FIX: C5-H-06
-      - '"from":"approval-agent-01"' # FIX: C5-H-06
-      - '"from": "approval-agent-01"' # FIX: C5-H-06
+      - '"from":"approval-agent-01"' # FIX: C5-H-06 (minified)
+      - '"from": "approval-agent-01"' # FIX: C5-H-06 (1-space pretty-print)
+      - '"from":  "approval-agent-01"' # FIX: C5-H-06 (2-space pretty-print, e.g., PowerShell)
+      - '"from" : "approval-agent-01"' # FIX: C5-H-06 (space-before-colon)
+      - "\"from\":\t\"approval-agent-01\"" # FIX: C5-H-06 (tab-separated)
+      - "\"from\":\n\"approval-agent-01\"" # FIX: C5-H-06 (newline-separated)
   selection_payload_action: # FIX: C5-H-06
     RequestBody|contains: # FIX: C5-H-06
-      - '"action":"create_admin_user"' # FIX: C5-H-06
-      - '"action": "create_admin_user"' # FIX: C5-H-06
+      - '"action":"create_admin_user"' # FIX: C5-H-06 (minified)
+      - '"action": "create_admin_user"' # FIX: C5-H-06 (1-space pretty-print)
+      - '"action":  "create_admin_user"' # FIX: C5-H-06 (2-space pretty-print, e.g., PowerShell)
+      - '"action" : "create_admin_user"' # FIX: C5-H-06 (space-before-colon)
+      - "\"action\":\t\"create_admin_user\"" # FIX: C5-H-06 (tab-separated)
+      - "\"action\":\n\"create_admin_user\"" # FIX: C5-H-06 (newline-separated)
   condition: selection_skill and selection_target and selection_payload_from and selection_payload_action # FIX: C5-H-06
 falsepositives:
   - Approved integration testing that publishes signed administrative queue messages

@@ -28,6 +28,34 @@
     "should_match": true
   },
   {
+    "name": "agent-impersonation-webhook-positive-multispace",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-multispace.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-tab",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-tab.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-spacebeforecolon",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-spacebeforecolon.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-newline",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-newline.json",
+    "should_match": true
+  },
+  {
     "name": "agent-impersonation-webhook-negative-slack-notify",
     "kind": "sigma",
     "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
