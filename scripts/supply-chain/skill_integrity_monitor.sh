@@ -235,38 +235,22 @@ EOF
 }
 
 create_default_patterns() { ## FIX: C5-M-12
-    # Writes a baseline dangerous-patterns.json to the runtime STATE_DIR location.
-    # Preserved as an explicit recovery utility; initialize() now syncs the runtime
-    # copy from POLICY_DIR on every invocation so this function is NOT called from
-    # the normal path. Invoke manually only when an operator needs an emergency
-    # baseline before a policy file is available.
-    # The upstream policy file (POLICY_DIR/dangerous-patterns.json) MUST exist;
-    # if it is missing the script fails fast rather than silently continuing.
+    # Recovery utility: copies the authoritative dangerous-patterns.json from
+    # POLICY_DIR to the runtime STATE_DIR location. initialize() already performs
+    # this sync on every invocation, so this function is NOT called from the
+    # normal path — it remains as an explicit operator-callable recovery helper.
+    # Fails fast if the upstream policy file is missing rather than producing a
+    # stale or fabricated baseline.
     info "Creating runtime patterns file from policy source..."
     local policy_source="${POLICY_DIR}/dangerous-patterns.json" ## FIX: C5-M-12
     if [ ! -f "$policy_source" ]; then ## FIX: C5-M-12
         error "Upstream policy file missing: $policy_source — cannot initialise patterns" ## FIX: C5-M-12
         exit 1 ## FIX: C5-M-12
     fi ## FIX: C5-M-12
-    cat > "$PATTERNS_FILE" << 'BASELINE_EOF'
-{
-  "version": "1.0.0",
-  "last_updated": "2026-02-14T12:00:00Z",
-  "description": "Baseline dangerous patterns — replace with policy file copy",
-  "patterns": [
-    {
-      "id": "exec-dangerous",
-      "name": "Dangerous exec/eval",
-      "pattern": "\\b(exec|eval)\\s*\\(",
-      "severity": "critical",
-      "description": "Direct code execution can lead to arbitrary code execution",
-      "languages": ["python", "javascript"],
-      "recommendation": "Avoid exec/eval. Use safe alternatives like ast.literal_eval()"
-    }
-  ],
-  "exceptions": []
-}
-BASELINE_EOF
+    if ! cp "$policy_source" "$PATTERNS_FILE"; then ## FIX: C5-M-12
+        error "Failed to copy $policy_source to $PATTERNS_FILE" ## FIX: C5-M-12
+        exit 1 ## FIX: C5-M-12
+    fi ## FIX: C5-M-12
     success "Runtime patterns file created: $PATTERNS_FILE" ## FIX: C5-M-12
 } ## FIX: C5-M-12
 
