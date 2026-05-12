@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True, help="Path to the agent configuration file")
     parser.add_argument("--gateway-url", default="", help="Gateway URL used by the worker")
     parser.add_argument("--max-tasks", type=int, default=5, help="Maximum concurrent tasks")
-    parser.add_argument("--host", default=os.environ.get("AGENT_HOST", "0.0.0.0"), help="Bind host")
+    parser.add_argument("--host", default=os.environ.get("AGENT_HOST", "127.0.0.1"), help="Bind host")  # FIX: C5-M-08
     parser.add_argument("--port", type=int, default=int(os.environ.get("AGENT_PORT", "8000")), help="Bind port")
     args = parser.parse_args(argv)
 

@@ -16,7 +16,7 @@ class IncidentSimulator:
     
     def create_incident(self, incident_type, severity="P1"):
         """Create simulated security incident."""
-        incident_id = f"INC-{datetime.now().strftime('%Y-%m-%d')}-{uuid.uuid4().hex[:6]}"
+        incident_id = f"INC-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}-{uuid.uuid4().hex[:6]}"  # FIX: C5-M-15
         
         scenarios = {
             "credential-theft": {

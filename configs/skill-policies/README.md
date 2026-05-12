@@ -9,9 +9,11 @@ This directory contains security policies for validating and monitoring Model Co
 ## Policy Files
 
 ### 1. allowlist.json
+
 **Purpose:** Define approved skills, sources, and authors
 
 **Configuration:**
+
 - **Trusted sources** - GitHub organizations automatically trusted
 - **Approved skills** - Specific skills with version constraints
 - **Deprecated skills** - Track outdated versions
@@ -19,6 +21,7 @@ This directory contains security policies for validating and monitoring Model Co
 - **Domain lists** - Allowed/blocked domains
 
 **Example:**
+
 ```json
 {
   "sources": {
@@ -42,9 +45,11 @@ This directory contains security policies for validating and monitoring Model Co
 ---
 
 ### 2. dangerous-patterns.json
+
 **Purpose:** Define regex patterns for detecting dangerous code
 
 **Patterns Include:**
+
 - Code execution (exec, eval)
 - Shell injection
 - SQL injection
@@ -55,12 +60,14 @@ This directory contains security policies for validating and monitoring Model Co
 - Command injection
 
 **Severity Levels:**
+
 - `critical` - Block immediately
 - `high` - Block or warn
 - `medium` - Warn
 - `low` - Log only
 
 **Example:**
+
 ```json
 {
   "patterns": [
@@ -77,9 +84,11 @@ This directory contains security policies for validating and monitoring Model Co
 ---
 
 ### 3. manifest-schema.json
+
 **Purpose:** JSON Schema for skill manifest validation
 
 **Validated Fields:**
+
 - Required: name, version, type, author
 - Optional: license, repository, dependencies
 - Security: integrity hashes, signatures
@@ -87,6 +96,7 @@ This directory contains security policies for validating and monitoring Model Co
 - Compatibility: platform/version constraints
 
 **Usage:**
+
 ```bash
 # Validate manifest with ajv-cli
 ajv validate -s manifest-schema.json -d skill-manifest.json
@@ -104,29 +114,40 @@ ajv validate -s enforcement-policy-schema.json -d enforcement-policy.json
 ---
 
 ### 4. enforcement-policy.json
+
 **Purpose:** Configure enforcement actions and monitoring
 
-**Settings:**
-- **Enforcement levels** - block, warn, log
-- **Validation rules** - manifest, integrity, signatures
-- **Pattern scanning** - severity-based actions
-- **Quarantine rules** - automatic isolation
-- **Monitoring** - continuous scanning
-- **Notifications** - alerts and webhooks
+**Settings (consumed by skill_integrity_monitor.sh):**
 
-**Example:**
+- **Validation rules** - manifest, integrity, signatures (`validation.signature.*` read via jq)
+- **Source validation** - allowlist, HTTPS, certificate checks
+- **Pattern scanning** - enable/disable flags and ignore patterns (severity actions removed — not consumed)
+- **Quarantine rules** - auto-quarantine flag and quarantine triggers
+- **Logging** - log level, rotation settings
+- **Exceptions** - per-skill override list
+
+**Removed fields (were not consumed by any code):**
+
+- `enforcement_level` — no code reads this via jq
+- `pattern_scanning.severity_actions` — severity routing is hardcoded in script logic
+- `permissions` — dangerous_permissions and permission_combinations not read
+- `monitoring` — continuous_monitoring not read; scan interval comes from `$SKILL_SCAN_INTERVAL` env var
+- `notifications` — no notification dispatcher reads this block
+- `compliance` — sbom_required and license_compliance not read
+
+**Example (consumed fields only):**
+
 ```json
 {
-  "enforcement_level": {
-    "production": "block",
-    "development": "warn"
-  },
-  "pattern_scanning": {
-    "severity_actions": {
-      "critical": "block",
-      "high": "block",
-      "medium": "warn"
+  "validation": {
+    "signature": {
+      "required": true,
+      "verify_pgp": true,
+      "trusted_keys": []
     }
+  },
+  "quarantine": {
+    "auto_quarantine": true
   }
 }
 ```
@@ -175,10 +196,7 @@ Edit `allowlist.json`:
         "name": "custom-mcp-tool",
         "version": ">=1.0.0",
         "source": "https://github.com/myorg/mcp-tool",
-        "allowed_permissions": [
-          "filesystem:read",
-          "network:https"
-        ],
+        "allowed_permissions": ["filesystem:read", "network:https"],
         "notes": "Internal tool for team"
       }
     ]
@@ -207,21 +225,24 @@ Edit `dangerous-patterns.json`:
 
 ### Adjusting Enforcement
 
-Edit `enforcement-policy.json`:
+Edit `enforcement-policy.json` (only fields below are consumed by code):
 
 ```json
 {
-  "enforcement_level": {
-    "production": "block",    // Block in production
-    "development": "warn"     // Warn in dev
+  "validation": {
+    "signature": {
+      "required": true,
+      "verify_pgp": true,
+      "trusted_keys": []
+    }
   },
   "quarantine": {
-    "auto_quarantine": true,  // Enable auto-quarantine
+    "auto_quarantine": true,
     "quarantine_on": {
       "integrity_failure": true,
       "dangerous_patterns": {
         "critical": true,
-        "high": true          // Also quarantine HIGH severity
+        "high": true
       }
     }
   }
@@ -311,9 +332,9 @@ Do not relax these defaults without a documented contract decision and cross-fil
       {
         "id": "legacy-skill",
         "reason": "Legacy system integration",
-        "expiry": "2026-12-31",           // Set expiration
+        "expiry": "2026-12-31", // Set expiration
         "skip_checks": ["pattern_scanning"],
-        "approved_by": "security-team"    // Track approval
+        "approved_by": "security-team" // Track approval
       }
     ]
   }

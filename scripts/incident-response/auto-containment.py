@@ -92,8 +92,10 @@ class ContainmentManager:
         if docker is not None:  # FIX: C5-finding-3
             try:
                 self.docker_client = docker.from_env()  # FIX: C5-finding-3
-            except docker.errors.DockerException:
-                logger.warning("Docker not available")
+            except (docker.errors.DockerException, OSError, Exception) as e:  # FIX: C5-M-02
+                self.docker_client = None  # FIX: C5-M-02
+                self.log_action("init_docker_client", "self", "FAIL", {"error": str(e)})  # FIX: C5-M-02
+                logger.warning("Docker not available: %s", e)  # FIX: C5-M-02
         else:
             logger.warning("docker SDK not available")  # FIX: C5-finding-3
         

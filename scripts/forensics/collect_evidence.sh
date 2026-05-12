@@ -43,12 +43,13 @@ record_warning() {
 run_capture() {
     local description="$1"
     local output_path="$2"
+    local exit_code=0  ## FIX: C5-M-13
     shift 2
 
     if "$@" > "${output_path}" 2>/dev/null; then
         return 0
     else
-        local exit_code=$? # FIX: C5-finding-2
+        exit_code=$?  ## FIX: C5-M-13
     fi
 
     : > "${output_path}"
@@ -58,12 +59,13 @@ run_capture() {
 run_append_capture() {
     local description="$1"
     local output_path="$2"
+    local exit_code=0  ## FIX: C5-M-13
     shift 2
 
     if "$@" >> "${output_path}" 2>/dev/null; then
         return 0
     else
-        local exit_code=$? # FIX: C5-finding-2
+        exit_code=$?  ## FIX: C5-M-13
     fi
 
     record_warning "Failed to ${description} (exit ${exit_code})"

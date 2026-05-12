@@ -3,13 +3,6 @@
   "last_updated": "2026-02-14T12:00:00Z",
   "description": "Skill security enforcement policy",
 
-  "enforcement_level": {
-    "default": "warn",
-    "production": "block",
-    "development": "log",
-    "testing": "warn"
-  },
-
   "validation": {
     "manifest": {
       "required": true,
@@ -47,36 +40,7 @@
     "scan_config": true,
     "scan_dependencies": false,
 
-    "severity_actions": {
-      "critical": "block",
-      "high": "block",
-      "medium": "warn",
-      "low": "log"
-    },
-
-    "ignore_patterns": [
-      "# nosec",
-      "# security: ignore"
-    ]
-  },
-
-  "permissions": {
-    "check_permissions": true,
-    "require_justification": false,
-
-    "dangerous_permissions": {
-      "filesystem:write": "warn",
-      "network:unrestricted": "block",
-      "process:exec": "block",
-      "secrets:write": "block"
-    },
-
-    "permission_combinations": {
-      "dangerous": [
-        ["filesystem:write", "network:unrestricted"],
-        ["process:exec", "network:unrestricted"]
-      ]
-    }
+    "ignore_patterns": ["# nosec", "# security: ignore"]
   },
 
   "quarantine": {
@@ -96,13 +60,6 @@
     "notify_on_quarantine": true
   },
 
-  "monitoring": {
-    "continuous_monitoring": true,
-    "scan_interval_seconds": 300,
-    "watch_for_changes": true,
-    "alert_on_modifications": true
-  },
-
   "logging": {
     "log_level": "info",
     "log_validation": true,
@@ -116,27 +73,6 @@
     }
   },
 
-  "notifications": {
-    "enabled": false,
-    "channels": {
-      "email": {
-        "enabled": false,
-        "recipients": ["security@example.com"],
-        "on_events": ["quarantine", "critical_pattern", "integrity_failure"]
-      },
-      "slack": {
-        "enabled": false,
-        "webhook_url": "",
-        "on_events": ["quarantine"]
-      },
-      "webhook": {
-        "enabled": false,
-        "url": "",
-        "auth_header": "Authorization: Bearer TOKEN"
-      }
-    }
-  },
-
   "exceptions": {
     "skills": [
       {
@@ -146,25 +82,5 @@
         "skip_checks": ["pattern_scanning"]
       }
     ]
-  },
-
-  "compliance": {
-    "frameworks": [
-      "OWASP-SAMM",
-      "NIST-SSDF"
-    ],
-    "sbom_required": true,
-    "license_compliance": {
-      "check_licenses": true,
-      "allowed_licenses": [
-        "MIT",
-        "Apache-2.0",
-        "BSD-3-Clause",
-        "ISC"
-      ],
-      "blocked_licenses": [
-        "GPL-3.0"
-      ]
-    }
   }
 }
