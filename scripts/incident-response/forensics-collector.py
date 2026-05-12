@@ -27,7 +27,7 @@ Usage:
     python3 forensics-collector.py --incident INC-2024-001 --level full
     python3 forensics-collector.py --incident INC-2024-001 --level quick --no-memory
 
-Dependencies: psutil, cryptography
+Dependencies: psutil  # FIX: C5-M-01
 
 Related: playbook-prompt-injection.md, IRP-001.md
 """
@@ -45,12 +45,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
-try:
-    import psutil
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+try:  # FIX: C5-M-01
+    import psutil  # FIX: C5-M-01
 except ImportError:
-    print("ERROR: Missing dependencies. Install with: pip install psutil cryptography")
+    print("ERROR: Missing dependencies. Install with: pip install psutil")  # FIX: C5-M-01
     sys.exit(1)
 
 # Configuration

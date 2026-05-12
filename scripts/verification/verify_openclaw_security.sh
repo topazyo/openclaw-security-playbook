@@ -298,18 +298,30 @@ fi
 echo ""
 
 # Check 4: Runtime Enforcement
-echo "[4/7] Checking runtime enforcement (external runtime enforcer, if integrated)..."  # FIX: C5-9
-if [ -f ~/.openclaw/config/shield/config.yml ]; then
-    if grep -q "enabled: true" ~/.openclaw/config/shield/config.yml; then
-        echo -e "${GREEN}✓ Shield configuration found and enabled${NC}"
-    else
-        echo -e "${YELLOW}⚠ WARNING: Shield config present but not clearly enabled${NC}"
-        WARNINGS=$((WARNINGS + 1))
-    fi
-else
-    echo -e "${YELLOW}⚠ WARNING: Shield configuration not found at ~/.openclaw/config/shield/config.yml${NC}"
-    WARNINGS=$((WARNINGS + 1))
-fi
+echo "[4/7] Checking runtime enforcement (openclaw-shield enforcer process)..."  ## FIX: C5-H-11
+SHIELD_CONFIG=~/.openclaw/config/shield/config.yml  ## FIX: C5-H-11
+if [ -f "$SHIELD_CONFIG" ] && grep -q "enabled: true" "$SHIELD_CONFIG"; then  ## FIX: C5-H-11
+    # Probe local enforcer signals: (1) pgrep process name, (2) systemd unit,  ## FIX: C5-H-11
+    # (3) Docker container with label com.openclaw.service=shield.              ## FIX: C5-H-11
+    # No outbound network calls are made.                                       ## FIX: C5-H-11
+    SHIELD_RUNNING=false  ## FIX: C5-H-11
+    if pgrep -x "openclaw-shield" > /dev/null 2>&1; then  ## FIX: C5-H-11
+        SHIELD_RUNNING=true  ## FIX: C5-H-11
+    elif systemctl is-active --quiet "openclaw-shield" 2>/dev/null; then  ## FIX: C5-H-11
+        SHIELD_RUNNING=true  ## FIX: C5-H-11
+    elif [ -n "$(docker ps --filter "label=com.openclaw.service=shield" --quiet 2>/dev/null)" ]; then  ## FIX: C5-H-11
+        SHIELD_RUNNING=true  ## FIX: C5-H-11
+    fi  ## FIX: C5-H-11
+    if [ "$SHIELD_RUNNING" = true ]; then  ## FIX: C5-H-11
+        echo -e "${GREEN}✓ CONFIGURED_AND_RUNNING: Shield config enabled and enforcer process detected${NC}"  ## FIX: C5-H-11
+    else  ## FIX: C5-H-11
+        echo -e "${YELLOW}⚠ WARNING: CONFIGURED_BUT_NOT_RUNNING: Shield config enabled but no enforcer process/unit/container found${NC}"  ## FIX: C5-H-11
+        WARNINGS=$((WARNINGS + 1))  ## FIX: C5-H-11
+    fi  ## FIX: C5-H-11
+else  ## FIX: C5-H-11
+    echo -e "${YELLOW}⚠ WARNING: NOT_CONFIGURED: Shield configuration not found or 'enabled: true' absent${NC}"  ## FIX: C5-H-11
+    WARNINGS=$((WARNINGS + 1))  ## FIX: C5-H-11
+fi  ## FIX: C5-H-11
 
 echo ""
 
