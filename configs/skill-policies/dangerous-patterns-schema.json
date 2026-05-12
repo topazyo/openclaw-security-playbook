@@ -3,7 +3,7 @@
   "$id": "https://openclaw.ai/schemas/skill-dangerous-patterns-v1.json",
   "title": "OpenClaw Dangerous Patterns",
   "type": "object",
-  "required": ["version", "last_updated", "description", "patterns", "file_patterns", "network_patterns"],
+  "required": ["version", "last_updated", "description", "patterns", "exceptions"],
   "additionalProperties": false,
   "properties": {
     "version": { "type": "string", "minLength": 1 },
@@ -13,13 +13,9 @@
       "type": "array",
       "items": { "$ref": "#/definitions/patternRule" }
     },
-    "file_patterns": {
+    "exceptions": {
       "type": "array",
-      "items": { "$ref": "#/definitions/simpleRule" }
-    },
-    "network_patterns": {
-      "type": "array",
-      "items": { "$ref": "#/definitions/simpleRule" }
+      "items": {}
     }
   },
   "definitions": {
@@ -42,19 +38,6 @@
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
         },
-        "recommendation": { "type": "string", "minLength": 1 }
-      }
-    },
-    "simpleRule": {
-      "type": "object",
-      "required": ["id", "name", "pattern", "severity", "description", "recommendation"],
-      "additionalProperties": true,
-      "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "name": { "type": "string", "minLength": 1 },
-        "pattern": { "type": "string", "minLength": 1 },
-        "severity": { "$ref": "#/definitions/severity" },
-        "description": { "type": "string", "minLength": 1 },
         "recommendation": { "type": "string", "minLength": 1 }
       }
     }
