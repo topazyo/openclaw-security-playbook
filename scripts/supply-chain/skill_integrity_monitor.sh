@@ -82,7 +82,7 @@ REPORT_FILE="${LOG_DIR}/skill_report_$(date +%Y%m%d_%H%M%S).json"
 
 # Policy files
 ALLOWLIST_FILE="${POLICY_DIR}/allowlist.json"
-PATTERNS_FILE="${POLICY_DIR}/dangerous-patterns.json"
+PATTERNS_FILE="${STATE_DIR}/dangerous-patterns.json" ## FIX: C5-M-12
 SCHEMA_FILE="${POLICY_DIR}/manifest-schema.json"
 POLICY_FILE="${POLICY_DIR}/enforcement-policy.json"
 
@@ -191,11 +191,10 @@ initialize() {
         create_default_allowlist
     fi
 
-    if [ ! -f "$PATTERNS_FILE" ]; then
-        warning "Dangerous patterns file not found: $PATTERNS_FILE"
-        info "Creating default patterns file"
-        cp "${POLICY_DIR}/dangerous-patterns.json" "$PATTERNS_FILE" 2>/dev/null || true
-    fi
+    if [ ! -f "$PATTERNS_FILE" ]; then ## FIX: C5-M-12
+        warning "Runtime patterns file not found: $PATTERNS_FILE" ## FIX: C5-M-12
+        create_default_patterns ## FIX: C5-M-12
+    fi ## FIX: C5-M-12
 
     if [ ! -f "$SCHEMA_FILE" ]; then
         warning "Schema file not found: $SCHEMA_FILE"
@@ -226,6 +225,39 @@ create_default_allowlist() {
 EOF
     success "Default allowlist created: $ALLOWLIST_FILE"
 }
+
+create_default_patterns() { ## FIX: C5-M-12
+    # Writes a baseline dangerous-patterns.json to the runtime STATE_DIR location.
+    # Called only when PATTERNS_FILE does not yet exist in state.
+    # The upstream policy file (POLICY_DIR/dangerous-patterns.json) MUST exist;
+    # if it is missing the script fails fast rather than silently continuing.
+    info "Creating runtime patterns file from policy source..."
+    local policy_source="${POLICY_DIR}/dangerous-patterns.json" ## FIX: C5-M-12
+    if [ ! -f "$policy_source" ]; then ## FIX: C5-M-12
+        error "Upstream policy file missing: $policy_source — cannot initialise patterns" ## FIX: C5-M-12
+        exit 1 ## FIX: C5-M-12
+    fi ## FIX: C5-M-12
+    cat > "$PATTERNS_FILE" << 'BASELINE_EOF'
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-14T12:00:00Z",
+  "description": "Baseline dangerous patterns — replace with policy file copy",
+  "patterns": [
+    {
+      "id": "exec-dangerous",
+      "name": "Dangerous exec/eval",
+      "pattern": "\\b(exec|eval)\\s*\\(",
+      "severity": "critical",
+      "description": "Direct code execution can lead to arbitrary code execution",
+      "languages": ["python", "javascript"],
+      "recommendation": "Avoid exec/eval. Use safe alternatives like ast.literal_eval()"
+    }
+  ],
+  "exceptions": []
+}
+BASELINE_EOF
+    success "Runtime patterns file created: $PATTERNS_FILE" ## FIX: C5-M-12
+} ## FIX: C5-M-12
 
 # ============================================================================
 # VALIDATION FUNCTIONS
