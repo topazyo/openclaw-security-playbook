@@ -191,9 +191,17 @@ initialize() {
         create_default_allowlist
     fi
 
-    if [ ! -f "$PATTERNS_FILE" ]; then ## FIX: C5-M-12
-        warning "Runtime patterns file not found: $PATTERNS_FILE" ## FIX: C5-M-12
-        create_default_patterns ## FIX: C5-M-12
+    # Refresh runtime patterns from authoritative policy on every invocation so ## FIX: C5-M-12
+    # policy edits are picked up without operator intervention and the runtime copy ## FIX: C5-M-12
+    # never goes stale relative to POLICY_DIR. ## FIX: C5-M-12
+    local policy_source="${POLICY_DIR}/dangerous-patterns.json" ## FIX: C5-M-12
+    if [ ! -f "$policy_source" ]; then ## FIX: C5-M-12
+        error "Authoritative policy file missing: $policy_source — cannot sync runtime patterns" ## FIX: C5-M-12
+        exit 1 ## FIX: C5-M-12
+    fi ## FIX: C5-M-12
+    if ! cp "$policy_source" "$PATTERNS_FILE"; then ## FIX: C5-M-12
+        error "Failed to sync runtime patterns from $policy_source to $PATTERNS_FILE" ## FIX: C5-M-12
+        exit 1 ## FIX: C5-M-12
     fi ## FIX: C5-M-12
 
     if [ ! -f "$SCHEMA_FILE" ]; then
@@ -228,7 +236,10 @@ EOF
 
 create_default_patterns() { ## FIX: C5-M-12
     # Writes a baseline dangerous-patterns.json to the runtime STATE_DIR location.
-    # Called only when PATTERNS_FILE does not yet exist in state.
+    # Preserved as an explicit recovery utility; initialize() now syncs the runtime
+    # copy from POLICY_DIR on every invocation so this function is NOT called from
+    # the normal path. Invoke manually only when an operator needs an emergency
+    # baseline before a policy file is available.
     # The upstream policy file (POLICY_DIR/dangerous-patterns.json) MUST exist;
     # if it is missing the script fails fast rather than silently continuing.
     info "Creating runtime patterns file from policy source..."
