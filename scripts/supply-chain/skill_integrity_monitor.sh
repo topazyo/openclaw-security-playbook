@@ -566,6 +566,48 @@ scan_dangerous_patterns() {
         fi
     done <<< "$patterns"
 
+    # Scan file_patterns against file basenames in the skill directory. ## FIX: C5-M-11
+    local file_patterns ## FIX: C5-M-11
+    file_patterns=$(jq -r '.file_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
+    while IFS= read -r fpattern; do ## FIX: C5-M-11
+        if [ -n "$fpattern" ]; then ## FIX: C5-M-11
+            if ! is_valid_ere "$fpattern"; then ## FIX: C5-M-11
+                warning "Skipping invalid file regex pattern: $fpattern" ## FIX: C5-M-11
+                audit "PATTERN_INVALID" "FilePattern: $fpattern" ## FIX: C5-M-11
+                continue ## FIX: C5-M-11
+            fi ## FIX: C5-M-11
+            local fmatches ## FIX: C5-M-11
+            fmatches=$(find "$skill_dir" -type f 2>/dev/null | awk -F/ '{print $NF}' | grep -E -- "$fpattern" || true) ## FIX: C5-M-11
+            if [ -n "$fmatches" ]; then ## FIX: C5-M-11
+                warning "Suspicious file pattern detected: $fpattern" ## FIX: C5-M-11
+                echo "$fmatches" | head -5 ## FIX: C5-M-11
+                ((found_issues++)) ## FIX: C5-M-11
+                audit "DANGEROUS_FILE_PATTERN" "Skill: $skill_dir | Pattern: $fpattern" ## FIX: C5-M-11
+            fi ## FIX: C5-M-11
+        fi ## FIX: C5-M-11
+    done <<< "$file_patterns" ## FIX: C5-M-11
+
+    # Scan network_patterns against file content (URL/IP literals in skill payload). ## FIX: C5-M-11
+    local network_patterns ## FIX: C5-M-11
+    network_patterns=$(jq -r '.network_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
+    while IFS= read -r npattern; do ## FIX: C5-M-11
+        if [ -n "$npattern" ]; then ## FIX: C5-M-11
+            if ! is_valid_ere "$npattern"; then ## FIX: C5-M-11
+                warning "Skipping invalid network regex pattern: $npattern" ## FIX: C5-M-11
+                audit "PATTERN_INVALID" "NetworkPattern: $npattern" ## FIX: C5-M-11
+                continue ## FIX: C5-M-11
+            fi ## FIX: C5-M-11
+            local nmatches ## FIX: C5-M-11
+            nmatches=$(grep -r -E -- "$npattern" "$skill_dir" 2>/dev/null || true) ## FIX: C5-M-11
+            if [ -n "$nmatches" ]; then ## FIX: C5-M-11
+                warning "Suspicious network pattern detected: $npattern" ## FIX: C5-M-11
+                echo "$nmatches" | head -5 ## FIX: C5-M-11
+                ((found_issues++)) ## FIX: C5-M-11
+                audit "DANGEROUS_NETWORK_PATTERN" "Skill: $skill_dir | Pattern: $npattern" ## FIX: C5-M-11
+            fi ## FIX: C5-M-11
+        fi ## FIX: C5-M-11
+    done <<< "$network_patterns" ## FIX: C5-M-11
+
     if [ $found_issues -gt 0 ]; then
         error "Found $found_issues dangerous pattern(s)"
         return 1
