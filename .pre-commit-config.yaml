@@ -6,3 +6,15 @@ repos:
         entry: python scripts/verification/check_yaml_loader_safety.py
         language: python
         pass_filenames: false
+
+      - id: bash-syntax-check  # FIX: C6-L-02
+        name: bash -n syntax check on shell scripts  # FIX: C6-L-02
+        entry: bash -c 'for f in "$@"; do bash -n "$f" || exit 1; done' --  # FIX: C6-L-02
+        language: system  # FIX: C6-L-02
+        types: [shell]  # FIX: C6-L-02
+        pass_filenames: true  # FIX: C6-L-02
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks  # FIX: C6-L-02
+    rev: v5.0.0  # FIX: C6-L-02
+    hooks:  # FIX: C6-L-02
+      - id: check-merge-conflict  # FIX: C6-L-02
