@@ -307,8 +307,7 @@ jobs:
           echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Trivy Scan" >> $GITHUB_STEP_SUMMARY
-<<<<<<< HEAD
-          case "$TRIVY_JOB_RESULT" in # FIX: C5-H-09
+          case "$TRIVY_JOB_RESULT" in # FIX: C5-H-09 # FIX: C6-C-01
             success) # FIX: C5-H-09
               echo "No CRITICAL/HIGH findings detected." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
               ;; # FIX: C5-H-09
@@ -324,14 +323,7 @@ jobs:
             *) # FIX: C5-H-09
               echo "Scan finished with unexpected status: $TRIVY_JOB_RESULT. Treat as inconclusive." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
               ;; # FIX: C5-H-09
-          esac # FIX: C5-H-09
-=======
-          if [ "$TRIVY_JOB_RESULT" = "success" ]; then # FIX: C5-H-09
-            echo "No CRITICAL/HIGH findings detected." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
-          else # FIX: C5-H-09
-            echo "FINDINGS DETECTED: Trivy reported CRITICAL/HIGH vulnerabilities (job result: $TRIVY_JOB_RESULT). See Security tab for details." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
-          fi # FIX: C5-H-09
->>>>>>> e07adfdeee91b9bd62e58003e449f1b9575c1ce8
+          esac # FIX: C5-H-09 # FIX: C6-C-01
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Bandit Python Security Scan" >> $GITHUB_STEP_SUMMARY
           if [ -f ./results/bandit-results.json ]; then
