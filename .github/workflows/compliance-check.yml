@@ -152,12 +152,12 @@ jobs:
           import json
           import sys
           import os
-          
+
           # Check for SOC2 report
           if not os.path.exists('soc2-report.json'):
             print("❌ Error: soc2-report.json not found", file=sys.stderr)
             sys.exit(1)
-          
+
           try:
             with open('soc2-report.json') as f:
               soc2_report = json.load(f)
@@ -168,12 +168,12 @@ jobs:
           except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in soc2-report.json: {e}", file=sys.stderr)
             sys.exit(1)
-          
+
           # Check for ISO27001 report
           if not os.path.exists('iso27001-report.json'):
             print("❌ Error: iso27001-report.json not found", file=sys.stderr)
             sys.exit(1)
-          
+
           try:
             with open('iso27001-report.json') as f:
               iso_report = json.load(f)
@@ -184,7 +184,7 @@ jobs:
           except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in iso27001-report.json: {e}", file=sys.stderr)
             sys.exit(1)
-          
+
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
             f.write(f"soc2_percentage={soc2_percentage}\n")
             f.write(f"iso27001_percentage={iso27001_percentage}\n")
@@ -265,4 +265,5 @@ jobs:
               print(f"✅ SOC2 ({soc2}%) and ISO27001 ({iso27001}%) both meet the 95% threshold")  # FIX: C5-H-10
           else:  # FIX: C5-H-10
               sys.exit(1)  # FIX: C5-H-10
-          EOF  # FIX: C5-H-10
+          # FIX: C6-H-06: terminator must be bare EOF with no trailing content so bash closes the heredoc
+          EOF
