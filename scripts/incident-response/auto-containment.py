@@ -38,7 +38,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 try:
     import boto3  # FIX: C5-finding-3
