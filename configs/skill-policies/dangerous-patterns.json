@@ -180,7 +180,7 @@
     {
       "id": "hidden-files",
       "name": "Hidden files",
-      "pattern": "^\\..*(?<!gitignore)$",
+      "pattern": "^\\.([^g].*|g[^i].*|gi[^t].*|git[^i].*|giti[^g].*|gitig[^n].*|gitign[^o].*|gitigno[^r].*|gitignor[^e].*|gitignore.+)$",
       "severity": "low",
       "description": "Hidden files may contain sensitive data",
       "recommendation": "Review hidden files for sensitive information"
