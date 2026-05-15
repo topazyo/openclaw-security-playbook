@@ -214,21 +214,27 @@
     "kind": "yara",
     "rule": "detections/ioc/ioc-openclaw.yar",
     "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill.md",
-    "expected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+    "expected_rules": [
+      "OpenClaw_Skill_Dangerous_Patterns"
+    ]
   },
   {
     "name": "yara-soul-injection-positive",
     "kind": "yara",
     "rule": "detections/ioc/ioc-openclaw.yar",
     "fixture": "tests/security/fixtures/detection-replay/yara-soul-injection.md",
-    "expected_rules": ["OpenClaw_SOUL_Injection_Persistence"]
+    "expected_rules": [
+      "OpenClaw_SOUL_Injection_Persistence"
+    ]
   },
   {
     "name": "yara-malicious-skill-evasion-whitespace-split",
     "kind": "yara",
     "rule": "detections/ioc/ioc-openclaw.yar",
     "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-evasion-whitespace.md",
-    "expected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+    "expected_rules": [
+      "OpenClaw_Skill_Dangerous_Patterns"
+    ]
   },
   {
     "name": "yara-malicious-skill-negative-ssh-backup",
@@ -236,7 +242,9 @@
     "rule": "detections/ioc/ioc-openclaw.yar",
     "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-benign-ssh.md",
     "expected_rules": [],
-    "unexpected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+    "unexpected_rules": [
+      "OpenClaw_Skill_Dangerous_Patterns"
+    ]
   },
   {
     "name": "yara-malicious-skill-negative-totp-enrollment",
@@ -244,7 +252,9 @@
     "rule": "detections/ioc/ioc-openclaw.yar",
     "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-benign-totp.md",
     "expected_rules": [],
-    "unexpected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+    "unexpected_rules": [
+      "OpenClaw_Skill_Dangerous_Patterns"
+    ]
   },
   {
     "name": "runtime-hardening-drift-evasion-readonly-false",
@@ -272,6 +282,55 @@
     "kind": "sigma",
     "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
     "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-evasion-user-zero.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-double-encoded-lower",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-double-encoded-lower.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-double-encoded-upper",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-double-encoded-upper.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-double-encoded-mixed-lower",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-double-encoded-mixed-lower.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-double-encoded-mixed-upper",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-double-encoded-mixed-upper.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-fullwidth",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-fullwidth.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-overlong-lower",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-overlong-lower.json",
+    "should_match": true
+  },
+  {
+    "name": "mcp-path-traversal-evasion-overlong-upper",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
+    "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-overlong-upper.json",
     "should_match": true
   }
 ]

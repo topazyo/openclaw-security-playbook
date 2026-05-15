@@ -33,6 +33,13 @@ detection:
       - '%2E%2E%5C' # FIX: C5-H-03 — dot-dot encoded, backslash encoded (upper)
       - '..%5c' # FIX: C5-H-03 — backslash encoded only (lower)
       - '..%5C' # FIX: C5-H-03 — backslash encoded only (upper)
+      - '%252e%252e%252f' # FIX: C6-M-01 - double-encoded dot-dot-slash (lower)
+      - '%252E%252E%252F' # FIX: C6-M-01 - double-encoded dot-dot-slash (upper)
+      - '%252e%252e/' # FIX: C6-M-01 - double-encoded dots, literal slash (lower)
+      - '%252E%252E/' # FIX: C6-M-01 - double-encoded dots, literal slash (upper)
+      - '．．/' # FIX: C6-M-01 - Unicode fullwidth dots (U+FF0E) with literal slash
+      - '%c0%ae%c0%ae/' # FIX: C6-M-01 - overlong UTF-8 encoded dots (lower)
+      - '%C0%AE%C0%AE/' # FIX: C6-M-01 - overlong UTF-8 encoded dots (upper)
   condition: selection_endpoint and selection_query_traversal # FIX: C5-H-03
 falsepositives:
   - Security testing against a staging MCP server
