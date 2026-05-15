@@ -235,7 +235,27 @@ class ComplianceReporter:
         return controls
     
     def generate_report(self, framework: str = "SOC2") -> ComplianceReport:  # FIX: C5-finding-4
-        """Generate compliance report for specified framework."""
+        """Generate compliance report for specified framework.
+
+        Returns:
+            ComplianceReport (``dict[str, Any]``) with at least the following keys:
+                - ``framework`` (str): canonical name — ``"SOC 2 Type II"``,
+                  ``"ISO 27001:2022"``, or ``"GDPR"``
+                - ``generated_at`` (str): ISO 8601 UTC timestamp
+                - ``controls`` (list[ControlRecord]): per-control status records
+                - ``implemented_count`` (int): count of fully-implemented controls
+                - ``pending_count`` (int): count of non-implemented controls
+                - ``compliance_percentage`` (float): implemented / total * 100
+            ISO 27001 reports include two additional keys (added by C6-H-05):
+                - ``compliance_percentage_basis`` (str): always ``"loaded_corpus"``
+                - ``coverage_summary`` (dict): per-control-family coverage details
+
+        Raises:
+            ValueError: If ``framework`` is not one of ``"SOC2"``, ``"ISO27001"``,
+                or ``"GDPR"``. The module's CLI handler catches ``ValueError`` and
+                exits with code 2; programmatic callers must handle the exception
+                explicitly — the function no longer returns an error dict.
+        """  # FIX: C6-M-08
         if framework == "SOC2":
             return self._generate_soc2_report()
         elif framework == "ISO27001":
@@ -243,7 +263,7 @@ class ComplianceReporter:
         elif framework == "GDPR":
             return self._generate_gdpr_report()
         else:
-            return {"error": f"Unknown framework: {framework}"}
+            raise ValueError(f"Unknown framework: {framework}")  # FIX: C6-M-08
     
     def _generate_soc2_report(self) -> ComplianceReport:  # FIX: C5-finding-4
         """Generate SOC 2 compliance report."""
