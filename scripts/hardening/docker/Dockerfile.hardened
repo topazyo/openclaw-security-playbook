@@ -88,8 +88,8 @@ RUN python -m venv /opt/venv
 # Activate virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip and install build tools
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Upgrade pip and install build tools; wheel floor clears CVE-2026-24049 (fixed in 0.46.2)
+RUN pip install --no-cache-dir --upgrade pip setuptools "wheel>=0.46.2"
 
 # Install production dependencies with hash verification
 RUN pip install --no-cache-dir \
