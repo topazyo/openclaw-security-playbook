@@ -438,6 +438,7 @@ def execute_scenario(scenario: ScenarioDefinition, archive_root: Path, image: st
             env["OPENCLAW_VERIFIER_GATEWAY_PORT"] = str(GATEWAY_PORT)
             env["OPENCLAW_VERIFIER_TLS_HOST"] = "127.0.0.1"
             env["OPENCLAW_VERIFIER_TLS_PORT"] = str(TLS_PORT)
+            env["OPENCLAW_VERIFIER_SKIP_ENFORCER_PROCESS"] = "1"  # FIX: C6-H-04
 
             verifier_result = run_command([bash, str(VERIFY_SCRIPT)], env=env, cwd=REPO_ROOT)
             combined_output = verifier_result.stdout + verifier_result.stderr

@@ -314,6 +314,8 @@ if [ -f "$SHIELD_CONFIG" ] && grep -q "enabled: true" "$SHIELD_CONFIG"; then  ##
     fi  ## FIX: C5-H-11
     if [ "$SHIELD_RUNNING" = true ]; then  ## FIX: C5-H-11
         echo -e "${GREEN}✓ CONFIGURED_AND_RUNNING: Shield config enabled and enforcer process detected${NC}"  ## FIX: C5-H-11
+    elif [ "${OPENCLAW_VERIFIER_SKIP_ENFORCER_PROCESS:-0}" = "1" ]; then  ## FIX: C6-H-04
+        echo -e "${GREEN}✓ CONFIGURED_PROCESS_CHECK_SKIPPED: Shield config enabled; enforcer process detection bypassed via OPENCLAW_VERIFIER_SKIP_ENFORCER_PROCESS${NC}"  ## FIX: C6-H-04
     else  ## FIX: C5-H-11
         echo -e "${YELLOW}⚠ WARNING: CONFIGURED_BUT_NOT_RUNNING: Shield config enabled but no enforcer process/unit/container found${NC}"  ## FIX: C5-H-11
         WARNINGS=$((WARNINGS + 1))  ## FIX: C5-H-11
