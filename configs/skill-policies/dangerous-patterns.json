@@ -182,7 +182,7 @@
       "name": "Hidden files",
       "pattern": "^\\.([^g].*|g[^i].*|gi[^t].*|git[^i].*|giti[^g].*|gitig[^n].*|gitign[^o].*|gitigno[^r].*|gitignor[^e].*|gitignore.+)$",
       "severity": "low",
-      "description": "Hidden files may contain sensitive data",
+      "description": "Hidden files may contain sensitive data. Pattern uses char-by-char alternation to exclude .gitignore because the consumer (skill_integrity_monitor.sh) calls grep -E (POSIX ERE), which lacks lookaround; a (?!gitignore$) lookahead would silently match nothing — see C6-H-03.",
       "recommendation": "Review hidden files for sensitive information"
     }
   ],
