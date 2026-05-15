@@ -9,6 +9,9 @@ on:
       - "configs/**"
       - "docs/policies/**"
       - "configs/organization-policies/**"
+      - "tools/compliance-reporter.py" # FIX: C6-M-??
+      - "tools/compliance-data/**" # FIX: C6-M-??
+      - ".github/workflows/compliance-check.yml" # FIX: C6-M-??
   workflow_dispatch:
 
 permissions:
