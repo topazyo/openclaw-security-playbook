@@ -55,7 +55,10 @@ detection:
       - "--user root" # FIX: C6-H-02
       - "--user=root" # FIX: C6-H-02
       - "--privileged" # FIX: C6-H-02
-  condition: selection_docker_run and selection_target_workload and (not (filter_cap_drop and filter_read_only and filter_user and filter_no_new_priv) or selection_negated_hardening) # FIX: C6-H-02
+  condition: >- # FIX: C6-H-02
+    selection_docker_run and selection_target_workload
+    and (not (filter_cap_drop and filter_read_only and filter_user and filter_no_new_priv)
+    or selection_negated_hardening)
 falsepositives:
   - Local development containers intentionally launched without hardening flags
 level: high
