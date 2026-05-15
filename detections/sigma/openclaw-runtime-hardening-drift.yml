@@ -18,29 +18,44 @@ logsource:
 detection:
   selection_docker_run:
     Image|endswith:
-      - '/docker'
+      - "/docker"
     CommandLine|contains|all:
-      - 'docker run'
+      - "docker run"
   selection_target_workload:
     CommandLine|contains:
-      - 'openclaw'
-      - 'clawdbot'
-      - 'moltbot'
+      - "openclaw"
+      - "clawdbot"
+      - "moltbot"
   filter_cap_drop: # FIX: C5-H-04
     CommandLine|contains: # FIX: C5-H-04
-      - '--cap-drop ALL' # FIX: C5-H-04
-      - '--cap-drop=ALL' # FIX: C5-H-04
+      - "--cap-drop ALL" # FIX: C5-H-04
+      - "--cap-drop=ALL" # FIX: C5-H-04
   filter_read_only: # FIX: C5-H-04
-    CommandLine|contains: '--read-only' # FIX: C5-H-04
+    CommandLine|contains: "--read-only" # FIX: C5-H-04
   filter_user: # FIX: C5-H-04
     CommandLine|contains: # FIX: C5-H-04
-      - '--user 1000:1000' # FIX: C5-H-04
-      - '--user=1000:1000' # FIX: C5-H-04
+      - "--user 1000:1000" # FIX: C5-H-04
+      - "--user=1000:1000" # FIX: C5-H-04
   filter_no_new_priv: # FIX: C5-H-04
     CommandLine|contains: # FIX: C5-H-04
-      - '--security-opt no-new-privileges:true' # FIX: C5-H-04
-      - '--security-opt=no-new-privileges:true' # FIX: C5-H-04
-  condition: selection_docker_run and selection_target_workload and not (filter_cap_drop and filter_read_only and filter_user and filter_no_new_priv) # FIX: C5-H-04
+      - "--security-opt no-new-privileges:true" # FIX: C5-H-04
+      - "--security-opt=no-new-privileges:true" # FIX: C5-H-04
+  selection_negated_hardening: # FIX: C6-H-02
+    CommandLine|contains: # FIX: C6-H-02
+      - "--read-only=false" # FIX: C6-H-02
+      - "--read-only false" # FIX: C6-H-02
+      - "--cap-add SYS_ADMIN" # FIX: C6-H-02
+      - "--cap-add=SYS_ADMIN" # FIX: C6-H-02
+      - "--cap-add ALL" # FIX: C6-H-02
+      - "--cap-add=ALL" # FIX: C6-H-02
+      - "--security-opt no-new-privileges:false" # FIX: C6-H-02
+      - "--security-opt=no-new-privileges:false" # FIX: C6-H-02
+      - "--user 0:0" # FIX: C6-H-02
+      - "--user=0:0" # FIX: C6-H-02
+      - "--user root" # FIX: C6-H-02
+      - "--user=root" # FIX: C6-H-02
+      - "--privileged" # FIX: C6-H-02
+  condition: selection_docker_run and selection_target_workload and (not (filter_cap_drop and filter_read_only and filter_user and filter_no_new_priv) or selection_negated_hardening) # FIX: C6-H-02
 falsepositives:
   - Local development containers intentionally launched without hardening flags
 level: high

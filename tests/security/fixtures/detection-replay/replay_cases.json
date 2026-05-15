@@ -245,5 +245,33 @@
     "fixture": "tests/security/fixtures/detection-replay/yara-malicious-skill-benign-totp.md",
     "expected_rules": [],
     "unexpected_rules": ["OpenClaw_Skill_Dangerous_Patterns"]
+  },
+  {
+    "name": "runtime-hardening-drift-evasion-readonly-false",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-evasion-readonly-false.json",
+    "should_match": true
+  },
+  {
+    "name": "runtime-hardening-drift-evasion-capadd-sysadmin",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-evasion-capadd-sysadmin.json",
+    "should_match": true
+  },
+  {
+    "name": "runtime-hardening-drift-evasion-nonewprivileges-false",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-evasion-nonewprivileges-false.json",
+    "should_match": true
+  },
+  {
+    "name": "runtime-hardening-drift-evasion-user-zero",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-runtime-hardening-drift.yml",
+    "fixture": "tests/security/fixtures/detection-replay/runtime-hardening-drift-evasion-user-zero.json",
+    "should_match": true
   }
 ]
