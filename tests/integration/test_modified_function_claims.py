@@ -176,7 +176,7 @@ def test__resolve_network_acl_id_claim_resolves_ip_blocking_acl(tmp_path):
     assert manager._resolve_network_acl_id() == "acl-emergency"
 
     ctx.fake_ec2.describe_network_acls.return_value = {"NetworkAcls": ["malformed-entry"]}  # FIX: C6-H-01
-    with pytest.raises(RuntimeError, match="No NACL configured"):  # FIX: C6-H-01
+    with pytest.raises(RuntimeError, match=r"^No NACL configured: set BLOCK_NETWORK_ACL_ID"):  # FIX: C6-H-01
         manager._resolve_network_acl_id()  # FIX: C6-H-01
 
 
@@ -193,7 +193,10 @@ def test__resolve_firewall_domain_list_id_claim_resolves_domain_blocklist(tmp_pa
         "FirewallDomainLists": [{"Name": "other-list", "Id": "fdl-other"}]
     }
     ctx.fake_route53resolver.create_firewall_domain_list.return_value = {"unexpected": "shape"}  # FIX: C6-H-01
-    with pytest.raises(RuntimeError, match="firewall domain list"):  # FIX: C6-H-01
+    with pytest.raises(  # FIX: C6-H-01
+        RuntimeError,  # FIX: C6-H-01
+        match=r"^firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID",  # FIX: C6-H-01
+    ):  # FIX: C6-H-01
         manager._resolve_firewall_domain_list_id()  # FIX: C6-H-01
     ctx.fake_route53resolver.create_firewall_domain_list.assert_called_once()
 
