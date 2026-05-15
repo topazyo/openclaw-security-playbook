@@ -47,7 +47,7 @@
 # ============================================================================
 
 ARG PYTHON_VERSION=3.11
-ARG ALPINE_VERSION=3.19
+ARG ALPINE_VERSION=3.22 # FIX: C6-C-02
 ARG BUILD_DATE
 ARG VCS_REF
 ARG VERSION=1.0.0
