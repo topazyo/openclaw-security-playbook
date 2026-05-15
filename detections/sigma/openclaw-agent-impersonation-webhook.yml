@@ -29,6 +29,10 @@ detection:
       - '"from" : "approval-agent-01"' # FIX: C5-H-06 (space-before-colon)
       - "\"from\":\t\"approval-agent-01\"" # FIX: C5-H-06 (tab-separated)
       - "\"from\":\n\"approval-agent-01\"" # FIX: C5-H-06 (newline-separated)
+      - '"from":   "approval-agent-01"' # FIX: C6-M-02 - 3-space variant
+      - '"from":    "approval-agent-01"' # FIX: C6-M-02 - 4-space variant
+      - "\"from\":\r\n\"approval-agent-01\"" # FIX: C6-M-02 - CRLF variant
+      - "\"from\": \"approval-agent-01\"" # FIX: C6-M-02 - NBSP variant (U+00A0)
   selection_payload_action: # FIX: C5-H-06
     RequestBody|contains: # FIX: C5-H-06
       - '"action":"create_admin_user"' # FIX: C5-H-06 (minified)
@@ -37,6 +41,10 @@ detection:
       - '"action" : "create_admin_user"' # FIX: C5-H-06 (space-before-colon)
       - "\"action\":\t\"create_admin_user\"" # FIX: C5-H-06 (tab-separated)
       - "\"action\":\n\"create_admin_user\"" # FIX: C5-H-06 (newline-separated)
+      - '"action":   "create_admin_user"' # FIX: C6-M-02 - 3-space variant
+      - '"action":    "create_admin_user"' # FIX: C6-M-02 - 4-space variant
+      - "\"action\":\r\n\"create_admin_user\"" # FIX: C6-M-02 - CRLF variant
+      - "\"action\": \"create_admin_user\"" # FIX: C6-M-02 - NBSP variant (U+00A0)
   condition: selection_skill and selection_target and selection_payload_from and selection_payload_action # FIX: C5-H-06
 falsepositives:
   - Approved integration testing that publishes signed administrative queue messages
