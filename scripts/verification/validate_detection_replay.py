@@ -266,7 +266,7 @@ def evaluate_yara_case(case: dict[str, Any], yara_command: str | None, require_y
         # FIX: C5-M-01 — returning passed=True here was a false-pass: YARA rules were never evaluated.
         # A skipped-but-unchecked YARA case is not a pass; it is a coverage gap that must surface as
         # a non-pass so callers cannot treat the run as a clean full-coverage result.
-        return ReplayResult(case["name"], "yara", False, "coverage-incomplete: yara command not available (use --skip-yara to opt out explicitly or --require-yara to hard-fail)")  # FIX: C5-M-01
+        return ReplayResult(case["name"], "yara", False, "coverage-incomplete: yara command not available")  # FIX: C5-M-01 FIX: C6-M-09
 
     rule_path = REPO_ROOT / case["rule"]
     fixture_path = REPO_ROOT / case["fixture"]
@@ -303,6 +303,11 @@ def run_validation(cases_path: Path, *, skip_yara: bool, require_yara: bool) -> 
             results.append(evaluate_sigma_case(case))
         elif kind == "yara":
             yara_cases_present = True  # FIX: C5-M-01
+            if skip_yara:  # FIX: C6-M-09 — skip_yara takes precedence; emit explicit-skip result instead of per-case FAIL
+                # Operator opted out via --skip-yara; emit a passed=True explicit-skip result so the  # FIX: C6-M-09
+                # case is traceable (vs. silent continue) and aggregate all(r.passed) stays True per operator intent.  # FIX: C6-M-09
+                results.append(ReplayResult(case["name"], "yara", True, "explicitly-skipped: --skip-yara active"))  # FIX: C6-M-09
+                continue  # FIX: C6-M-09
             results.append(evaluate_yara_case(case, yara_command, require_yara))
         else:
             raise ValueError(f"Unsupported replay case kind: {kind}")
