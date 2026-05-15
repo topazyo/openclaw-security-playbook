@@ -88,8 +88,8 @@ RUN python -m venv /opt/venv
 # Activate virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip and install build tools; wheel floor clears CVE-2026-24049 (fixed in 0.46.2)
-RUN pip install --no-cache-dir --upgrade pip setuptools "wheel>=0.46.2"
+# Upgrade pip and install build tools; floors clear CVE-2026-24049 (wheel) and CVE-2024-6345/CVE-2025-47273 (setuptools)
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" "wheel>=0.46.2"
 
 # Install production dependencies with hash verification
 RUN pip install --no-cache-dir \
@@ -164,6 +164,13 @@ RUN apk add --no-cache \
     netcat-openbsd \
     curl \
     && update-ca-certificates
+
+# Upgrade system Python pip/setuptools/wheel; the python:alpine base ships outdated versions
+# carrying CVE-2026-24049 (wheel<0.46.2), CVE-2024-6345 + CVE-2025-47273 (setuptools<78.1.1).
+# Trivy scans /usr/local/lib/python3.11/site-packages directly, so upgrading the venv alone
+# is not enough.
+RUN pip install --no-cache-dir --upgrade \
+        "pip" "setuptools>=78.1.1" "wheel>=0.46.2"
 
 # Create non-root user
 RUN addgroup -g 1000 -S clawdbot && \
@@ -291,6 +298,11 @@ RUN apk add --no-cache \
     ca-certificates \
     tini \
     && update-ca-certificates
+
+# Upgrade system Python pip/setuptools/wheel; the python:alpine base ships outdated versions
+# carrying CVE-2026-24049 (wheel<0.46.2), CVE-2024-6345 + CVE-2025-47273 (setuptools<78.1.1).
+RUN pip install --no-cache-dir --upgrade \
+        "pip" "setuptools>=78.1.1" "wheel>=0.46.2"
 
 # Create non-root user and workspace
 RUN addgroup -g 1000 -S clawdbot && \
