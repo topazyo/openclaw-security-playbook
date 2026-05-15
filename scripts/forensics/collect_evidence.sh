@@ -2,7 +2,12 @@
 # collect_evidence.sh — OpenClaw Incident Evidence Preservation
 #
 # USAGE: ./collect_evidence.sh [--containment]
-#   --containment: Also stop the agent and block network after evidence collection
+#   --containment: After evidence collection, attempt to stop the agent's       ## FIX: C5-H-06
+#                  services/containers (moltbot + openclaw via systemctl,       ## FIX: C5-H-06
+#                  clawdbot via docker). Does NOT block network traffic —       ## FIX: C5-H-06
+#                  apply iptables/ufw rules separately if network containment   ## FIX: C5-H-06
+#                  is required (see docs/guides/06-incident-response.md         ## FIX: C5-H-06
+#                  Playbook 1 Step 1.2).                                        ## FIX: C5-H-06
 #
 # Run this BEFORE stopping the agent process to preserve in-memory state.
 # Part of: https://github.com/topazyo/openclaw-security-playbook
@@ -23,13 +28,18 @@ Usage:
   ./scripts/forensics/collect_evidence.sh [--containment] [--help|-h]
 
 Options:
-  --containment   Also stop agent services after evidence collection
+  --containment   After evidence collection, attempt to stop the moltbot and
+                  openclaw systemd services and the clawdbot Docker container.
+                  Each stop attempt that fails is recorded as a warning. Does
+                  NOT block network traffic — apply iptables/ufw separately
+                  if network containment is required.
   --help, -h      Show this help message and exit
 
 Exit codes:
     0  Successful execution (no critical issues, no warnings)
     1  Critical findings detected during collection
-    2  Warnings detected or invalid arguments
+    2  Warnings detected (including failed containment commands) or invalid
+       arguments
 
 Run this before stopping the agent process to preserve volatile state.
 EOF
@@ -230,7 +240,8 @@ echo "  5. Run check_credential_scope.sh to assess what was exposed"
 echo ""
 
 if [ "${CONTAINMENT}" = true ]; then
-    echo "[+] Running containment (--containment flag set)..."
+    echo "[+] Running containment (--containment flag set)..."                  ## FIX: C5-H-06
+    echo "    Note: stops services/containers only — does NOT block network."  ## FIX: C5-H-06
     if ! systemctl stop moltbot 2>/dev/null; then
         record_warning "Failed to stop moltbot during containment"
     fi
@@ -240,7 +251,7 @@ if [ "${CONTAINMENT}" = true ]; then
     if ! docker stop clawdbot 2>/dev/null; then
         record_warning "Failed to stop clawdbot during containment"
     fi
-    echo "    Agent stopped."
+    echo "    Containment step finished (service/container stop attempted)."   ## FIX: C5-H-06
 fi
 
 echo ""
