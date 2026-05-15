@@ -136,7 +136,7 @@ RUN python setup.py bdist_wheel && \
 # STAGE 4: Security Scanner
 # ============================================================================
 
-FROM aquasec/trivy:0.45.0 AS scanner
+FROM aquasec/trivy:0.70.0 AS scanner
 
 # Copy built application for scanning
 COPY --from=app-builder /opt/venv /scan/venv
