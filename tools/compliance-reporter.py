@@ -7,6 +7,7 @@ Run from repo root:
 
 import argparse
 import json
+import sys  # FIX: C6-H-05
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypeAlias, cast  # FIX: C5-finding-4
@@ -70,6 +71,105 @@ class ComplianceReporter:
 
         percentage = round((implemented / applicable) * 100, 2)  # FIX: C5-finding-5
         return implemented, pending, percentage  # FIX: C5-finding-5
+
+    @staticmethod  # FIX: C6-H-05
+    def _validate_soa_internal_consistency(statement: ControlRecord) -> None:  # FIX: C6-H-05
+        """Assert that statement_of_applicability fields sum to total_controls.
+
+        Catches the prior failure mode where a worker set implemented=19, planned=0,
+        not_applicable=23 (sum=42) while total_controls remained 93 — an inconsistency
+        that the old code silently accepted.  Raises ValueError with all four numbers
+        so the offending field is immediately identifiable.
+        """  # FIX: C6-H-05
+        total = statement.get("total_controls")  # FIX: C6-H-05
+        implemented = statement.get("implemented")  # FIX: C6-H-05
+        planned = statement.get("planned")  # FIX: C6-H-05
+        not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
+        if not all(isinstance(v, int) and not isinstance(v, bool) for v in (total, implemented, planned, not_applicable)):  # FIX: C6-H-05
+            return  # type checking handled by _calculate_statement_summary  # FIX: C6-H-05
+        actual_sum = implemented + planned + not_applicable  # FIX: C6-H-05
+        if actual_sum != total:  # FIX: C6-H-05
+            raise ValueError(  # FIX: C6-H-05
+                f"ISO27001 statement_of_applicability internal inconsistency: "  # FIX: C6-H-05
+                f"implemented({implemented}) + planned({planned}) + not_applicable({not_applicable}) "  # FIX: C6-H-05
+                f"= {actual_sum} must equal total_controls({total})"  # FIX: C6-H-05
+            )  # FIX: C6-H-05
+
+    @staticmethod  # FIX: C6-H-05
+    def _build_iso27001_coverage_summary(  # FIX: C6-H-05
+        corpus_controls: list[ControlRecord],  # FIX: C6-H-05
+        statement: ControlRecord,  # FIX: C6-H-05
+    ) -> dict[str, Any]:  # FIX: C6-H-05
+        """Build a structured coverage_summary dict comparing corpus to the SoA.
+
+        Compares the actually loaded corpus controls against the Statement of
+        Applicability (SoA) to surface the mapping gap as a structured, queryable
+        JSON object.  Does not modify the SoA.
+
+        gap_status enum:
+          INCOMPLETE_MAPPING  — mapped controls < soa_applicable_controls
+          COMPLETE_MAPPING    — mapped controls == soa_applicable_controls
+          OVER_MAPPING        — mapped controls > soa_applicable_controls
+        """  # FIX: C6-H-05
+        mapped = len(corpus_controls)  # FIX: C6-H-05
+        soa_total = statement.get("total_controls", 0)  # FIX: C6-H-05
+        soa_implemented = statement.get("implemented", 0)  # FIX: C6-H-05
+        soa_planned = statement.get("planned", 0)  # FIX: C6-H-05
+        soa_not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
+        soa_applicable = soa_implemented + soa_planned  # FIX: C6-H-05
+
+        unmapped = soa_applicable - mapped  # FIX: C6-H-05 (signed: negative means OVER_MAPPING)
+        coverage_pct = round(mapped / soa_applicable * 100, 2) if soa_applicable > 0 else 0.0  # FIX: C6-H-05
+
+        if mapped < soa_applicable:  # FIX: C6-H-05
+            gap_status = "INCOMPLETE_MAPPING"  # FIX: C6-H-05
+        elif mapped == soa_applicable:  # FIX: C6-H-05
+            gap_status = "COMPLETE_MAPPING"  # FIX: C6-H-05
+        else:  # FIX: C6-H-05
+            gap_status = "OVER_MAPPING"  # FIX: C6-H-05
+
+        # Theme breakdown: count controls per top-level group key  # FIX: C6-H-05
+        theme_counts: dict[str, int] = {}  # FIX: C6-H-05
+        for control in corpus_controls:  # FIX: C6-H-05
+            group = control.get("group", "unknown")  # FIX: C6-H-05
+            theme_counts[group] = theme_counts.get(group, 0) + 1  # FIX: C6-H-05
+
+        return {  # FIX: C6-H-05
+            "mapped_controls": mapped,  # FIX: C6-H-05
+            "soa_total_controls": soa_total,  # FIX: C6-H-05
+            "soa_applicable_controls": soa_applicable,  # FIX: C6-H-05
+            "soa_implemented": soa_implemented,  # FIX: C6-H-05
+            "soa_planned": soa_planned,  # FIX: C6-H-05
+            "soa_not_applicable": soa_not_applicable,  # FIX: C6-H-05
+            "unmapped_applicable_controls": unmapped,  # FIX: C6-H-05
+            "corpus_to_soa_coverage_percentage": coverage_pct,  # FIX: C6-H-05
+            "theme_breakdown": theme_counts,  # FIX: C6-H-05
+            "gap_status": gap_status,  # FIX: C6-H-05
+        }  # FIX: C6-H-05
+
+    @staticmethod  # FIX: C6-H-05
+    def _emit_iso27001_coverage_warning(coverage: dict[str, Any]) -> None:  # FIX: C6-H-05
+        """Write a single-line WARNING to stderr when corpus mapping is incomplete.
+
+        No-op when gap_status is COMPLETE_MAPPING (corpus fully covers SoA applicable
+        controls).  The WARNING: prefix is picked up by CI log scanners and most
+        Splunk parsers without configuration.
+
+        Format (machine-parseable, one line, no newlines):
+          WARNING: ISO27001 compliance_mapping coverage gap: mapped=<n> soa_applicable=<n> gap=<n> (coverage=<n.nn>%) basis=loaded_corpus
+        """  # FIX: C6-H-05
+        if coverage.get("gap_status") == "COMPLETE_MAPPING":  # FIX: C6-H-05
+            return  # FIX: C6-H-05
+        mapped = coverage["mapped_controls"]  # FIX: C6-H-05
+        soa_applicable = coverage["soa_applicable_controls"]  # FIX: C6-H-05
+        gap = soa_applicable - mapped  # FIX: C6-H-05
+        pct = coverage["corpus_to_soa_coverage_percentage"]  # FIX: C6-H-05
+        print(  # FIX: C6-H-05
+            f"WARNING: ISO27001 compliance_mapping coverage gap: "  # FIX: C6-H-05
+            f"mapped={mapped} soa_applicable={soa_applicable} gap={gap} "  # FIX: C6-H-05
+            f"(coverage={pct}%) basis=loaded_corpus",  # FIX: C6-H-05
+            file=sys.stderr,  # FIX: C6-H-05
+        )  # FIX: C6-H-05
 
     @staticmethod
     def _normalize_control_list(mapping_name: str, controls: list[Any]) -> list[ControlRecord]:  # FIX: C5-finding-4
@@ -159,30 +259,36 @@ class ComplianceReporter:
             "compliance_percentage": percentage,
         }
     
-    def _validate_iso27001_summary_counts(self, controls: list[ControlRecord], implemented: int, pending: int) -> None:  # FIX: C5-finding-5
-        expected_total = implemented + pending  # FIX: C5-finding-5
-        actual_total = len(controls)  # FIX: C5-finding-5
-        if actual_total != expected_total:  # FIX: C5-finding-5
-            raise ValueError(  # FIX: C5-finding-5
-                "ISO27001 controls count mismatch: "  # FIX: C5-finding-5
-                f"statement summary expects {expected_total} controls "  # FIX: C5-finding-5
-                f"(implemented={implemented}, pending={pending}) but loaded {actual_total}"  # FIX: C5-finding-5
-            )  # FIX: C5-finding-5
+    def _generate_iso27001_report(self) -> ComplianceReport:  # FIX: C5-finding-4, C6-H-05
+        """Generate ISO 27001 compliance report.
 
-    def _generate_iso27001_report(self) -> ComplianceReport:  # FIX: C5-finding-4
-        """Generate ISO 27001 compliance report."""
-        controls = self._load_iso27001_controls()
-        implemented, pending, percentage = self._load_iso27001_statement_summary()  # FIX: C5-finding-5
-        self._validate_iso27001_summary_counts(controls, implemented, pending)  # FIX: C5-finding-5
-        
-        return {
-            "framework": "ISO 27001:2022",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "controls": controls,
-            "implemented_count": implemented,  # FIX: C5-finding-5
-            "pending_count": pending,  # FIX: C5-finding-5
-            "compliance_percentage": percentage,  # FIX: C5-finding-5
-        }
+        compliance_percentage and implemented_count/pending_count are derived from
+        the loaded corpus (basis=loaded_corpus), not from the Statement of
+        Applicability (SoA).  The SoA is preserved verbatim under coverage_summary
+        so the SoA-vs-corpus gap is visible to auditors in three channels:
+          1. coverage_summary.gap_status (structured JSON)
+          2. coverage_summary.unmapped_applicable_controls (integer gap)
+          3. A WARNING line on stderr (see _emit_iso27001_coverage_warning)
+
+        See ADR in .omc/plans/C6-H-05-compliance-reporter.md §8 for the decision
+        rationale and the pre-mortem risk analysis (gate flip-flop scenario).
+        """  # FIX: C6-H-05
+        controls = self._load_iso27001_controls()  # FIX: C6-H-05
+        implemented, pending, percentage = self._calculate_summary(controls)  # FIX: C6-H-05
+        statement = self._load_iso27001_statement_raw()  # FIX: C6-H-05
+        coverage = self._build_iso27001_coverage_summary(controls, statement)  # FIX: C6-H-05
+        self._emit_iso27001_coverage_warning(coverage)  # FIX: C6-H-05
+
+        return {  # FIX: C6-H-05
+            "framework": "ISO 27001:2022",  # FIX: C6-H-05
+            "generated_at": datetime.now(timezone.utc).isoformat(),  # FIX: C6-H-05
+            "controls": controls,  # FIX: C6-H-05
+            "implemented_count": implemented,  # FIX: C6-H-05
+            "pending_count": pending,  # FIX: C6-H-05
+            "compliance_percentage": percentage,  # FIX: C6-H-05
+            "compliance_percentage_basis": "loaded_corpus",  # FIX: C6-H-05
+            "coverage_summary": coverage,  # FIX: C6-H-05
+        }  # FIX: C6-H-05
 
     def _generate_gdpr_report(self) -> ComplianceReport:  # FIX: C5-finding-4
         """Generate GDPR compliance report."""  # FIX: C5-finding-4
@@ -232,17 +338,27 @@ class ComplianceReporter:
 
         raise ValueError("ISO27001 controls format is invalid: expected controls list or annex_a_controls object")
 
+    def _load_iso27001_statement_raw(self) -> ControlRecord:  # FIX: C6-H-05
+        """Load and validate the raw statement_of_applicability dict from the corpus.
+
+        Runs _validate_soa_internal_consistency (D5) to catch prior failure mode
+        where implemented+planned+not_applicable != total_controls.
+        """  # FIX: C6-H-05
+        controls_path = _safe_repo_path("configs/organization-policies/iso27001-compliance-mapping.json")  # FIX: C6-H-05
+        with open(controls_path, encoding="utf-8") as f:  # FIX: C6-H-05
+            data = json.load(f)  # FIX: C6-H-05
+
+        statement = data.get("statement_of_applicability")  # FIX: C6-H-05
+        if not isinstance(statement, dict):  # FIX: C6-H-05
+            raise ValueError("ISO27001 report requires statement_of_applicability for truthful summary counts")  # FIX: C6-H-05
+
+        typed_statement = cast(ControlRecord, statement)  # FIX: C6-H-05
+        self._validate_soa_internal_consistency(typed_statement)  # FIX: C6-H-05
+        return typed_statement  # FIX: C6-H-05
+
     def _load_iso27001_statement_summary(self) -> tuple[int, int, float]:  # FIX: C5-finding-5
         """Load ISO 27001 summary from the authoritative Statement of Applicability."""  # FIX: C5-finding-5
-        controls_path = _safe_repo_path("configs/organization-policies/iso27001-compliance-mapping.json")  # FIX: C5-finding-5
-        with open(controls_path, encoding="utf-8") as f:  # FIX: C5-finding-5
-            data = json.load(f)  # FIX: C5-finding-5
-
-        statement = data.get("statement_of_applicability")  # FIX: C5-finding-5
-        if not isinstance(statement, dict):  # FIX: C5-finding-5
-            raise ValueError("ISO27001 report requires statement_of_applicability for truthful summary counts")  # FIX: C5-finding-5
-
-        typed_statement = cast(ControlRecord, statement)  # FIX: C5-finding-5
+        typed_statement = self._load_iso27001_statement_raw()  # FIX: C6-H-05 (consistency check now in _load_iso27001_statement_raw)
         return self._calculate_statement_summary(typed_statement)  # FIX: C5-finding-5
 
     def _load_gdpr_controls(self) -> list[ControlRecord]:  # FIX: C5-finding-4

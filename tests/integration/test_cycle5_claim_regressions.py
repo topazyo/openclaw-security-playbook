@@ -731,3 +731,50 @@ class TestDependencyAuditShClaim:
         assert "FAIL" in proc.stderr, (
             f"Script must print 'FAIL' on a red run; stderr: {proc.stderr!r}"
         )
+
+
+# ===========================================================================
+# compliance-reporter.py ISO27001 claim — C6-H-05
+#
+# Claim (post-fix):
+#   "python tools/compliance-reporter.py --framework ISO27001 exits 0 and
+#    produces a valid JSON report containing compliance_percentage."
+#
+# Original bug (pre-fix):
+#   _validate_iso27001_summary_counts raised ValueError because SoA says 70
+#   applicable controls (45+25) but the corpus only has 19 — the reporter
+#   always exited 2 for ISO27001.
+# ===========================================================================
+
+class TestComplianceReporterISO27001Claim:  # FIX: C6-H-05
+    """compliance-reporter.py --framework ISO27001 — smoke-level E2E claim test."""  # FIX: C6-H-05
+
+    def test_iso27001_reporter_exits_0_and_produces_valid_json(self, tmp_path):  # FIX: C6-H-05
+        """CLAIM: ISO27001 report generation exits 0 and produces parseable JSON.
+
+        Wires C6-H-05 into the claim-regression suite.  Pre-fix: the reporter
+        raised ValueError and exited 2.  Post-fix: exits 0 with a valid report.
+        """  # FIX: C6-H-05
+        import importlib.util as _ilu  # FIX: C6-H-05
+        import sys as _sys  # FIX: C6-H-05
+
+        reporter_path = _REPO_ROOT / "tools" / "compliance-reporter.py"  # FIX: C6-H-05
+        spec = _ilu.spec_from_file_location("compliance_reporter_c6h05_integration", reporter_path)  # FIX: C6-H-05
+        assert spec is not None and spec.loader is not None  # FIX: C6-H-05
+        mod = _ilu.module_from_spec(spec)  # FIX: C6-H-05
+        spec.loader.exec_module(mod)  # FIX: C6-H-05
+
+        reporter = mod.ComplianceReporter()  # FIX: C6-H-05
+        report = reporter.generate_report("ISO27001")  # FIX: C6-H-05
+
+        # Must not be an error dict  # FIX: C6-H-05
+        assert "error" not in report, (  # FIX: C6-H-05
+            f"ISO27001 report must not contain 'error' key; got: {report}"  # FIX: C6-H-05
+        )  # FIX: C6-H-05
+        assert "compliance_percentage" in report, (  # FIX: C6-H-05
+            "ISO27001 report must contain compliance_percentage"  # FIX: C6-H-05
+        )  # FIX: C6-H-05
+        # Verify the JSON round-trip (parseable)  # FIX: C6-H-05
+        json_bytes = json.dumps(report).encode()  # FIX: C6-H-05
+        parsed = json.loads(json_bytes)  # FIX: C6-H-05
+        assert parsed["compliance_percentage"] == report["compliance_percentage"]  # FIX: C6-H-05
