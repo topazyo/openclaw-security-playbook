@@ -303,6 +303,8 @@ def run_validation(cases_path: Path, *, skip_yara: bool, require_yara: bool) -> 
             results.append(evaluate_sigma_case(case))
         elif kind == "yara":
             yara_cases_present = True  # FIX: C5-M-01
+            if skip_yara:  # FIX: C6-M-09 — skip_yara takes precedence; omit case so no per-case FAIL is produced
+                continue  # FIX: C6-M-09
             results.append(evaluate_yara_case(case, yara_command, require_yara))
         else:
             raise ValueError(f"Unsupported replay case kind: {kind}")
