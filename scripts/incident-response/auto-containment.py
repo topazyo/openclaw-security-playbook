@@ -135,7 +135,9 @@ class ContainmentManager:
         network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
         if network_acls and isinstance(network_acls[0], dict) and network_acls[0].get("NetworkAclId"):  # FIX: C5-finding-3
             return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3
-        return f"acl-auto-containment-{self.incident_id.lower()}"  # FIX: C5-finding-3
+        raise RuntimeError(  # FIX: C6-H-01
+            "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
+        )  # FIX: C6-H-01
 
     def _resolve_firewall_domain_list_id(self) -> str:  # FIX: C5-finding-3
         """Resolve the DNS firewall domain list used for domain blocking."""  # FIX: C5-finding-3
@@ -153,9 +155,11 @@ class ContainmentManager:
             Name="openclaw-auto-containment",  # FIX: C5-finding-3
         )  # FIX: C5-finding-3
         created_record = created_domain_list.get("FirewallDomainList", {}) if isinstance(created_domain_list, dict) else {}  # FIX: C5-finding-3
-        if created_record.get("Id"):  # FIX: C5-finding-3
-            return created_record["Id"]  # FIX: C5-finding-3
-        return f"fdl-auto-containment-{self.incident_id.lower()}"  # FIX: C5-finding-3
+        if not isinstance(created_domain_list, dict) or not isinstance(created_record, dict) or not created_record.get("Id"):  # FIX: C6-H-01
+            raise RuntimeError(  # FIX: C6-H-01
+                "firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID to a valid pre-existing list"  # FIX: C6-H-01
+            )  # FIX: C6-H-01
+        return created_record["Id"]  # FIX: C6-H-01
 
     def block_ip_address(self, ip_address: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
         """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
