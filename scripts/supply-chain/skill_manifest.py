@@ -254,7 +254,7 @@ class SkillManifest:
         with open(file_path, 'rb') as f:
             try:
                 if fcntl is not None:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)  # type: ignore[attr-defined]  # pylance: fcntl is POSIX-only; attr present at runtime
                 elif msvcrt is not None:
                     size = max(1, os.path.getsize(file_path))
                     msvcrt.locking(f.fileno(), msvcrt.LK_RLCK, size)
@@ -266,7 +266,7 @@ class SkillManifest:
 
             try:
                 if fcntl is not None:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]  # pylance: fcntl is POSIX-only; attr present at runtime
                 elif msvcrt is not None:
                     size = max(1, os.path.getsize(file_path))
                     msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, size)

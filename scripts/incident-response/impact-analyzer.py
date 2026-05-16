@@ -28,7 +28,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Set
+from typing import Set, Optional  # pylance: Optional for nullable param annotations
 
 try:
     import boto3
@@ -158,7 +158,7 @@ class ImpactAnalyzer:
             "notification_deadline_hours": 72 if gdpr_breach else None
         }
     
-    def generate_report(self, output_path: str = None):
+    def generate_report(self, output_path: Optional[str] = None):  # pylance: default None requires Optional
         """Generate impact analysis report"""
         logger.info("Generating impact report...")
         

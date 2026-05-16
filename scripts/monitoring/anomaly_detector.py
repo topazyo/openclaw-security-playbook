@@ -44,7 +44,7 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional  # pylance: Optional added for nullable param annotation
 
 
 class AnomalyDetector:
@@ -55,8 +55,8 @@ class AnomalyDetector:
     standard telemetry tools.
     """
 
-    def __init__(self, work_hours: tuple = (9, 18), 
-                 allowed_recipients: List[str] = None):
+    def __init__(self, work_hours: tuple = (9, 18),
+                 allowed_recipients: Optional[List[str]] = None):  # pylance: default None requires Optional annotation
         """
         Initialize anomaly detector with organization-specific settings.
 
