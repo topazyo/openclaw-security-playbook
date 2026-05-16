@@ -429,7 +429,11 @@ class ForensicsCollector:
             f.write("# Evidence Items\n")
             
             for item in self.manifest["evidence_items"]:
-                f.write(f"{item['checksum_sha256']}  {item['file_path']}\n")
+                if item.get("status") in ("degraded", "failed") or item.get("file_path") is None:  # FIX: C6-H-08
+                    detail = item.get("reason") or item.get("description") or "no detail"  # FIX: C6-H-08
+                    f.write(f"# DEGRADED  {item.get('name', 'unnamed')}: {detail}\n")  # FIX: C6-H-08
+                    continue  # FIX: C6-H-08
+                f.write(f"{item.get('checksum_sha256', 'N/A')}  {item.get('file_path', 'N/A')}\n")  # FIX: C6-H-08
         
         logger.info(f"✓ Chain of custody manifest saved: {manifest_file}")
         logger.info(f"✓ Checksums saved: {checksum_file}")
