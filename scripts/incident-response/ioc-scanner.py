@@ -37,7 +37,7 @@ import socket
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
 
 try:
     import requests
@@ -308,7 +308,7 @@ class IOCScanner:
             self._record_scan_result("file", str(file_path), result)
             return result
     
-    def generate_report(self, output_path: str = None):
+    def generate_report(self, output_path: Optional[str] = None):  # pylance: output_path defaults to None
         """Generate IOC scan report.
 
         The report preserves the scan's non-success status so callers can detect

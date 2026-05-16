@@ -43,7 +43,7 @@ import subprocess  # nosec B404
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
 
 try:  # FIX: C5-M-01
     import psutil  # FIX: C5-M-01
@@ -96,7 +96,7 @@ class ForensicsCollector:
         
         return sha256.hexdigest()
     
-    def add_evidence_item(self, name: str, file_path: Path, description: str, metadata: Dict = None):
+    def add_evidence_item(self, name: str, file_path: Path, description: str, metadata: Optional[Dict] = None):  # pylance: metadata defaults to None
         """Add evidence item to manifest with integrity check"""
         if not file_path.exists():
             logger.warning(f"Evidence file not found: {file_path}")

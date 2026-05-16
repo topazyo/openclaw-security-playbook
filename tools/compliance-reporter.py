@@ -87,7 +87,7 @@ class ComplianceReporter:
         not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
         if not all(isinstance(v, int) and not isinstance(v, bool) for v in (total, implemented, planned, not_applicable)):  # FIX: C6-H-05
             return  # type checking handled by _calculate_statement_summary  # FIX: C6-H-05
-        actual_sum = implemented + planned + not_applicable  # FIX: C6-H-05
+        actual_sum = implemented + planned + not_applicable  # type: ignore[operator]  # FIX: C6-H-05  # pylance: types narrowed by L88 isinstance(int) check; pyright cannot propagate narrowing through all() + genexp
         if actual_sum != total:  # FIX: C6-H-05
             raise ValueError(  # FIX: C6-H-05
                 f"ISO27001 statement_of_applicability internal inconsistency: "  # FIX: C6-H-05
