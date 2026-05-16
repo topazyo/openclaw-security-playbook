@@ -92,12 +92,12 @@ def _load_auto_containment_context(tmp_path, module_name: str):
         module_name,
         {"boto3": fake_boto3, "docker": fake_docker},
     )
-    module.CONTAINMENT_LOG_DIR = tmp_path / module_name
-    module.CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
-    module.BLOCK_NETWORK_ACL_ID = None
-    module.DNS_FIREWALL_DOMAIN_LIST_ID = None
-    module.RATE_LIMIT_CONFIG_PATH = None
-    module.QUARANTINE_SG_ID = "sg-quarantine"
+    module.CONTAINMENT_LOG_DIR = tmp_path / module_name  # type: ignore[attr-defined]  # pylance: dynamic module attr injection
+    module.CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]  # pylance: dynamic module attr
+    module.BLOCK_NETWORK_ACL_ID = None  # type: ignore[attr-defined]  # pylance: dynamic module attr injection
+    module.DNS_FIREWALL_DOMAIN_LIST_ID = None  # type: ignore[attr-defined]  # pylance: dynamic module attr injection
+    module.RATE_LIMIT_CONFIG_PATH = None  # type: ignore[attr-defined]  # pylance: dynamic module attr injection
+    module.QUARANTINE_SG_ID = "sg-quarantine"  # type: ignore[attr-defined]  # pylance: dynamic module attr injection
 
     return SimpleNamespace(
         module=module,
@@ -113,21 +113,21 @@ def _load_auto_containment_context(tmp_path, module_name: str):
 
 def _load_forensics_collector_module(module_name: str):
     fake_psutil = ModuleType("psutil")
-    fake_psutil.Error = RuntimeError
-    fake_psutil.NoSuchProcess = RuntimeError
-    fake_psutil.AccessDenied = RuntimeError
-    fake_psutil.disk_partitions = MagicMock()
-    fake_psutil.disk_usage = MagicMock()
-    fake_psutil.process_iter = MagicMock()
-    fake_psutil.net_connections = MagicMock()
+    fake_psutil.Error = RuntimeError  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.NoSuchProcess = RuntimeError  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.AccessDenied = RuntimeError  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.disk_partitions = MagicMock()  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.disk_usage = MagicMock()  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.process_iter = MagicMock()  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_psutil.net_connections = MagicMock()  # type: ignore[attr-defined]  # pylance: synthetic module stub
     fake_cryptography = ModuleType("cryptography")
     fake_hazmat = ModuleType("cryptography.hazmat")
     fake_primitives = ModuleType("cryptography.hazmat.primitives")
-    fake_primitives.hashes = ModuleType("hashes")
-    fake_primitives.serialization = ModuleType("serialization")
+    fake_primitives.hashes = ModuleType("hashes")  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_primitives.serialization = ModuleType("serialization")  # type: ignore[attr-defined]  # pylance: synthetic module stub
     fake_asymmetric = ModuleType("cryptography.hazmat.primitives.asymmetric")
-    fake_asymmetric.rsa = ModuleType("rsa")
-    fake_asymmetric.padding = ModuleType("padding")
+    fake_asymmetric.rsa = ModuleType("rsa")  # type: ignore[attr-defined]  # pylance: synthetic module stub
+    fake_asymmetric.padding = ModuleType("padding")  # type: ignore[attr-defined]  # pylance: synthetic module stub
     return _load_module_from_path(
         FORENSICS_COLLECTOR_PATH,
         module_name,

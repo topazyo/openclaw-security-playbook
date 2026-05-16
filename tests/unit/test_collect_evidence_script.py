@@ -22,6 +22,7 @@ def test_collect_evidence_surfaces_capture_command_failures(tmp_path):
 
     script_input = b"ss() { return 3; }\n" + _SCRIPT_PATH.read_bytes().replace(b"\r", b"")
 
+    assert _BASH_PATH is not None, "bash required; tests are skipped without it"  # pylance: narrow Optional[str] from shutil.which
     result = subprocess.run(
         [_BASH_PATH, "-s"],
         capture_output=True,
