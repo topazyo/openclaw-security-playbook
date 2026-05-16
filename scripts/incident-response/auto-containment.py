@@ -38,7 +38,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
 
 try:
     import boto3  # FIX: C5-finding-3
@@ -92,7 +92,7 @@ class ContainmentManager:
         if docker is not None:  # FIX: C5-finding-3
             try:
                 self.docker_client = docker.from_env()  # FIX: C5-finding-3
-            except (docker.errors.DockerException, OSError) as e:  # FIX: C6-M-03
+            except (docker.errors.DockerException, OSError) as e:  # FIX: C6-M-03  # type: ignore[attr-defined]  # pylance: docker module attrs unknown to pyright when stubs absent
                 self.docker_client = None  # FIX: C5-M-02
                 self.log_action("init_docker_client", "self", "FAIL", {"error": str(e)})  # FIX: C5-M-02
                 logger.warning("Docker not available: %s", e)  # FIX: C5-M-02
@@ -102,7 +102,7 @@ class ContainmentManager:
         # Create log directory
         CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
     
-    def log_action(self, action: str, target: str, status: str, details: Dict = None):
+    def log_action(self, action: str, target: str, status: str, details: Optional[Dict] = None):  # pylance: details defaults to None so type must be Optional
         """Log containment action"""
         action_record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -161,12 +161,13 @@ class ContainmentManager:
             )  # FIX: C6-H-01
         return created_record["Id"]  # FIX: C6-H-01
 
-    def block_ip_address(self, ip_address: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
         """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
         logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
             network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
+            assert self.ec2 is not None  # pylance: _resolve_network_acl_id raises if self.ec2 is None
             rule_seed = sum(ord(character) for character in cidr_block) % 10000  # FIX: C5-finding-3
             ingress_rule_number = 100 + rule_seed  # FIX: C5-finding-3
             egress_rule_number = 200 + rule_seed  # FIX: C5-finding-3
@@ -185,7 +186,7 @@ class ContainmentManager:
             self.log_action("block_ip", ip_address, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def block_domain_name(self, domain: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def block_domain_name(self, domain: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
         """Block a domain by adding it to the emergency DNS firewall list."""  # FIX: C5-finding-3
         logger.info(f"Blocking domain: {domain}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
@@ -193,6 +194,7 @@ class ContainmentManager:
             if not normalized_domain:  # FIX: C5-finding-3
                 raise ValueError("Domain cannot be empty")  # FIX: C5-finding-3
             firewall_domain_list_id = self._resolve_firewall_domain_list_id()  # FIX: C5-finding-3
+            assert self.route53resolver is not None  # pylance: _resolve_firewall_domain_list_id raises if self.route53resolver is None
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would add the domain to the emergency DNS firewall list")  # FIX: C5-finding-3
                 self.log_action("block_domain", normalized_domain, "dry_run", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3
@@ -207,7 +209,7 @@ class ContainmentManager:
             self.log_action("block_domain", domain, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def isolate_container(self, container_id: str, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def isolate_container(self, container_id: str, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
         logger.info(f"Isolating container: {container_id}")  # FIX: C5-finding-3
         if not self.docker_client:  # FIX: C5-finding-3
@@ -229,7 +231,7 @@ class ContainmentManager:
             container_labels = {'quarantine': self.incident_id}  # FIX: C5-finding-3
             if reason:  # FIX: C5-finding-3
                 container_labels['containment_reason'] = reason  # FIX: C5-finding-3
-            container.update(labels=container_labels)  # FIX: C5-finding-3
+            container.update(labels=container_labels)  # type: ignore[call-arg]  # FIX: C5-finding-3  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
             self.log_action("isolate_container", container_id, "success", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
             logger.info(f"✓ Container {container_id} isolated successfully")  # FIX: C5-finding-3
             return True  # FIX: C5-finding-3
@@ -238,7 +240,7 @@ class ContainmentManager:
             self.log_action("isolate_container", container_id, "failed", {"error": str(e), "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def update_rate_limits(self, mode: str, limits: Dict, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def update_rate_limits(self, mode: str, limits: Dict, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Write an emergency rate-limit override profile for the requested mode."""  # FIX: C5-finding-3
         logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
@@ -302,6 +304,7 @@ class ContainmentManager:
                 logger.info(f"✓ Snapshot created: {snapshot['SnapshotId']}")
             
             # Apply quarantine security group
+            quarantine_sg: Optional[str] = None  # pylance: ensure bound on all paths for log_action below
             if QUARANTINE_SG_ID:
                 logger.info(f"Applying quarantine security group: {QUARANTINE_SG_ID}")
                 self.ec2.modify_instance_attribute(
@@ -486,7 +489,7 @@ class ContainmentManager:
                 })
             
             # Add quarantine label
-            container.update(labels={'quarantine': self.incident_id})
+            container.update(labels={'quarantine': self.incident_id})  # type: ignore[call-arg]  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
             
             self.log_action("isolate_docker", container_id, "success", {
                 "original_networks": original_networks
