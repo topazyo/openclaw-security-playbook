@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -258,6 +259,38 @@ def test_isolate_container_claim_isolates_documented_container(tmp_path):
     no_docker_manager = ctx.module.ContainmentManager("INC-NODOCKER")
     no_docker_manager.docker_client = None
     assert no_docker_manager.isolate_container("agent-prod-42", reason="Missing Docker") is False
+
+
+def test_C6_H_08_save_manifest_does_not_crash_on_degraded_evidence_items(tmp_path):  # FIX: C6-H-08
+    """Locks the C6-H-08 claim: save_manifest must emit CHECKSUMS.txt successfully
+    even when manifest contains degraded items lacking checksum_sha256/file_path."""
+    module = _load_forensics_collector_module("forensics_collector_claim_c6_h_08_save_manifest")  # FIX: C6-H-08
+    inst = module.ForensicsCollector("INC-TEST-C6H08", level="standard")  # FIX: C6-H-08
+    inst.evidence_dir = tmp_path / "evidence"  # FIX: C6-H-08
+    inst.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C6-H-08
+    inst.manifest["evidence_items"].append({  # FIX: C6-H-08
+        "name": "log_collection_degraded",  # FIX: C6-H-08
+        "file_path": None,  # FIX: C6-H-08
+        "description": "no log source available on host",  # FIX: C6-H-08
+        "status": "degraded",  # FIX: C6-H-08
+        "reason": "neither journalctl nor LOG_DIR is available",  # FIX: C6-H-08
+    })  # FIX: C6-H-08
+
+    inst.save_manifest()  # FIX: C6-H-08 — must not raise KeyError
+
+    checksums_path = inst.evidence_dir / "CHECKSUMS.txt"  # FIX: C6-H-08
+    manifest_path = inst.evidence_dir / "chain-of-custody.json"  # FIX: C6-H-08
+    assert checksums_path.exists(), "CHECKSUMS.txt was not written"  # FIX: C6-H-08
+    assert manifest_path.exists(), "chain-of-custody.json was not written"  # FIX: C6-H-08
+    checksums_content = checksums_path.read_text(encoding="utf-8")  # FIX: C6-H-08
+    assert "# DEGRADED  log_collection_degraded" in checksums_content, checksums_content  # FIX: C6-H-08
+    # Negative assertion: no SHA-256 checksum line for the degraded item exists  # FIX: C6-H-08
+    bad_checksum = re.compile(r"^[0-9a-fA-F]{64}\s+log_collection_degraded\s*$", re.MULTILINE)  # FIX: C6-H-08
+    assert not bad_checksum.search(checksums_content), (  # FIX: C6-H-08
+        "save_manifest emitted an invalid checksum line for a degraded item; "  # FIX: C6-H-08
+        "the `continue` at L435 of forensics-collector.py is not guarding the "  # FIX: C6-H-08
+        f"sha256sum-style line. Output was:\n{checksums_content}"  # FIX: C6-H-08
+    )  # FIX: C6-H-08
 
 
 def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
