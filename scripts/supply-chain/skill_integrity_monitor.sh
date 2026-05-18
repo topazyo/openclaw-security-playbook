@@ -698,9 +698,9 @@ restore_skill() {
 
     info "Restoring skill: $quarantine_id"
 
-    # Read original path
+    # Read original path — awk extracts everything after the 3rd field so paths with spaces round-trip ## FIX: C6-M-06
     local original_path
-    original_path=$(grep "Original Path:" "${quarantine_path}/QUARANTINE_INFO.txt" | cut -d' ' -f3)
+    original_path=$(awk '/^Original Path:/ { $1=$2=""; sub(/^[[:space:]]+/, ""); print }' "${quarantine_path}/QUARANTINE_INFO.txt") ## FIX: C6-M-06
 
     if [ -z "$original_path" ]; then
         error "Could not determine original path"
