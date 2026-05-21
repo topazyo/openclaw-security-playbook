@@ -97,23 +97,34 @@ echo ""
 
 # Check 1: Credential Isolation
 echo "[1/7] Checking credential isolation..."
-BACKUP_FILES=$(find ~/.openclaw ~/.clawdbot ~/.moltbot -type f \( -name "*.bak*" -o -name "*~" -o -name "*.swp" \) 2>/dev/null || true)
-PLAINTEXT_KEYS=$(grep -rE "(sk-ant-|sk-proj-|AKIA[0-9A-Z]{16})" ~/.openclaw ~/.clawdbot ~/.moltbot 2>/dev/null || true)
+## FIX: C6-M-10 — verify at least one config dir exists before declaring success
+CONFIG_DIRS_FOUND=0 ## FIX: C6-M-10
+for _dir in ~/.openclaw ~/.clawdbot ~/.moltbot; do ## FIX: C6-M-10
+    [ -d "$_dir" ] && CONFIG_DIRS_FOUND=$((CONFIG_DIRS_FOUND + 1)) ## FIX: C6-M-10
+done ## FIX: C6-M-10
 
-if [ -n "$BACKUP_FILES" ]; then
-    BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l)
-    echo -e "${RED}✗ CRITICAL: Found ${BACKUP_COUNT} backup files that may contain credentials${NC}"
-    CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
-else
-    echo -e "${GREEN}✓ No backup credential files found${NC}"
-fi
+if [ "$CONFIG_DIRS_FOUND" -eq 0 ]; then ## FIX: C6-M-10
+    echo -e "${YELLOW}~ SKIP: No config dirs found (~/.openclaw, ~/.clawdbot, ~/.moltbot) — credential isolation check inconclusive${NC}" ## FIX: C6-M-10
+    WARNINGS=$((WARNINGS + 1)) ## FIX: C6-M-10
+else ## FIX: C6-M-10
+    BACKUP_FILES=$(find ~/.openclaw ~/.clawdbot ~/.moltbot -type f \( -name "*.bak*" -o -name "*~" -o -name "*.swp" \) 2>/dev/null || true)
+    PLAINTEXT_KEYS=$(grep -rE "(sk-ant-|sk-proj-|AKIA[0-9A-Z]{16})" ~/.openclaw ~/.clawdbot ~/.moltbot 2>/dev/null || true)
 
-if [ -n "$PLAINTEXT_KEYS" ]; then
-    echo -e "${RED}✗ CRITICAL: Potential plaintext credential patterns found${NC}"
-    CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
-else
-    echo -e "${GREEN}✓ No plaintext credential patterns found in local config paths${NC}"
-fi
+    if [ -n "$BACKUP_FILES" ]; then
+        BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l)
+        echo -e "${RED}✗ CRITICAL: Found ${BACKUP_COUNT} backup files that may contain credentials${NC}"
+        CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+    else
+        echo -e "${GREEN}✓ No backup credential files found${NC}"
+    fi
+
+    if [ -n "$PLAINTEXT_KEYS" ]; then
+        echo -e "${RED}✗ CRITICAL: Potential plaintext credential patterns found${NC}"
+        CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+    else
+        echo -e "${GREEN}✓ No plaintext credential patterns found in local config paths${NC}"
+    fi
+fi ## FIX: C6-M-10
 
 echo ""
 
