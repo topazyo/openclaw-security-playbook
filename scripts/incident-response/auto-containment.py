@@ -59,6 +59,11 @@ CONTAINMENT_LOG_DIR = Path("/var/log/openclaw/containment")
 BLOCK_NETWORK_ACL_ID = os.getenv("BLOCK_NETWORK_ACL_ID")  # FIX: C5-finding-3
 DNS_FIREWALL_DOMAIN_LIST_ID = os.getenv("DNS_FIREWALL_DOMAIN_LIST_ID")  # FIX: C5-finding-3
 RATE_LIMIT_CONFIG_PATH = os.getenv("RATE_LIMIT_CONFIG_PATH")  # FIX: C5-finding-3
+# Allowlisted base directory the rate-limit config path must resolve under.
+# When unset, ContainmentManager defaults the base to its log directory so
+# RATE_LIMIT_CONFIG_PATH cannot point the script at arbitrary files (e.g.
+# /etc/passwd) if the env is attacker-influenced and the process is privileged.
+RATE_LIMIT_ALLOWED_BASE_DIR = os.getenv("RATE_LIMIT_ALLOWED_BASE_DIR")
 
 # Logging
 logging.basicConfig(
@@ -329,7 +334,27 @@ class ContainmentManager:
         logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             if RATE_LIMIT_CONFIG_PATH:  # FIX: C5-finding-3
-                rate_limit_profile_path = Path(RATE_LIMIT_CONFIG_PATH)  # FIX: C5-finding-3
+                candidate_path = Path(RATE_LIMIT_CONFIG_PATH)
+                allowed_base = (
+                    Path(RATE_LIMIT_ALLOWED_BASE_DIR) if RATE_LIMIT_ALLOWED_BASE_DIR else self.log_dir
+                )
+                if allowed_base is None:
+                    logger.error(
+                        "Refusing to honor RATE_LIMIT_CONFIG_PATH: no allowlisted base "
+                        "(set RATE_LIMIT_ALLOWED_BASE_DIR or restore log directory)"
+                    )
+                    self.log_action("update_rate_limits", mode, "failed", {"error": "no allowlisted base", "config_path": str(candidate_path)})
+                    return False
+                resolved_candidate = candidate_path.resolve()
+                resolved_base = allowed_base.resolve()
+                if not resolved_candidate.is_relative_to(resolved_base):
+                    logger.error(
+                        "RATE_LIMIT_CONFIG_PATH %s is not under allowlisted base %s; refusing to write",
+                        resolved_candidate, resolved_base,
+                    )
+                    self.log_action("update_rate_limits", mode, "failed", {"error": "path outside allowlisted base", "config_path": str(resolved_candidate), "allowed_base": str(resolved_base)})
+                    return False
+                rate_limit_profile_path = candidate_path
             elif self.log_dir is not None:
                 rate_limit_profile_path = self.log_dir / f"{self.incident_id}-rate-limits.json"
             else:
@@ -342,8 +367,23 @@ class ContainmentManager:
                 self.log_action("update_rate_limits", mode, "dry_run", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
                 return True  # FIX: C5-finding-3
             rate_limit_profile_path.parent.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
-            with open(rate_limit_profile_path, 'w', encoding='utf-8') as f:  # FIX: C5-finding-3
-                json.dump(rate_limit_payload, f, indent=2)  # FIX: C5-finding-3
+            # Atomic write: emit to a sibling temp file then rename, so a crash
+            # mid-write cannot leave a half-written rate-limit config in place.
+            fd, temp_path_str = tempfile.mkstemp(
+                prefix=f".{rate_limit_profile_path.name}.",
+                suffix=".tmp",
+                dir=str(rate_limit_profile_path.parent),
+            )
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(rate_limit_payload, f, indent=2)
+                os.replace(temp_path_str, rate_limit_profile_path)
+            except Exception:
+                try:
+                    os.unlink(temp_path_str)
+                except OSError:
+                    pass
+                raise
             self.rollback_commands.append({"action": "restore_rate_limits", "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
             self.log_action("update_rate_limits", mode, "success", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
             logger.info(f"✓ Rate limits updated successfully using mode {mode}")  # FIX: C5-finding-3

@@ -332,6 +332,7 @@ def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
     ctx.module.docker = None
     rate_limit_path = tmp_path / "rate-limits" / "override.json"
     ctx.module.RATE_LIMIT_CONFIG_PATH = str(rate_limit_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
     manager = ctx.module.ContainmentManager("INC-RATE")
 
     limits = {
@@ -346,6 +347,24 @@ def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
 
     assert manager.update_rate_limits("aggressive", {"bad": {1, 2}}, reason="Malformed limits") is False
     assert manager.actions_taken[-1]["status"] == "failed"
+
+
+def test_update_rate_limits_rejects_config_path_outside_allowlisted_base(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_rate_limits_allowlist")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+    safe_base = tmp_path / "safe"
+    safe_base.mkdir()
+    outside_path = tmp_path / "outside" / "rate-limits.json"
+    ctx.module.RATE_LIMIT_CONFIG_PATH = str(outside_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(safe_base)
+    manager = ctx.module.ContainmentManager("INC-RATE-DENY")
+
+    assert manager.update_rate_limits("aggressive", {"global_per_second": 100}, reason="path traversal") is False
+    assert not outside_path.exists()
+    failure = manager.actions_taken[-1]
+    assert failure["status"] == "failed"
+    assert failure["details"]["error"] == "path outside allowlisted base"
 
 
 def test_isolate_ec2_instance_claim_isolates_instance_when_requested(tmp_path):
@@ -393,6 +412,7 @@ def test_main_claim_dispatches_requested_containment_action(tmp_path):
     ctx.module.boto3 = None
     ctx.module.docker = None
     ctx.module.RATE_LIMIT_CONFIG_PATH = str(tmp_path / "main-rate-limits.json")
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
     ctx.module.CONTAINMENT_LOG_DIR = tmp_path / "containment-main"
     ctx.module.CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
