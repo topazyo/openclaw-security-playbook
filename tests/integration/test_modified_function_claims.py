@@ -185,21 +185,15 @@ def test__resolve_firewall_domain_list_id_claim_resolves_domain_blocklist(tmp_pa
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_resolve_domain_list")
     manager = ctx.module.ContainmentManager("INC-DOMAIN")
 
-    ctx.fake_route53resolver.list_firewall_domain_lists.return_value = {
-        "FirewallDomainLists": [{"Name": "openclaw-auto-containment", "Id": "fdl-existing"}]
-    }
-    assert manager._resolve_firewall_domain_list_id() == "fdl-existing"
+    # Returns the pre-wired list when DNS_FIREWALL_DOMAIN_LIST_ID is set.
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-prewired"
+    assert manager._resolve_firewall_domain_list_id() == "fdl-prewired"
 
-    ctx.fake_route53resolver.list_firewall_domain_lists.return_value = {
-        "FirewallDomainLists": [{"Name": "other-list", "Id": "fdl-other"}]
-    }
-    ctx.fake_route53resolver.create_firewall_domain_list.return_value = {"unexpected": "shape"}  # FIX: C6-H-01
-    with pytest.raises(  # FIX: C6-H-01
-        RuntimeError,  # FIX: C6-H-01
-        match=r"^firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID",  # FIX: C6-H-01
-    ):  # FIX: C6-H-01
-        manager._resolve_firewall_domain_list_id()  # FIX: C6-H-01
-    ctx.fake_route53resolver.create_firewall_domain_list.assert_called_once()
+    # Refuses to silently create an unenforced list when the env var is unset.
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = None
+    with pytest.raises(RuntimeError, match=r"^DNS_FIREWALL_DOMAIN_LIST_ID is not set"):
+        manager._resolve_firewall_domain_list_id()
+    ctx.fake_route53resolver.create_firewall_domain_list.assert_not_called()
 
 
 def test_block_ip_address_claim_blocks_attack_ip(tmp_path):
@@ -226,6 +220,7 @@ def test_block_ip_address_claim_blocks_attack_ip(tmp_path):
 
 def test_block_domain_name_claim_blocks_attack_domain(tmp_path):
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_block_domain")
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-default"
     manager = ctx.module.ContainmentManager("INC-DNS")
 
     assert manager.block_domain_name(

@@ -161,27 +161,25 @@ class ContainmentManager:
             "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
         )  # FIX: C6-H-01
 
-    def _resolve_firewall_domain_list_id(self) -> str:  # FIX: C5-finding-3
-        """Resolve the DNS firewall domain list used for domain blocking."""  # FIX: C5-finding-3
-        if self.route53resolver is None:  # FIX: C5-finding-3
-            raise RuntimeError("boto3 is required for Route53 Resolver management")  # FIX: C5-finding-3
-        if DNS_FIREWALL_DOMAIN_LIST_ID:  # FIX: C5-finding-3
-            return DNS_FIREWALL_DOMAIN_LIST_ID  # FIX: C5-finding-3
-        response = self.route53resolver.list_firewall_domain_lists(MaxResults=100)  # FIX: C5-finding-3
-        firewall_domain_lists = response.get("FirewallDomainLists", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
-        for firewall_domain_list in firewall_domain_lists:  # FIX: C5-finding-3
-            if isinstance(firewall_domain_list, dict) and firewall_domain_list.get("Name") == "openclaw-auto-containment":  # FIX: C5-finding-3
-                return firewall_domain_list["Id"]  # FIX: C5-finding-3
-        created_domain_list = self.route53resolver.create_firewall_domain_list(  # FIX: C5-finding-3
-            CreatorRequestId=f"{self.incident_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",  # FIX: C5-finding-3
-            Name="openclaw-auto-containment",  # FIX: C5-finding-3
-        )  # FIX: C5-finding-3
-        created_record = created_domain_list.get("FirewallDomainList", {}) if isinstance(created_domain_list, dict) else {}  # FIX: C5-finding-3
-        if not isinstance(created_domain_list, dict) or not isinstance(created_record, dict) or not created_record.get("Id"):  # FIX: C6-H-01
-            raise RuntimeError(  # FIX: C6-H-01
-                "firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID to a valid pre-existing list"  # FIX: C6-H-01
-            )  # FIX: C6-H-01
-        return created_record["Id"]  # FIX: C6-H-01
+    def _resolve_firewall_domain_list_id(self) -> str:
+        """Resolve the DNS firewall domain list used for domain blocking.
+
+        Requires DNS_FIREWALL_DOMAIN_LIST_ID to point at a list that is already
+        referenced by a Route53 Resolver DNS Firewall rule group associated
+        with the target VPC(s). Creating a list on demand is intentionally not
+        supported: an orphan list enforces no policy, so reporting "success"
+        after creating one would be a false claim.
+        """
+        if self.route53resolver is None:
+            raise RuntimeError("boto3 is required for Route53 Resolver management")
+        if not DNS_FIREWALL_DOMAIN_LIST_ID:
+            raise RuntimeError(
+                "DNS_FIREWALL_DOMAIN_LIST_ID is not set. Provide the Id of a "
+                "Route53 Resolver DNS Firewall domain list that is already "
+                "referenced by a rule group associated with the target VPC(s); "
+                "this script will not create an unenforced list."
+            )
+        return DNS_FIREWALL_DOMAIN_LIST_ID
 
     def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
         """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
