@@ -215,6 +215,54 @@ class TestT5SoaInternalInconsistencyRaises:  # FIX: C6-H-05
 
 
 # ---------------------------------------------------------------------------
+# T5b — strict int validation on SoA fields before any arithmetic
+# ---------------------------------------------------------------------------
+
+class TestT5bSoaIntFieldStrictValidation:
+    """_build_iso27001_coverage_summary rejects non-int SoA fields with a clear ValueError."""
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("total_controls", "93"),
+            ("total_controls", None),
+            ("implemented", "45"),
+            ("implemented", None),
+            ("planned", 25.0),
+            ("planned", True),
+            ("not_applicable", "23"),
+        ],
+    )
+    def test_non_int_soa_field_raises_named_value_error(self, field, value):
+        statement = _make_statement()
+        statement[field] = value
+
+        with pytest.raises(ValueError) as exc_info:
+            ComplianceReporter._build_iso27001_coverage_summary(
+                _make_corpus_controls(n_implemented=0), statement
+            )
+        msg = str(exc_info.value)
+        assert field in msg, f"Error message must name the offending field {field!r}; got: {msg!r}"
+
+    def test_not_applicable_defaults_to_zero_when_missing(self):
+        statement = _make_statement()
+        del statement["not_applicable"]
+        # implemented=45, planned=25, not_applicable=0 (default) -> 70 applicable
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(
+            _make_corpus_controls(n_implemented=70), statement
+        )
+        assert coverage["soa_not_applicable"] == 0
+        assert coverage["soa_applicable_controls"] == 70
+
+    def test_required_field_missing_raises_named_value_error(self):
+        statement = _make_statement()
+        del statement["implemented"]
+
+        with pytest.raises(ValueError, match="implemented"):
+            ComplianceReporter._build_iso27001_coverage_summary([], statement)
+
+
+# ---------------------------------------------------------------------------
 # T6 — applicable_controls == 0 still raises ValueError (D4 preservation)
 # ---------------------------------------------------------------------------
 

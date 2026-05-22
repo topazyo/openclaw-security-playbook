@@ -10,7 +10,7 @@ import json
 import sys  # FIX: C6-H-05
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypeAlias, cast  # FIX: C5-finding-4
+from typing import Any, Optional, TypeAlias, cast  # FIX: C5-finding-4
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -95,6 +95,33 @@ class ComplianceReporter:
                 f"= {actual_sum} must equal total_controls({total})"  # FIX: C6-H-05
             )  # FIX: C6-H-05
 
+    @staticmethod
+    def _require_soa_int_field(
+        statement: ControlRecord,
+        field_name: str,
+        *,
+        default_when_missing: Optional[int] = None,
+    ) -> int:
+        """Return statement[field_name] as a strict int (bool excluded).
+
+        Raises ValueError naming the field when the value is missing without a
+        default, or when it is not an int (or is a bool, since bool subclasses
+        int in Python but is never the intended type for a control count).
+        """
+        if field_name not in statement:
+            if default_when_missing is not None:
+                return default_when_missing
+            raise ValueError(
+                f"ISO27001 statement_of_applicability missing required integer field {field_name!r}"
+            )
+        value = statement[field_name]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"ISO27001 statement_of_applicability field {field_name!r} must be an int, "
+                f"got {type(value).__name__}: {value!r}"
+            )
+        return value
+
     @staticmethod  # FIX: C6-H-05
     def _build_iso27001_coverage_summary(  # FIX: C6-H-05
         corpus_controls: list[ControlRecord],  # FIX: C6-H-05
@@ -112,10 +139,15 @@ class ComplianceReporter:
           OVER_MAPPING        — mapped controls > soa_applicable_controls
         """  # FIX: C6-H-05
         mapped = len(corpus_controls)  # FIX: C6-H-05
-        soa_total = statement.get("total_controls", 0)  # FIX: C6-H-05
-        soa_implemented = statement.get("implemented", 0)  # FIX: C6-H-05
-        soa_planned = statement.get("planned", 0)  # FIX: C6-H-05
-        soa_not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
+        # Strict int validation before any arithmetic; raises ValueError naming
+        # the offending field if a corpus entry is the wrong type (str, None,
+        # bool, etc.) instead of letting TypeError leak out of the arithmetic.
+        soa_total = ComplianceReporter._require_soa_int_field(statement, "total_controls")
+        soa_implemented = ComplianceReporter._require_soa_int_field(statement, "implemented")
+        soa_planned = ComplianceReporter._require_soa_int_field(statement, "planned")
+        soa_not_applicable = ComplianceReporter._require_soa_int_field(
+            statement, "not_applicable", default_when_missing=0
+        )
         soa_applicable = soa_implemented + soa_planned  # FIX: C6-H-05
 
         unmapped = soa_applicable - mapped  # FIX: C6-H-05 (signed: negative means OVER_MAPPING)
