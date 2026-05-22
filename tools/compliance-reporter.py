@@ -180,29 +180,45 @@ class ComplianceReporter:
             "gap_status": gap_status,  # FIX: C6-H-05
         }  # FIX: C6-H-05
 
-    @staticmethod  # FIX: C6-H-05
-    def _emit_iso27001_coverage_warning(coverage: dict[str, Any]) -> None:  # FIX: C6-H-05
-        """Write a single-line WARNING to stderr when corpus mapping is incomplete.
+    @staticmethod
+    def _emit_iso27001_coverage_warning(coverage: dict[str, Any]) -> None:
+        """Write a single-line WARNING to stderr for non-complete corpus mapping.
 
-        No-op when gap_status is COMPLETE_MAPPING (corpus fully covers SoA applicable
-        controls).  The WARNING: prefix is picked up by CI log scanners and most
-        Splunk parsers without configuration.
+        The WARNING: prefix is picked up by CI log scanners and most Splunk
+        parsers without configuration. Message and fields branch on
+        gap_status so OVER_MAPPING does not surface a negative 'gap' value
+        (which would confuse field-based assertions in CI scanners).
 
-        Format (machine-parseable, one line, no newlines):
-          WARNING: ISO27001 compliance_mapping coverage gap: mapped=<n> soa_applicable=<n> gap=<n> (coverage=<n.nn>%) basis=loaded_corpus
-        """  # FIX: C6-H-05
-        if coverage.get("gap_status") == "COMPLETE_MAPPING":  # FIX: C6-H-05
-            return  # FIX: C6-H-05
-        mapped = coverage["mapped_controls"]  # FIX: C6-H-05
-        soa_applicable = coverage["soa_applicable_controls"]  # FIX: C6-H-05
-        gap = soa_applicable - mapped  # FIX: C_emit_iso27001_coverage_warning() emits a 'coverage gap' WARNING for any non-COMPLETE_MAPPING state, including OVER_MAPPING. In the over-mapped case, gap becomes negative, which is likely confusing for CI log scanners and aud6-H-05
-        pct = coverage["corpus_to_soa_coverage_percentage"]  # FIX: C6-H-05
-        print(  # FIX: C6-H-05
-            f"WARNING: ISO27001 compliance_mapping coverage gap: "  # FIX: C6-H-05
-            f"mapped={mapped} soa_applicable={soa_applicable} gap={gap} "  # FIX: C6-H-05
-            f"(coverage={pct}%) basis=loaded_corpus",  # FIX: C6-H-05
-            file=sys.stderr,  # FIX: C6-H-05
-        )  # FIX: C6-H-05
+        Formats (machine-parseable, one line, no newlines):
+          INCOMPLETE_MAPPING:
+            WARNING: ISO27001 compliance_mapping coverage gap: mapped=<n> soa_applicable=<n> gap=<n> (coverage=<n.nn>%) basis=loaded_corpus
+          OVER_MAPPING:
+            WARNING: ISO27001 compliance_mapping mapping excess: mapped=<n> soa_applicable=<n> over_mapped_by=<n> (coverage=<n.nn>%) basis=loaded_corpus
+          COMPLETE_MAPPING:
+            no-op
+        """
+        gap_status = coverage.get("gap_status")
+        if gap_status == "COMPLETE_MAPPING":
+            return
+        mapped = coverage["mapped_controls"]
+        soa_applicable = coverage["soa_applicable_controls"]
+        pct = coverage["corpus_to_soa_coverage_percentage"]
+        if gap_status == "OVER_MAPPING":
+            over_mapped_by = mapped - soa_applicable
+            print(
+                f"WARNING: ISO27001 compliance_mapping mapping excess: "
+                f"mapped={mapped} soa_applicable={soa_applicable} over_mapped_by={over_mapped_by} "
+                f"(coverage={pct}%) basis=loaded_corpus",
+                file=sys.stderr,
+            )
+            return
+        gap = soa_applicable - mapped
+        print(
+            f"WARNING: ISO27001 compliance_mapping coverage gap: "
+            f"mapped={mapped} soa_applicable={soa_applicable} gap={gap} "
+            f"(coverage={pct}%) basis=loaded_corpus",
+            file=sys.stderr,
+        )
 
     @staticmethod
     def _normalize_control_list(mapping_name: str, controls: list[Any]) -> list[ControlRecord]:  # FIX: C5-finding-4

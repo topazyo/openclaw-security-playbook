@@ -215,6 +215,29 @@ class TestT5SoaInternalInconsistencyRaises:  # FIX: C6-H-05
 
 
 # ---------------------------------------------------------------------------
+# T4b — OVER_MAPPING warning uses 'mapping excess' and positive over_mapped_by
+# ---------------------------------------------------------------------------
+
+class TestT4bOverMappingWarningShape:
+    """_emit_iso27001_coverage_warning emits a distinct message for OVER_MAPPING."""
+
+    def test_over_mapping_warning_uses_excess_message_and_positive_over_mapped_by(self, capsys):
+        # SoA applicable = 5 + 5 = 10, but corpus has 15 controls -> OVER_MAPPING
+        statement = _make_statement(total=20, implemented=5, planned=5, not_applicable=10)
+        corpus = _make_corpus_controls(n_implemented=15)
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == "OVER_MAPPING"
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        assert "mapping excess" in err
+        assert "coverage gap" not in err, "OVER_MAPPING must not use the 'coverage gap' wording"
+        assert "over_mapped_by=5" in err, f"over_mapped_by must be positive 5; got: {err!r}"
+        assert "gap=-" not in err, f"Negative gap=… must not appear; got: {err!r}"
+        assert "basis=loaded_corpus" in err
+
+
+# ---------------------------------------------------------------------------
 # T5c — _validate_soa_internal_consistency fails closed on malformed types
 # ---------------------------------------------------------------------------
 
