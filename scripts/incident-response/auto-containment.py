@@ -36,6 +36,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
@@ -99,8 +100,27 @@ class ContainmentManager:
         else:
             logger.warning("docker SDK not available")  # FIX: C5-finding-3
         
-        # Create log directory
-        CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        # Resolve a writable log directory; fall back to a tempdir if the
+        # default isn't writable so the tool can still run (stdout/stderr
+        # logging is always available). None disables file logging entirely.
+        self.log_dir: Optional[Path] = CONTAINMENT_LOG_DIR
+        try:
+            CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            fallback = Path(tempfile.gettempdir()) / "openclaw" / "containment"
+            try:
+                fallback.mkdir(parents=True, exist_ok=True)
+                self.log_dir = fallback
+                logger.warning(
+                    "Containment log dir %s not writable (%s); falling back to %s",
+                    CONTAINMENT_LOG_DIR, e, fallback,
+                )
+            except OSError as e2:
+                self.log_dir = None
+                logger.error(
+                    "Cannot create containment log dir (%s) or fallback (%s); file logging disabled",
+                    e, e2,
+                )
     
     def log_action(self, action: str, target: str, status: str, details: Optional[Dict] = None):  # pylance: details defaults to None so type must be Optional
         """Log containment action"""
@@ -115,9 +135,11 @@ class ContainmentManager:
         }
         
         self.actions_taken.append(action_record)
-        
-        log_file = CONTAINMENT_LOG_DIR / f"{self.incident_id}.json"
-        
+
+        if self.log_dir is None:
+            return
+        log_file = self.log_dir / f"{self.incident_id}.json"
+
         # Append to log file
         try:
             with open(log_file, 'a') as f:
@@ -244,7 +266,14 @@ class ContainmentManager:
         """Write an emergency rate-limit override profile for the requested mode."""  # FIX: C5-finding-3
         logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
-            rate_limit_profile_path = Path(RATE_LIMIT_CONFIG_PATH) if RATE_LIMIT_CONFIG_PATH else CONTAINMENT_LOG_DIR / f"{self.incident_id}-rate-limits.json"  # FIX: C5-finding-3
+            if RATE_LIMIT_CONFIG_PATH:  # FIX: C5-finding-3
+                rate_limit_profile_path = Path(RATE_LIMIT_CONFIG_PATH)  # FIX: C5-finding-3
+            elif self.log_dir is not None:
+                rate_limit_profile_path = self.log_dir / f"{self.incident_id}-rate-limits.json"
+            else:
+                logger.error("No writable path for rate-limit profile (set RATE_LIMIT_CONFIG_PATH)")
+                self.log_action("update_rate_limits", mode, "failed", {"error": "no writable path"})
+                return False
             rate_limit_payload = {"incident_id": self.incident_id, "mode": mode, "updated_at": datetime.now(timezone.utc).isoformat(), "limits": limits, "reason": reason}  # FIX: C5-finding-3
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would write the emergency rate-limit override profile")  # FIX: C5-finding-3
@@ -513,12 +542,13 @@ class ContainmentManager:
             "rollback_commands": self.rollback_commands
         }
         
-        report_file = CONTAINMENT_LOG_DIR / f"{self.incident_id}-report.json"
-        
-        with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
-        
-        logger.info(f"✓ Containment report saved: {report_file}")
+        if self.log_dir is None:
+            logger.error("No writable log directory; skipping containment report file")
+        else:
+            report_file = self.log_dir / f"{self.incident_id}-report.json"
+            with open(report_file, 'w') as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"✓ Containment report saved: {report_file}")
         
         # Print summary
         print("\n" + "=" * 80)
