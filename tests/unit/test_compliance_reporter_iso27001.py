@@ -376,6 +376,58 @@ class TestT7Soc2GdprUnchanged:  # FIX: C6-H-05
 
 
 # ---------------------------------------------------------------------------
+# T9 — warning emission matches gap_status across all three classifications
+# ---------------------------------------------------------------------------
+
+class TestT9WarningEmissionMatchesGapStatus:
+    """Consolidated coverage for the SoA warning-emission contract.
+
+    Verifies ask #4 from the review checklist in one place: warnings are
+    emitted only when appropriate, with the right wording and field names.
+    """
+
+    @pytest.mark.parametrize(
+        "n_mapped, expected_status, expected_substrings, forbidden_substrings",
+        [
+            (19, "INCOMPLETE_MAPPING", ["WARNING:", "coverage gap", "gap=51"], ["mapping excess", "over_mapped_by", "gap=-"]),
+            (80, "OVER_MAPPING", ["WARNING:", "mapping excess", "over_mapped_by=10"], ["coverage gap", "gap="]),
+        ],
+        ids=["incomplete-warns-with-gap", "over-mapped-warns-with-excess"],
+    )
+    def test_warning_shape_per_gap_status(
+        self,
+        capsys,
+        n_mapped,
+        expected_status,
+        expected_substrings,
+        forbidden_substrings,
+    ):
+        statement = _make_statement(total=93, implemented=45, planned=25, not_applicable=23)
+        corpus = _make_corpus_controls(n_implemented=n_mapped)
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == expected_status
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        for substring in expected_substrings:
+            assert substring in err, f"expected {substring!r} in stderr; got: {err!r}"
+        for substring in forbidden_substrings:
+            assert substring not in err, f"forbidden {substring!r} found in stderr; got: {err!r}"
+        # Exactly one WARNING line is emitted.
+        assert err.count("WARNING:") == 1, f"expected exactly one WARNING line; got: {err!r}"
+
+    def test_complete_mapping_emits_nothing(self, capsys):
+        statement = _make_statement(total=93, implemented=45, planned=25, not_applicable=23)
+        corpus = _make_corpus_controls(n_implemented=70)  # 70 == soa_applicable
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == "COMPLETE_MAPPING"
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        assert err == "", f"COMPLETE_MAPPING must be silent; stderr: {err!r}"
+
+
+# ---------------------------------------------------------------------------
 # T8 — coverage_summary invariants (Architect Revision 1, parametrized)
 # ---------------------------------------------------------------------------
 
