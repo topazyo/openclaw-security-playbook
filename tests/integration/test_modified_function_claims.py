@@ -349,6 +349,102 @@ def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
     assert manager.actions_taken[-1]["status"] == "failed"
 
 
+@pytest.mark.parametrize("bad_input", ["", "   ", "not.an.ip", "192.168.1.999", "256.0.0.1"])
+def test_block_ip_address_rejects_invalid_ip_inputs(tmp_path, bad_input):
+    ctx = _load_auto_containment_context(tmp_path, f"auto_containment_bad_ip_{abs(hash(bad_input))}")
+    manager = ctx.module.ContainmentManager("INC-BAD-IP")
+
+    create_calls_before = ctx.fake_ec2.create_network_acl_entry.call_count
+    assert manager.block_ip_address(bad_input, reason="invalid") is False
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == create_calls_before
+    assert manager.actions_taken[-1]["status"] == "failed"
+    assert manager.rollback_commands == []
+
+
+def test_main_rejects_non_dict_limits_payload(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_main_nondict_limits")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "auto-containment.py",
+            "--incident",
+            "INC-NONDICT",
+            "--action",
+            "update_rate_limits",
+            "--mode",
+            "aggressive",
+            "--limits",
+            "[1, 2, 3]",
+        ],
+    ):
+        with pytest.raises(SystemExit) as exc_info:
+            ctx.module.main()
+    assert exc_info.value.code != 0
+
+
+def test_dry_run_skips_mutating_calls_and_records_rollback_on_success(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_dry_run")
+    rate_limit_path = tmp_path / "rate-limits" / "override.json"
+    ctx.module.RATE_LIMIT_CONFIG_PATH = str(rate_limit_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-default"
+
+    # Dry-run path: no mutating AWS/Docker/file-write calls; no rollback entries.
+    dry = ctx.module.ContainmentManager("INC-DRY", dry_run=True)
+    assert dry.block_ip_address("198.51.100.42", reason="dry") is True
+    assert dry.block_domain_name("evil.example", reason="dry") is True
+    assert dry.isolate_container("ctr-1", reason="dry") is True
+    assert dry.update_rate_limits("aggressive", {"global_per_second": 1}, reason="dry") is True
+
+    ctx.fake_ec2.create_network_acl_entry.assert_not_called()
+    ctx.fake_route53resolver.update_firewall_domains.assert_not_called()
+    ctx.fake_network.disconnect.assert_not_called()
+    ctx.fake_container.update.assert_not_called()
+    assert not rate_limit_path.exists()
+    assert dry.rollback_commands == []
+    assert all(record["status"] == "dry_run" for record in dry.actions_taken)
+
+    # Real-run path: the same actions populate rollback_commands with the
+    # expected action names so an operator can undo each step.
+    real = ctx.module.ContainmentManager("INC-REAL")
+    assert real.block_ip_address("198.51.100.42", reason="real") is True
+    assert real.block_domain_name("evil.example", reason="real") is True
+    assert real.update_rate_limits("aggressive", {"global_per_second": 1}, reason="real") is True
+    rollback_actions = [entry["action"] for entry in real.rollback_commands]
+    assert "delete_network_acl_entry" in rollback_actions
+    assert "remove_firewall_domain" in rollback_actions
+    assert "restore_rate_limits" in rollback_actions
+
+
+def test_log_action_per_run_files_isolate_concurrent_instances(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_concurrent_log")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+    ctx.module.CONTAINMENT_LOG_DIR = tmp_path / "containment-concurrent"
+
+    # Two managers for the same incident — different processes would naturally
+    # land here; in-test, two instances suffice because the per-run id derives
+    # from PID + microsecond timestamp.
+    first = ctx.module.ContainmentManager("INC-CONCUR")
+    second = ctx.module.ContainmentManager("INC-CONCUR")
+    assert first.log_file_path != second.log_file_path
+    assert first.log_file_path is not None and second.log_file_path is not None
+
+    first.log_action("block_ip", "1.1.1.1", "success", {"who": "first"})
+    second.log_action("block_ip", "2.2.2.2", "success", {"who": "second"})
+
+    first_lines = first.log_file_path.read_text(encoding="utf-8").splitlines()
+    second_lines = second.log_file_path.read_text(encoding="utf-8").splitlines()
+    assert len(first_lines) == 1
+    assert len(second_lines) == 1
+    assert json.loads(first_lines[0])["details"]["who"] == "first"
+    assert json.loads(second_lines[0])["details"]["who"] == "second"
+
+
 def test_update_rate_limits_rejects_config_path_outside_allowlisted_base(tmp_path):
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_rate_limits_allowlist")
     ctx.module.boto3 = None

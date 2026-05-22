@@ -37,6 +37,7 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
@@ -126,7 +127,20 @@ class ContainmentManager:
                     "Cannot create containment log dir (%s) or fallback (%s); file logging disabled",
                     e, e2,
                 )
-    
+
+        # Per-run action-log file: PID + microsecond UTC timestamp ensures
+        # concurrent ContainmentManager processes never share a writer, so
+        # JSONL appends cannot interleave. The threading.Lock additionally
+        # serializes same-process appends if this class is ever used from
+        # multiple threads.
+        self.run_id = f"{os.getpid()}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+        self.log_file_path: Optional[Path] = (
+            self.log_dir / f"{self.incident_id}-{self.run_id}.jsonl"
+            if self.log_dir is not None
+            else None
+        )
+        self._log_lock = threading.Lock()
+
     def log_action(self, action: str, target: str, status: str, details: Optional[Dict] = None):  # pylance: details defaults to None so type must be Optional
         """Log containment action"""
         action_record = {
@@ -141,14 +155,15 @@ class ContainmentManager:
         
         self.actions_taken.append(action_record)
 
-        if self.log_dir is None:
+        if self.log_file_path is None:
             return
-        log_file = self.log_dir / f"{self.incident_id}.json"
 
-        # Append to log file
+        # Same-process serial appends are guarded by self._log_lock; cross-
+        # process serialization is provided by the per-run filename.
         try:
-            with open(log_file, 'a') as f:
-                f.write(json.dumps(action_record) + "\n")
+            with self._log_lock:
+                with open(self.log_file_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(action_record) + "\n")
         except Exception as e:
             logger.error(f"Failed to write log: {e}")
 
