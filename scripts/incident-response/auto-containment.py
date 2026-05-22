@@ -95,7 +95,7 @@ class ContainmentManager:
                 self.docker_client = docker.from_env()  # FIX: C5-finding-3
             except (docker.errors.DockerException, OSError) as e:  # FIX: C6-M-03  # type: ignore[attr-defined]  # pylance: docker module attrs unknown to pyright when stubs absent
                 self.docker_client = None  # FIX: C5-M-02
-                self.log_action("init_docker_client", "self", "FAIL", {"error": str(e)})  # FIX: C5-M-02
+                self.log_action("init_docker_client", "self", "failed", {"error": str(e)})  # FIX: C5-M-02
                 logger.warning("Docker not available: %s", e)  # FIX: C5-M-02
         else:
             logger.warning("docker SDK not available")  # FIX: C5-finding-3
