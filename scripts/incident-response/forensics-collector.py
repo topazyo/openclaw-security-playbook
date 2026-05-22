@@ -372,6 +372,9 @@ class ForensicsCollector:
                 "description": "DEGRADED — tcpdump not available; network packet capture was NOT performed",  # FIX: C5-M-04
                 "status": "degraded",  # FIX: C5-M-04
                 "reason": "tcpdump binary not found on PATH",  # FIX: C5-M-04
+                "checksum_sha256": None,
+                "file_size_bytes": None,
+                "metadata": {},
                 "collected_at": datetime.now(timezone.utc).isoformat(),  # FIX: C5-M-04
             })  # FIX: C5-M-04
             return False  # FIX: C5-M-04
@@ -402,6 +405,9 @@ class ForensicsCollector:
                 "description": f"FAILED — tcpdump ran but did not complete successfully: {e}",  # FIX: C5-M-04
                 "status": "failed",  # FIX: C5-M-04
                 "reason": str(e),  # FIX: C5-M-04
+                "checksum_sha256": None,
+                "file_size_bytes": None,
+                "metadata": {},
                 "collected_at": datetime.now(timezone.utc).isoformat(),  # FIX: C5-M-04
             })  # FIX: C5-M-04
             return False  # FIX: C5-M-04
@@ -429,6 +435,16 @@ class ForensicsCollector:
             f.write("# Evidence Items\n")
             
             for item in self.manifest["evidence_items"]:
+                # Degraded/failed items have no file on disk to checksum.
+                # Record their existence as a comment so operators can see
+                # the gap without claiming a checksum that does not exist.
+                if item.get("file_path") is None or item.get("checksum_sha256") is None:
+                    f.write(
+                        f"# DEGRADED: {item.get('name')} "
+                        f"(status={item.get('status', 'unknown')}, "
+                        f"reason={item.get('reason', 'unknown')})\n"
+                    )
+                    continue
                 f.write(f"{item['checksum_sha256']}  {item['file_path']}\n")
         
         logger.info(f"✓ Chain of custody manifest saved: {manifest_file}")
