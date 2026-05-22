@@ -218,6 +218,44 @@ def test_block_ip_address_claim_blocks_attack_ip(tmp_path):
     assert manager.actions_taken[-1]["status"] == "failed"
 
 
+def test_block_ip_address_allocates_unused_rule_number_and_is_idempotent(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_block_ip_alloc")
+    manager = ctx.module.ContainmentManager("INC-IP-ALLOC")
+
+    # NACL already has entries occupying numbers 100 and 101 in both directions,
+    # plus an existing deny-all for our CIDR on ingress only (egress missing).
+    ctx.fake_ec2.describe_network_acls.return_value = {
+        "NetworkAcls": [{
+            "NetworkAclId": "acl-emergency",
+            "Entries": [
+                {"RuleNumber": 100, "Egress": False, "CidrBlock": "10.0.0.0/8", "Protocol": "6", "RuleAction": "allow"},
+                {"RuleNumber": 101, "Egress": False, "CidrBlock": "203.0.113.10/32", "Protocol": "-1", "RuleAction": "deny"},
+                {"RuleNumber": 100, "Egress": True, "CidrBlock": "10.0.0.0/8", "Protocol": "6", "RuleAction": "allow"},
+            ],
+        }]
+    }
+
+    assert manager.block_ip_address("203.0.113.10", reason="repeat block") is True
+    # Ingress already covers this CIDR → no create; egress missing → create at lowest free (101).
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == 1
+    egress_call = ctx.fake_ec2.create_network_acl_entry.call_args_list[0]
+    assert egress_call.kwargs["Egress"] is True
+    assert egress_call.kwargs["CidrBlock"] == "203.0.113.10/32"
+    assert egress_call.kwargs["RuleNumber"] == 101
+    # Rollback records only the rule we actually created.
+    assert manager.rollback_commands[-1]["rule_numbers"] == [101]
+
+    # Re-running the same block is a no-op (both directions now present).
+    ctx.fake_ec2.describe_network_acls.return_value["NetworkAcls"][0]["Entries"].append(
+        {"RuleNumber": 101, "Egress": True, "CidrBlock": "203.0.113.10/32", "Protocol": "-1", "RuleAction": "deny"}
+    )
+    previous_create_count = ctx.fake_ec2.create_network_acl_entry.call_count
+    previous_rollback_count = len(manager.rollback_commands)
+    assert manager.block_ip_address("203.0.113.10", reason="idempotent retry") is True
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == previous_create_count
+    assert len(manager.rollback_commands) == previous_rollback_count
+
+
 def test_block_domain_name_claim_blocks_attack_domain(tmp_path):
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_block_domain")
     ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-default"

@@ -161,6 +161,62 @@ class ContainmentManager:
             "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
         )  # FIX: C6-H-01
 
+    def _allocate_acl_rule_numbers(self, network_acl_id: str, cidr_block: str):
+        """Find collision-free NACL rule numbers for an emergency deny on cidr_block.
+
+        Scans existing entries on the NACL. If a matching deny-all entry for the
+        same CIDR already exists in a given direction, reuses that rule number
+        and signals the caller to skip the create (idempotent re-block). For
+        any direction without an existing match, returns the lowest unused rule
+        number in [100, 32766]. Returns a dict with rule numbers and presence
+        flags so the caller can avoid both create-on-collision failures and
+        spurious rollback entries for rules it did not create.
+        """
+        if self.ec2 is None:
+            raise RuntimeError("boto3 is required for network ACL management")
+        response = self.ec2.describe_network_acls(NetworkAclIds=[network_acl_id])
+        network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []
+        entries = (
+            network_acls[0].get("Entries", [])
+            if network_acls and isinstance(network_acls[0], dict)
+            else []
+        )
+
+        ingress_used: set = set()
+        egress_used: set = set()
+        existing_ingress: Optional[int] = None
+        existing_egress: Optional[int] = None
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            rule_number = entry.get("RuleNumber")
+            if not isinstance(rule_number, int):
+                continue
+            is_egress = bool(entry.get("Egress"))
+            (egress_used if is_egress else ingress_used).add(rule_number)
+            if (
+                entry.get("CidrBlock") == cidr_block
+                and entry.get("RuleAction") == "deny"
+                and str(entry.get("Protocol")) == "-1"
+            ):
+                if is_egress:
+                    existing_egress = rule_number
+                else:
+                    existing_ingress = rule_number
+
+        def _next_free(used: set) -> int:
+            for candidate in range(100, 32767):
+                if candidate not in used:
+                    return candidate
+            raise RuntimeError("No free NACL rule numbers available in range 100-32766")
+
+        return {
+            "ingress_rule_number": existing_ingress if existing_ingress is not None else _next_free(ingress_used),
+            "egress_rule_number": existing_egress if existing_egress is not None else _next_free(egress_used),
+            "ingress_already_present": existing_ingress is not None,
+            "egress_already_present": existing_egress is not None,
+        }
+
     def _resolve_firewall_domain_list_id(self) -> str:
         """Resolve the DNS firewall domain list used for domain blocking.
 
@@ -188,17 +244,25 @@ class ContainmentManager:
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
             network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
             assert self.ec2 is not None  # pylance: _resolve_network_acl_id raises if self.ec2 is None
-            rule_seed = sum(ord(character) for character in cidr_block) % 10000  # FIX: C5-finding-3
-            ingress_rule_number = 100 + rule_seed  # FIX: C5-finding-3
-            egress_rule_number = 200 + rule_seed  # FIX: C5-finding-3
+            allocation = self._allocate_acl_rule_numbers(network_acl_id, cidr_block)
+            ingress_rule_number = allocation["ingress_rule_number"]
+            egress_rule_number = allocation["egress_rule_number"]
+            ingress_already_present = allocation["ingress_already_present"]
+            egress_already_present = allocation["egress_already_present"]
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C5-finding-3
-                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
                 return True  # FIX: C5-finding-3
-            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)  # FIX: C5-finding-3
-            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=egress_rule_number, Protocol='-1', RuleAction='deny', Egress=True, CidrBlock=cidr_block)  # FIX: C5-finding-3
-            self.rollback_commands.append({"action": "delete_network_acl_entry", "network_acl_id": network_acl_id, "rule_numbers": [ingress_rule_number, egress_rule_number]})  # FIX: C5-finding-3
-            self.log_action("block_ip", ip_address, "success", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+            created_rule_numbers = []
+            if not ingress_already_present:
+                self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)
+                created_rule_numbers.append(ingress_rule_number)
+            if not egress_already_present:
+                self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=egress_rule_number, Protocol='-1', RuleAction='deny', Egress=True, CidrBlock=cidr_block)
+                created_rule_numbers.append(egress_rule_number)
+            if created_rule_numbers:
+                self.rollback_commands.append({"action": "delete_network_acl_entry", "network_acl_id": network_acl_id, "rule_numbers": created_rule_numbers})
+            self.log_action("block_ip", ip_address, "success", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
             logger.info(f"✓ IP address {ip_address} blocked successfully")  # FIX: C5-finding-3
             return True  # FIX: C5-finding-3
         except Exception as e:  # FIX: C5-finding-3
