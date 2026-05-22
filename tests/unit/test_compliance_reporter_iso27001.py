@@ -215,6 +215,38 @@ class TestT5SoaInternalInconsistencyRaises:  # FIX: C6-H-05
 
 
 # ---------------------------------------------------------------------------
+# T5c — _validate_soa_internal_consistency fails closed on malformed types
+# ---------------------------------------------------------------------------
+
+class TestT5cValidatorFailsClosedOnBadTypes:
+    """_validate_soa_internal_consistency must raise, not silently return, on bad types."""
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("total_controls", "93"),
+            ("total_controls", None),
+            ("implemented", None),
+            ("planned", 25.0),
+            ("planned", True),
+            ("not_applicable", "23"),
+        ],
+    )
+    def test_validator_raises_named_value_error_for_bad_types(self, field, value):
+        statement = _make_statement()
+        statement[field] = value
+        with pytest.raises(ValueError) as exc_info:
+            ComplianceReporter._validate_soa_internal_consistency(statement)
+        assert field in str(exc_info.value)
+
+    def test_validator_raises_for_missing_required_field(self):
+        statement = _make_statement()
+        del statement["implemented"]
+        with pytest.raises(ValueError, match="implemented"):
+            ComplianceReporter._validate_soa_internal_consistency(statement)
+
+
+# ---------------------------------------------------------------------------
 # T5b — strict int validation on SoA fields before any arithmetic
 # ---------------------------------------------------------------------------
 

@@ -76,18 +76,19 @@ class ComplianceReporter:
     def _validate_soa_internal_consistency(statement: ControlRecord) -> None:  # FIX: C6-H-05
         """Assert that statement_of_applicability fields sum to total_controls.
 
-        Catches the prior failure mode where a worker set implemented=19, planned=0,
-        not_applicable=23 (sum=42) while total_controls remained 93 — an inconsistency
-        that the old code silently accepted.  Raises ValueError with all four numbers
-        so the offending field is immediately identifiable.
+        Fail-closed: each required field is validated as a strict int (rejects
+        bool) via _require_soa_int_field, then the sum is checked. A missing
+        required field, a wrong-typed field, or a sum mismatch all raise
+        ValueError naming the offending field so the caller (typically the
+        load helper) cannot mistake malformed SoA data for a clean record.
         """  # FIX: C6-H-05
-        total = statement.get("total_controls")  # FIX: C6-H-05
-        implemented = statement.get("implemented")  # FIX: C6-H-05
-        planned = statement.get("planned")  # FIX: C6-H-05
-        not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
-        if not all(isinstance(v, int) and not isinstance(v, bool) for v in (total, implemented, planned, not_applicable)):  # FIX: C6-H-05
-            return  # type checking handled by _calculate_statement_summary  # FIX: C6-H-05
-        actual_sum = implemented + planned + not_applicable  # type: ignore[operator]  # FIX: C6-H-05  # pylance: types narrowed by L88 isinstance(int) check; pyright cannot propagate narrowing through all() + genexp
+        total = ComplianceReporter._require_soa_int_field(statement, "total_controls")
+        implemented = ComplianceReporter._require_soa_int_field(statement, "implemented")
+        planned = ComplianceReporter._require_soa_int_field(statement, "planned")
+        not_applicable = ComplianceReporter._require_soa_int_field(
+            statement, "not_applicable", default_when_missing=0
+        )
+        actual_sum = implemented + planned + not_applicable
         if actual_sum != total:  # FIX: C6-H-05
             raise ValueError(  # FIX: C6-H-05
                 f"ISO27001 statement_of_applicability internal inconsistency: "  # FIX: C6-H-05
@@ -194,7 +195,7 @@ class ComplianceReporter:
             return  # FIX: C6-H-05
         mapped = coverage["mapped_controls"]  # FIX: C6-H-05
         soa_applicable = coverage["soa_applicable_controls"]  # FIX: C6-H-05
-        gap = soa_applicable - mapped  # FIX: C6-H-05
+        gap = soa_applicable - mapped  # FIX: C_emit_iso27001_coverage_warning() emits a 'coverage gap' WARNING for any non-COMPLETE_MAPPING state, including OVER_MAPPING. In the over-mapped case, gap becomes negative, which is likely confusing for CI log scanners and aud6-H-05
         pct = coverage["corpus_to_soa_coverage_percentage"]  # FIX: C6-H-05
         print(  # FIX: C6-H-05
             f"WARNING: ISO27001 compliance_mapping coverage gap: "  # FIX: C6-H-05
