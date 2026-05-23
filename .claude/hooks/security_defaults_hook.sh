@@ -111,17 +111,26 @@ check_file() {
   fi
 
   # TLS version — only TLS 1.3 permitted ## FIX: C6-H-09
-  if grep -qE 'ssl_protocols|tls_version|TLSv' "$FILE"; then ## FIX: C6-H-09
+  # Scope the TLS check to real configuration directives (ssl_protocols, ## FIX: C6-H-09
+  # tls_version) anchored at line start so commented-out lines and unrelated ## FIX: C6-H-09
+  # prose mentioning TLSv1.x do not produce false positives or false negatives. ## FIX: C6-H-09
+  # The trailing sed strips any inline `# ...` comment from each directive ## FIX: C6-H-09
+  # line, so `ssl_protocols TLSv1.3;  # was TLSv1.2` is evaluated as ## FIX: C6-H-09
+  # `ssl_protocols TLSv1.3;` only. ## FIX: C6-H-09
+  # `|| true` is required because `set -euo pipefail` (line 8) would otherwise ## FIX: C6-H-09
+  # kill the script when grep returns 1 (no directive lines present). ## FIX: C6-H-09
+  TLS_DIRECTIVES=$(echo "$CONTENT" | grep -E '^[[:space:]]*(ssl_protocols|tls_version)\b' | sed 's/#.*$//' || true) ## FIX: C6-H-09
+  if [[ -n "$TLS_DIRECTIVES" ]]; then ## FIX: C6-H-09
     # Negative check: reject TLSv1, TLSv1.0, TLSv1.1, TLSv1.2 but NOT TLSv1.3 ## FIX: C6-H-09
     # Regex breakdown: ## FIX: C6-H-09
     #   TLSv1\.[012]\b   — matches TLSv1.0/1.1/1.2 with word boundary ## FIX: C6-H-09
     #   TLSv1[^.0-9]     — matches TLSv1 followed by non-version char (space, ;, newline) ## FIX: C6-H-09
     #   TLSv1$           — matches TLSv1 at end of line ## FIX: C6-H-09
-    if echo "$CONTENT" | grep -qE 'TLSv1\.[012]\b|TLSv1[^.0-9]|TLSv1$'; then ## FIX: C6-H-09
+    if echo "$TLS_DIRECTIVES" | grep -qE 'TLSv1\.[012]\b|TLSv1[^.0-9]|TLSv1$'; then ## FIX: C6-H-09
       VIOLATIONS+=("TLS: only TLS 1.3 permitted in $FILE — found older version reference") ## FIX: C6-H-09
     fi ## FIX: C6-H-09
-    # Positive check: TLS keyword present but TLSv1.3 is NOT explicitly configured ## FIX: C6-H-09
-    if ! echo "$CONTENT" | grep -qE 'TLSv1\.3'; then ## FIX: C6-H-09
+    # Positive check: directive present but TLSv1.3 is NOT explicitly configured ## FIX: C6-H-09
+    if ! echo "$TLS_DIRECTIVES" | grep -qE 'TLSv1\.3'; then ## FIX: C6-H-09
       VIOLATIONS+=("TLS: TLS 1.3 must be explicitly configured in $FILE") ## FIX: C6-H-09
     fi ## FIX: C6-H-09
   fi ## FIX: C6-H-09

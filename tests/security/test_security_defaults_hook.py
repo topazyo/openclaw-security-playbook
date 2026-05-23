@@ -172,3 +172,67 @@ class TestTLSNoTrigger:  # FIX: C6-H-09
         assert rc == 0, (  # FIX: C6-H-09
             f"Expected PASS for file with no TLS keywords but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-H-09
         )
+
+
+class TestTLSCommentRobustness:  # FIX: C6-H-09
+    """The TLS check must reflect real configuration directives, not commented-out  # FIX: C6-H-09
+    lines or unrelated prose mentioning TLSv1.x. These tests lock the directive-  # FIX: C6-H-09
+    scoping behavior so future regex changes cannot reintroduce false positives  # FIX: C6-H-09
+    on stale comments or false negatives on aspirational comments."""  # FIX: C6-H-09
+
+    def test_comment_only_with_older_tls_reference_passes(self, tls_yml_conf) -> None:  # FIX: C6-H-09
+        """`# Removed TLSv1.0 from rotation` (no real directive) must NOT trigger  # FIX: C6-H-09
+        the older-version violation: there is no actual TLS configuration to enforce."""  # FIX: C6-H-09
+        path = tls_yml_conf(  # FIX: C6-H-09
+            "# Historical note: TLSv1.0 was removed last quarter\n"  # FIX: C6-H-09
+            "# TLSv1.1 followed in the cleanup\n"  # FIX: C6-H-09
+            "server:\n  listen: 443\n"  # FIX: C6-H-09
+        )
+        rc, output = _run_hook(path)  # FIX: C6-H-09
+        assert rc == 0, (  # FIX: C6-H-09
+            f"Expected PASS — comments alone must not trigger TLS check.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+        assert "TLS:" not in output, (  # FIX: C6-H-09
+            f"Comment-only TLS reference produced a TLS violation.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+
+    def test_inline_comment_with_older_version_does_not_false_positive(  # FIX: C6-H-09
+        self, tls_nginx_conf  # FIX: C6-H-09
+    ) -> None:  # FIX: C6-H-09
+        """`ssl_protocols TLSv1.3;  # was TLSv1.2 until last sprint` must PASS:  # FIX: C6-H-09
+        only the directive portion (left of #) participates in the check."""  # FIX: C6-H-09
+        path = tls_nginx_conf("ssl_protocols TLSv1.3;  # was TLSv1.2 until last sprint\n")  # FIX: C6-H-09
+        rc, output = _run_hook(path)  # FIX: C6-H-09
+        assert rc == 0, (  # FIX: C6-H-09
+            f"Expected PASS — inline comment must not trigger older-version match.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+        assert "TLS:" not in output, (  # FIX: C6-H-09
+            f"Inline comment mentioning older version produced a TLS violation.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+
+    def test_comment_mentioning_tls13_does_not_satisfy_positive_check(  # FIX: C6-H-09
+        self, tls_nginx_conf  # FIX: C6-H-09
+    ) -> None:  # FIX: C6-H-09
+        """An empty directive with only a comment that says `# TLSv1.3` must still  # FIX: C6-H-09
+        fire the must-configure violation — aspirational comments are not config."""  # FIX: C6-H-09
+        path = tls_nginx_conf("ssl_protocols ;  # We want TLSv1.3 here eventually\n")  # FIX: C6-H-09
+        rc, output = _run_hook(path)  # FIX: C6-H-09
+        assert rc == 1, (  # FIX: C6-H-09
+            f"Expected FAIL — comment mentioning TLSv1.3 must NOT satisfy positive check.\n"  # FIX: C6-H-09
+            f"Output:\n{output}"  # FIX: C6-H-09
+        )
+        assert "must be explicitly configured" in output, (  # FIX: C6-H-09
+            f"Expected must-configure violation despite TLSv1.3 in a comment.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+
+    def test_commented_out_directive_does_not_trigger_check(self, tls_nginx_conf) -> None:  # FIX: C6-H-09
+        """A fully commented-out directive (`# ssl_protocols TLSv1.2;`) must NOT  # FIX: C6-H-09
+        be treated as a real directive — commented-out lines are inert."""  # FIX: C6-H-09
+        path = tls_nginx_conf("# ssl_protocols TLSv1.2;\nserver_name example.com;\n")  # FIX: C6-H-09
+        rc, output = _run_hook(path)  # FIX: C6-H-09
+        assert rc == 0, (  # FIX: C6-H-09
+            f"Expected PASS — commented-out directive must not trigger TLS check.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+        assert "TLS:" not in output, (  # FIX: C6-H-09
+            f"Commented-out directive produced a TLS violation.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
