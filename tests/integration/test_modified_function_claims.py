@@ -277,21 +277,191 @@ def test_block_domain_name_claim_blocks_attack_domain(tmp_path):
     assert manager.actions_taken[-1]["status"] == "failed"
 
 
-def test_isolate_container_claim_isolates_documented_container(tmp_path):
+def test_isolate_container_claim_isolates_documented_container(tmp_path):  # FIX: C6-H-07
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_isolate_container")
     manager = ctx.module.ContainmentManager("INC-CONTAINER")
 
-    assert manager.isolate_container("agent-prod-42", reason="Potential compromise") is True
+    assert manager.isolate_container("agent-prod-42", reason="Potential compromise") is True  # FIX: C6-H-07
     ctx.fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")
     assert ctx.fake_network.disconnect.call_count == 2
     assert len(manager.rollback_commands) == 2
-    labels = ctx.fake_container.update.call_args.kwargs["labels"]
-    assert labels["quarantine"] == "INC-CONTAINER"
-    assert labels["containment_reason"] == "Potential compromise"
+    # FIX: C6-H-07 - container.update(labels=...) was removed; quarantine state is now
+    # persisted to a JSON-Lines manifest because Docker labels are immutable
+    # post-creation. JSONL append is used so concurrent writers cannot
+    # lose each other's records (see _write_quarantine_manifest docstring).
+    manifest_path = ctx.log_dir / "INC-CONTAINER-quarantined-containers.jsonl"  # FIX: C6-H-07
+    assert manifest_path.exists(), "Quarantine manifest file was not written"  # FIX: C6-H-07
+    records = [  # FIX: C6-H-07
+        json.loads(line)  # FIX: C6-H-07
+        for line in manifest_path.read_text(encoding="utf-8").splitlines()  # FIX: C6-H-07
+        if line.strip()  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
+    assert len(records) == 1  # FIX: C6-H-07
+    assert records[0]["incident_id"] == "INC-CONTAINER"  # FIX: C6-H-07
+    assert records[0]["container_id"] == "agent-prod-42"  # FIX: C6-H-07
+    assert records[0]["reason"] == "Potential compromise"  # FIX: C6-H-07
+    assert set(records[0]["original_networks"]) == {"openclaw-network", "bridge"}  # FIX: C6-H-07
+    assert "quarantined_at" in records[0]  # FIX: C6-H-07
 
     no_docker_manager = ctx.module.ContainmentManager("INC-NODOCKER")
     no_docker_manager.docker_client = None
     assert no_docker_manager.isolate_container("agent-prod-42", reason="Missing Docker") is False
+
+
+def test_C6_H_07_quarantine_manifest_appends_without_clobbering_prior_records(tmp_path):  # FIX: C6-H-07
+    """Regression lock: the JSONL manifest must append, never read-modify-write.
+
+    Locks in the structural property that eliminates the lost-update race a
+    JSON-array implementation would have. Writing two records for the same
+    incident must yield both records in the file — if a future change
+    re-introduces a read step before write, a concurrent second writer could
+    silently overwrite the first's record and this test would still pass for
+    the sequential case. So we additionally assert the file is parseable as
+    JSONL (one JSON object per line) and is NOT a JSON array.
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_manifest_append")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-MULTI")  # FIX: C6-H-07
+
+    manager._write_quarantine_manifest("INC-MULTI", "container-one", "first reason", ["net-a"])  # FIX: C6-H-07
+    manager._write_quarantine_manifest("INC-MULTI", "container-two", "second reason", ["net-b", "net-c"])  # FIX: C6-H-07
+
+    manifest_path = ctx.log_dir / "INC-MULTI-quarantined-containers.jsonl"  # FIX: C6-H-07
+    raw = manifest_path.read_text(encoding="utf-8")  # FIX: C6-H-07
+    # Format invariant: JSONL, not a JSON array. A leading '[' would indicate  # FIX: C6-H-07
+    # someone re-introduced the read-modify-write pattern.  # FIX: C6-H-07
+    assert not raw.lstrip().startswith("["), (  # FIX: C6-H-07
+        "Manifest must be JSONL (one record per line), not a JSON array — "  # FIX: C6-H-07
+        "an array implementation would reintroduce the lost-update race."  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+    records = [json.loads(line) for line in raw.splitlines() if line.strip()]  # FIX: C6-H-07
+    assert len(records) == 2, f"Both records must be preserved; got {records!r}"  # FIX: C6-H-07
+    assert records[0]["container_id"] == "container-one"  # FIX: C6-H-07
+    assert records[1]["container_id"] == "container-two"  # FIX: C6-H-07
+    assert records[1]["original_networks"] == ["net-b", "net-c"]  # FIX: C6-H-07
+
+
+def test_C6_H_07_rollback_helper_reconnects_and_purges_succeeded_entries(tmp_path):  # FIX: C6-H-07
+    """On persist failure, _rollback_reconnect_networks must:
+      1. reconnect each network previously disconnected for this container
+      2. remove the successfully-rolled-back entries from rollback_commands
+         (so the report doesn't surface them as still-pending and a later
+         recovery process doesn't double-rollback)
+      3. preserve unrelated rollback entries (other containers, other actions)
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_rollback_purge")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-ROLLBACK")  # FIX: C6-H-07
+
+    # Force persist to fail so the rollback path runs.  # FIX: C6-H-07
+    def _explode(*args, **kwargs):  # FIX: C6-H-07
+        raise OSError("simulated disk-full")  # FIX: C6-H-07
+    manager._write_quarantine_manifest = _explode  # type: ignore[method-assign]  # FIX: C6-H-07
+
+    # Seed an unrelated rollback entry that must survive the helper.  # FIX: C6-H-07
+    manager.rollback_commands.append(  # FIX: C6-H-07
+        {"action": "remove_firewall_domain", "firewall_domain_list_id": "fdl-x", "domain": "x.example"}  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+
+    assert manager.isolate_container("agent-prod-42", reason="Persist failure path") is False  # FIX: C6-H-07
+
+    # Networks reconnected once each (2 disconnects in fixture → 2 reconnects).  # FIX: C6-H-07
+    assert ctx.fake_network.connect.call_count == 2  # FIX: C6-H-07
+
+    # The two reconnect entries are gone, the unrelated entry remains.  # FIX: C6-H-07
+    reconnect_entries = [  # FIX: C6-H-07
+        rb for rb in manager.rollback_commands  # FIX: C6-H-07
+        if rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
+    assert reconnect_entries == [], (  # FIX: C6-H-07
+        "Succeeded rollback entries must be purged; still present: "  # FIX: C6-H-07
+        f"{reconnect_entries!r}"  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+    assert any(  # FIX: C6-H-07
+        rb.get("action") == "remove_firewall_domain" for rb in manager.rollback_commands  # FIX: C6-H-07
+    ), "Unrelated rollback entries must be preserved"  # FIX: C6-H-07
+
+
+def test_C6_H_07_rollback_helper_keeps_failed_reconnect_entries(tmp_path):  # FIX: C6-H-07
+    """If a reconnect fails, that entry must REMAIN in rollback_commands so the
+    operator can retry from the containment report. Only successful rollbacks
+    are purged.
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_rollback_failed")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-ROLLBACK-FAIL")  # FIX: C6-H-07
+
+    # Persist will fail (triggers rollback) AND the rollback itself will fail.  # FIX: C6-H-07
+    def _explode(*args, **kwargs):  # FIX: C6-H-07
+        raise OSError("simulated disk-full")  # FIX: C6-H-07
+    manager._write_quarantine_manifest = _explode  # type: ignore[method-assign]  # FIX: C6-H-07
+    ctx.fake_network.connect.side_effect = RuntimeError("simulated reconnect failure")  # FIX: C6-H-07
+
+    assert manager.isolate_container("agent-prod-42", reason="Reconnect failure path") is False  # FIX: C6-H-07
+
+    # Both reconnect attempts were made (helper does not stop on first failure).  # FIX: C6-H-07
+    assert ctx.fake_network.connect.call_count == 2  # FIX: C6-H-07
+
+    # Both failed reconnects remain in rollback_commands for manual retry.  # FIX: C6-H-07
+    reconnect_entries = [  # FIX: C6-H-07
+        rb for rb in manager.rollback_commands  # FIX: C6-H-07
+        if rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
+        and rb.get("container_id") == "agent-prod-42"  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
+    assert len(reconnect_entries) == 2, (  # FIX: C6-H-07
+        "Failed rollback entries must be retained for manual retry; got "  # FIX: C6-H-07
+        f"{reconnect_entries!r}"  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+
+
+def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path):  # FIX: C6-H-07
+    """Regression lock: any future re-introduction of container.update(labels=...) or
+    other unsupported kwargs must fail at test time rather than silently passing.
+
+    Uses create_autospec with a minimal class mirroring docker-py Container.update()
+    (only blkio_weight, cpu_*, mem_* are valid). create_autospec enforces the actual
+    method signature at call time without requiring the docker SDK to be installed.
+    """  # FIX: C6-H-07
+    from unittest.mock import create_autospec  # FIX: C6-H-07
+
+    class _ContainerSpec:  # FIX: C6-H-07
+        """Minimal spec mirroring docker.models.containers.Container.update().
+        The real update_container API accepts resource-constraint args only;
+        'labels' is NOT a valid argument and must not silently pass.
+        """  # FIX: C6-H-07
+        attrs: dict  # FIX: C6-H-07
+
+        def update(  # FIX: C6-H-07
+            self,  # FIX: C6-H-07
+            blkio_weight: int = 0,  # FIX: C6-H-07
+            cpu_period: int = 0,  # FIX: C6-H-07
+            cpu_quota: int = 0,  # FIX: C6-H-07
+            cpu_shares: int = 0,  # FIX: C6-H-07
+            cpuset_cpus: str = "",  # FIX: C6-H-07
+            cpuset_mems: str = "",  # FIX: C6-H-07
+            mem_limit: int = 0,  # FIX: C6-H-07
+            mem_reservation: int = 0,  # FIX: C6-H-07
+            memswap_limit: int = 0,  # FIX: C6-H-07
+            kernel_memory: int = 0,  # FIX: C6-H-07
+            restart_policy: dict = None,  # type: ignore[assignment]  # FIX: C6-H-07
+        ) -> dict:  # FIX: C6-H-07
+            ...  # FIX: C6-H-07
+
+    # create_autospec enforces the method signature at call time (MagicMock(spec=...) does not)
+    spec_container = create_autospec(_ContainerSpec)  # FIX: C6-H-07
+    # Calling .update() with labels= must raise TypeError because 'labels' is not in the signature.
+    with pytest.raises(TypeError):  # FIX: C6-H-07
+        spec_container.update(labels={"quarantine": "INC-TEST"})  # FIX: C6-H-07
+
+    # Confirm the production path no longer calls container.update() at all.  # FIX: C6-H-07
+    # The actual invariant we want to lock in is "isolate_container does not  # FIX: C6-H-07
+    # invoke container.update at any signature" — the first block above already  # FIX: C6-H-07
+    # provides the signature-enforcement evidence (instance-bound autospec  # FIX: C6-H-07
+    # correctly rejects labels=). Using assert_not_called() here keeps intent  # FIX: C6-H-07
+    # direct and avoids autospec'ing an unbound function (which would raise  # FIX: C6-H-07
+    # "missing required argument: 'self'" instead of the intended unknown-kwarg  # FIX: C6-H-07
+    # signal if a future regression re-introduced a call).  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_spec_regression")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-SPEC")  # FIX: C6-H-07
+    assert manager.isolate_container("spec-test-01", reason="Regression check") is True  # FIX: C6-H-07
+    ctx.fake_container.update.assert_not_called()  # FIX: C6-H-07
 
 
 def test_C6_H_08_save_manifest_does_not_crash_on_degraded_evidence_items(tmp_path):  # FIX: C6-H-08
