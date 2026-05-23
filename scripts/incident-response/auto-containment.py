@@ -409,7 +409,7 @@ class ContainmentManager:
                 self._write_quarantine_manifest(self.incident_id, container_id, reason, original_networks)  # FIX: C6-H-07
             except Exception as persist_err:  # FIX: C6-H-07
                 logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
-                self.log_action("isolate_container", container_id, "failed", {"error": str(persist_err), "stage": "label_persist", "reason": reason})  # FIX: C6-H-07
+                self.log_action("isolate_container", container_id, "failed", {"error": str(persist_err), "stage": "manifest_persist", "reason": reason})  # FIX: C6-H-07
                 # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
                 self._rollback_reconnect_networks(container_id, container)  # FIX: C6-H-07
                 return False  # FIX: C6-H-07
@@ -718,7 +718,7 @@ class ContainmentManager:
                 self._write_quarantine_manifest(self.incident_id, container_id, None, original_networks)  # FIX: C6-H-07
             except Exception as persist_err:  # FIX: C6-H-07
                 logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
-                self.log_action("isolate_docker", container_id, "failed", {"error": str(persist_err), "stage": "label_persist"})  # FIX: C6-H-07
+                self.log_action("isolate_docker", container_id, "failed", {"error": str(persist_err), "stage": "manifest_persist"})  # FIX: C6-H-07
                 # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
                 self._rollback_reconnect_networks(container_id, container)  # FIX: C6-H-07
                 return False  # FIX: C6-H-07
