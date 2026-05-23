@@ -46,18 +46,39 @@ _DEPENDENCY_AUDIT_SCRIPT = _REPO_ROOT / "scripts" / "supply-chain" / "dependency
 _BASH_PATH = shutil.which("bash")
 
 
-def _to_wsl_path(win_path: Path) -> str:
-    """Convert a Windows absolute path to its WSL /mnt/<drive>/... equivalent."""
+def _detect_bash_mount_root(bash_path: str | None) -> str:
+    """Return the mount-prefix this bash flavor uses for Windows drives.
+
+    WSL bash mounts C: at /mnt/c; Git Bash / MSYS / Cygwin mount it at /c.
+    A path formatted for one flavor is unresolvable by the other, so the
+    tests must detect the actual binary on PATH rather than hard-coding.
+    """
+    if not bash_path:
+        return "/mnt/"
+    try:
+        proc = subprocess.run(
+            [bash_path, "--version"], capture_output=True, text=True, check=False, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "/mnt/"
+    banner = (proc.stdout + proc.stderr).lower()
+    if "cygwin" in banner or "msys" in banner or "mingw" in banner:
+        return "/"
+    return "/mnt/"
+
+
+def _to_bash_path(win_path: Path, bash_path: str | None = None) -> str:
+    """Convert a Windows absolute path to the bash mount path for this flavor."""
     drive_letter = win_path.drive.rstrip(":").lower()
     rest = win_path.as_posix()[len(win_path.drive):]
-    return f"/mnt/{drive_letter}{rest}"
+    return f"{_detect_bash_mount_root(bash_path)}{drive_letter}{rest}"
 
 
-# pip-audit.exe from the Windows venv, accessed via its WSL mount path so
+# pip-audit.exe from the Windows venv, accessed via its bash mount path so
 # bash -s tests can invoke it without modifying the system PATH.
 _PIP_AUDIT_EXE = _REPO_ROOT / ".venv" / "Scripts" / "pip-audit.exe"
-_PIP_AUDIT_WSL_PATH = (
-    _to_wsl_path(_PIP_AUDIT_EXE)
+_PIP_AUDIT_BASH_PATH = (
+    _to_bash_path(_PIP_AUDIT_EXE, _BASH_PATH)
     if sys.platform == "win32" and _PIP_AUDIT_EXE.exists()
     else ""
 )
@@ -668,7 +689,7 @@ class TestDependencyAuditShClaim:
     # --- green run: exits 0 when no CVEs found (FAIL 1 acceptance criterion) ---
 
     @pytest.mark.skipif(
-        not _PIP_AUDIT_WSL_PATH or not _BASH_AVAILABLE,
+        not _PIP_AUDIT_BASH_PATH or not _BASH_AVAILABLE,
         reason="pip-audit.exe not in .venv/Scripts or bash not available",
     )
     def test_dependency_audit_sh_claim_exits_0_on_clean_requirements(self):
@@ -688,7 +709,7 @@ class TestDependencyAuditShClaim:
         wslenv = f"PIP_AUDIT_BIN:{existing_wslenv}".rstrip(":")
         proc = self._run(
             ["--requirements", "requirements.txt"],
-            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_WSL_PATH, "WSLENV": wslenv},
+            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_BASH_PATH, "WSLENV": wslenv},
         )
         assert proc.returncode == 0, (
             "Script must exit 0 (PASS) on clean requirements.txt; "
@@ -701,7 +722,7 @@ class TestDependencyAuditShClaim:
     # --- red run: exits 1 when CVEs found (FAIL 2 acceptance criterion) ---
 
     @pytest.mark.skipif(
-        not _PIP_AUDIT_WSL_PATH
+        not _PIP_AUDIT_BASH_PATH
         or not _BASH_AVAILABLE
         or not _SEEDED_CVE_FIXTURE.exists(),
         reason="pip-audit.exe, bash, or seeded-cve-requirements.txt not available",
@@ -722,7 +743,7 @@ class TestDependencyAuditShClaim:
         wslenv = f"PIP_AUDIT_BIN:{existing_wslenv}".rstrip(":")
         proc = self._run(
             ["--requirements", "tests/fixtures/seeded-cve-requirements.txt"],
-            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_WSL_PATH, "WSLENV": wslenv},
+            extra_env={"PIP_AUDIT_BIN": _PIP_AUDIT_BASH_PATH, "WSLENV": wslenv},
         )
         assert proc.returncode == 1, (
             "Script must exit 1 (FAIL) on seeded CVE fixture (PyYAML==5.3.1); "
