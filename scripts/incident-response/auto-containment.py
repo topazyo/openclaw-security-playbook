@@ -348,6 +348,41 @@ class ContainmentManager:
         with open(manifest_path, "a", encoding="utf-8") as handle:  # FIX: C6-H-07
             handle.write(json.dumps(record) + "\n")  # FIX: C6-H-07
 
+    def _rollback_reconnect_networks(self, container_id: str, container) -> None:  # FIX: C6-H-07
+        """Reconnect networks previously disconnected during isolation of `container_id`.  # FIX: C6-H-07
+
+        Called when post-disconnect persistence fails so the container is not  # FIX: C6-H-07
+        left stranded off-network with no isolation record.  # FIX: C6-H-07
+
+        For each matching rollback entry: attempts network.connect(container).  # FIX: C6-H-07
+        On success, removes the entry from self.rollback_commands so subsequent  # FIX: C6-H-07
+        recovery logic (or the containment report) does not re-attempt a  # FIX: C6-H-07
+        rollback that has already been performed. On failure, logs the error  # FIX: C6-H-07
+        and keeps the entry so an operator can retry it manually from the  # FIX: C6-H-07
+        report.  # FIX: C6-H-07
+
+        No-op when docker_client is unavailable (defensive — current callers  # FIX: C6-H-07
+        guard for this earlier, but the helper must not crash if a future  # FIX: C6-H-07
+        path invokes it without that guard).  # FIX: C6-H-07
+        """  # FIX: C6-H-07
+        if self.docker_client is None:  # FIX: C6-H-07
+            return  # FIX: C6-H-07
+        remaining: list = []  # FIX: C6-H-07
+        for rb in self.rollback_commands:  # FIX: C6-H-07
+            if (  # FIX: C6-H-07
+                rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
+                and rb.get("container_id") == container_id  # FIX: C6-H-07
+            ):  # FIX: C6-H-07
+                try:  # FIX: C6-H-07
+                    self.docker_client.networks.get(rb["network_name"]).connect(container)  # FIX: C6-H-07
+                    continue  # success — drop from rollback_commands  # FIX: C6-H-07
+                except Exception as rb_err:  # FIX: C6-H-07
+                    logger.error(f"Rollback reconnect failed for {rb['network_name']}: {rb_err}")  # FIX: C6-H-07
+                    remaining.append(rb)  # keep so operator can retry  # FIX: C6-H-07
+            else:  # FIX: C6-H-07
+                remaining.append(rb)  # FIX: C6-H-07
+        self.rollback_commands = remaining  # FIX: C6-H-07
+
     def isolate_container(self, container_id: str, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
         logger.info(f"Isolating container: {container_id}")  # FIX: C5-finding-3
@@ -376,12 +411,7 @@ class ContainmentManager:
                 logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
                 self.log_action("isolate_container", container_id, "failed", {"error": str(persist_err), "stage": "label_persist", "reason": reason})  # FIX: C6-H-07
                 # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
-                for rb in self.rollback_commands:  # FIX: C6-H-07
-                    if rb.get("action") == "reconnect_docker_network" and rb.get("container_id") == container_id:  # FIX: C6-H-07
-                        try:  # FIX: C6-H-07
-                            self.docker_client.networks.get(rb["network_name"]).connect(container)  # FIX: C6-H-07
-                        except Exception as rb_err:  # FIX: C6-H-07
-                            logger.error(f"Rollback reconnect failed for {rb['network_name']}: {rb_err}")  # FIX: C6-H-07
+                self._rollback_reconnect_networks(container_id, container)  # FIX: C6-H-07
                 return False  # FIX: C6-H-07
             self.log_action("isolate_container", container_id, "success", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
             logger.info(f"✓ Container {container_id} isolated successfully")  # FIX: C5-finding-3
@@ -690,12 +720,7 @@ class ContainmentManager:
                 logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
                 self.log_action("isolate_docker", container_id, "failed", {"error": str(persist_err), "stage": "label_persist"})  # FIX: C6-H-07
                 # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
-                for rb in self.rollback_commands:  # FIX: C6-H-07
-                    if rb.get("action") == "reconnect_docker_network" and rb.get("container_id") == container_id:  # FIX: C6-H-07
-                        try:  # FIX: C6-H-07
-                            self.docker_client.networks.get(rb["network_name"]).connect(container)  # FIX: C6-H-07
-                        except Exception as rb_err:  # FIX: C6-H-07
-                            logger.error(f"Rollback reconnect failed for {rb['network_name']}: {rb_err}")  # FIX: C6-H-07
+                self._rollback_reconnect_networks(container_id, container)  # FIX: C6-H-07
                 return False  # FIX: C6-H-07
             
             self.log_action("isolate_docker", container_id, "success", {

@@ -340,6 +340,77 @@ def test_C6_H_07_quarantine_manifest_appends_without_clobbering_prior_records(tm
     assert records[1]["original_networks"] == ["net-b", "net-c"]  # FIX: C6-H-07
 
 
+def test_C6_H_07_rollback_helper_reconnects_and_purges_succeeded_entries(tmp_path):  # FIX: C6-H-07
+    """On persist failure, _rollback_reconnect_networks must:
+      1. reconnect each network previously disconnected for this container
+      2. remove the successfully-rolled-back entries from rollback_commands
+         (so the report doesn't surface them as still-pending and a later
+         recovery process doesn't double-rollback)
+      3. preserve unrelated rollback entries (other containers, other actions)
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_rollback_purge")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-ROLLBACK")  # FIX: C6-H-07
+
+    # Force persist to fail so the rollback path runs.  # FIX: C6-H-07
+    def _explode(*args, **kwargs):  # FIX: C6-H-07
+        raise OSError("simulated disk-full")  # FIX: C6-H-07
+    manager._write_quarantine_manifest = _explode  # type: ignore[method-assign]  # FIX: C6-H-07
+
+    # Seed an unrelated rollback entry that must survive the helper.  # FIX: C6-H-07
+    manager.rollback_commands.append(  # FIX: C6-H-07
+        {"action": "remove_firewall_domain", "firewall_domain_list_id": "fdl-x", "domain": "x.example"}  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+
+    assert manager.isolate_container("agent-prod-42", reason="Persist failure path") is False  # FIX: C6-H-07
+
+    # Networks reconnected once each (2 disconnects in fixture → 2 reconnects).  # FIX: C6-H-07
+    assert ctx.fake_network.connect.call_count == 2  # FIX: C6-H-07
+
+    # The two reconnect entries are gone, the unrelated entry remains.  # FIX: C6-H-07
+    reconnect_entries = [  # FIX: C6-H-07
+        rb for rb in manager.rollback_commands  # FIX: C6-H-07
+        if rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
+    assert reconnect_entries == [], (  # FIX: C6-H-07
+        "Succeeded rollback entries must be purged; still present: "  # FIX: C6-H-07
+        f"{reconnect_entries!r}"  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+    assert any(  # FIX: C6-H-07
+        rb.get("action") == "remove_firewall_domain" for rb in manager.rollback_commands  # FIX: C6-H-07
+    ), "Unrelated rollback entries must be preserved"  # FIX: C6-H-07
+
+
+def test_C6_H_07_rollback_helper_keeps_failed_reconnect_entries(tmp_path):  # FIX: C6-H-07
+    """If a reconnect fails, that entry must REMAIN in rollback_commands so the
+    operator can retry from the containment report. Only successful rollbacks
+    are purged.
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_rollback_failed")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-ROLLBACK-FAIL")  # FIX: C6-H-07
+
+    # Persist will fail (triggers rollback) AND the rollback itself will fail.  # FIX: C6-H-07
+    def _explode(*args, **kwargs):  # FIX: C6-H-07
+        raise OSError("simulated disk-full")  # FIX: C6-H-07
+    manager._write_quarantine_manifest = _explode  # type: ignore[method-assign]  # FIX: C6-H-07
+    ctx.fake_network.connect.side_effect = RuntimeError("simulated reconnect failure")  # FIX: C6-H-07
+
+    assert manager.isolate_container("agent-prod-42", reason="Reconnect failure path") is False  # FIX: C6-H-07
+
+    # Both reconnect attempts were made (helper does not stop on first failure).  # FIX: C6-H-07
+    assert ctx.fake_network.connect.call_count == 2  # FIX: C6-H-07
+
+    # Both failed reconnects remain in rollback_commands for manual retry.  # FIX: C6-H-07
+    reconnect_entries = [  # FIX: C6-H-07
+        rb for rb in manager.rollback_commands  # FIX: C6-H-07
+        if rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
+        and rb.get("container_id") == "agent-prod-42"  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
+    assert len(reconnect_entries) == 2, (  # FIX: C6-H-07
+        "Failed rollback entries must be retained for manual retry; got "  # FIX: C6-H-07
+        f"{reconnect_entries!r}"  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+
+
 def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path):  # FIX: C6-H-07
     """Regression lock: any future re-introduction of container.update(labels=...) or
     other unsupported kwargs must fail at test time rather than silently passing.
