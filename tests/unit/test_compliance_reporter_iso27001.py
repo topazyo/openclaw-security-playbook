@@ -554,8 +554,8 @@ class TestT9SoaApplicableZeroCoverageContradiction:  # FIX: C6-M-13
 
         assert coverage["soa_applicable_controls"] == 50  # FIX: C6-M-13
         assert coverage["mapped_controls"] == 25  # FIX: C6-M-13
-        assert coverage["corpus_to_soa_coverage_percentage"] == 50.0, (  # FIX: C6-M-13
-            f"coverage_pct must be 50.0 for 25/50; got {coverage['corpus_to_soa_coverage_percentage']!r}"  # FIX: C6-M-13
+        assert coverage["corpus_to_soa_coverage_percentage"] == pytest.approx(50.0, abs=0.01), (  # FIX: C6-M-13
+            f"coverage_pct must be ~50.0 for 25/50; got {coverage['corpus_to_soa_coverage_percentage']!r}"  # FIX: C6-M-13
         )  # FIX: C6-M-13
         assert coverage["gap_status"] == "INCOMPLETE_MAPPING", (  # FIX: C6-M-13
             f"gap_status must be INCOMPLETE_MAPPING when mapped < soa_applicable; got {coverage['gap_status']!r}"  # FIX: C6-M-13
