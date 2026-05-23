@@ -374,6 +374,9 @@ def test_evaluate_yara_case_returns_rule_read_error_when_rule_file_missing(tmp_p
     def _fail_if_invoked(*_args: object, **_kwargs: object) -> None:  # FIX: C6-H-11
         raise AssertionError("subprocess.run must not be invoked when rule file is unreadable")  # FIX: C6-H-11
     monkeypatch.setattr(validate_detection_replay.subprocess, "run", _fail_if_invoked)  # FIX: C6-H-11
-    result = validate_detection_replay.evaluate_yara_case(case, "/usr/bin/yara", require_yara=True)  # FIX: C6-H-11
+    # yara_command only needs to be truthy to pass the early guard; use a tmp_path-anchored value  # FIX: C6-H-11
+    # so the string is platform-agnostic (no hardcoded POSIX /usr/bin path on Windows runners).  # FIX: C6-H-11
+    yara_command = str(tmp_path / "fake-yara")  # FIX: C6-H-11
+    result = validate_detection_replay.evaluate_yara_case(case, yara_command, require_yara=True)  # FIX: C6-H-11
     assert result.passed is False  # FIX: C6-H-11
     assert result.details.startswith("rule-read-error:"), result.details  # FIX: C6-H-11
