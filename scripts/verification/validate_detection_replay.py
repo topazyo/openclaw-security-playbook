@@ -91,17 +91,17 @@ def find_high_risk_yara_patterns(rule_text: str) -> list[str]:
 
 def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool:
     field_name, modifiers = parse_field_expression(expression)
+    operator_modifiers = sorted(SIGMA_OPERATOR_MODIFIERS.intersection(modifiers))  # FIX: C6-H-10
+    if len(operator_modifiers) > 1:  # FIX: C6-H-10 — validate before reading the event so missing fields can't hide a malformed rule
+        raise ValueError(  # FIX: C6-H-10
+            f"Sigma field expression {expression!r} has conflicting operator modifiers: "  # FIX: C6-H-10
+            f"{operator_modifiers}. At most one of contains/endswith/gte/lte/gt/lt may be present."  # FIX: C6-H-10
+        )  # FIX: C6-H-10
     actual = event.get(field_name)
     if actual is None:
         return False
 
     require_all = "all" in modifiers
-    operator_modifiers = sorted(SIGMA_OPERATOR_MODIFIERS.intersection(modifiers))  # FIX: C6-H-10
-    if len(operator_modifiers) > 1:  # FIX: C6-H-10
-        raise ValueError(  # FIX: C6-H-10
-            f"Sigma field expression {expression!r} has conflicting operator modifiers: "  # FIX: C6-H-10
-            f"{operator_modifiers}. At most one of contains/endswith/gte/lte/gt/lt may be present."  # FIX: C6-H-10
-        )  # FIX: C6-H-10
     operation = "equals"
     for modifier in modifiers:
         if modifier in {"contains", "endswith"}:

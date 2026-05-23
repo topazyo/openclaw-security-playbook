@@ -117,6 +117,12 @@ def test_field_matches_rejects_conflicting_operator_modifiers(expression: str) -
         validate_detection_replay.field_matches({"FieldName": "anything"}, expression, "x")
 
 
+def test_field_matches_rejects_conflicting_modifiers_when_field_missing() -> None:
+    # FIX: C6-H-10 — guard against the early-return-hides-bad-rule case the reviewer flagged
+    with pytest.raises(ValueError, match="conflicting operator modifiers"):
+        validate_detection_replay.field_matches({}, "FieldName|contains|gte", "x")
+
+
 @pytest.mark.parametrize(
     "expression,event_value,expected,want",
     [
