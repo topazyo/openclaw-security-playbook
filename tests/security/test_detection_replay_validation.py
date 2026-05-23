@@ -98,3 +98,195 @@ def test_yara_rules_avoid_high_risk_regex_patterns() -> None:
     )
 
     assert findings == []
+
+
+# --- C6-H-10: conflicting operator modifiers must raise, not silently pick one ---
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "FieldName|contains|gte",
+        "FieldName|gt|lt",
+        "FieldName|endswith|contains",
+        "FieldName|lte|gt",
+        "FieldName|all|contains|gte",
+    ],
+)
+def test_field_matches_rejects_conflicting_operator_modifiers(expression: str) -> None:
+    with pytest.raises(ValueError, match="conflicting operator modifiers"):
+        validate_detection_replay.field_matches({"FieldName": "anything"}, expression, "x")
+
+
+def test_field_matches_rejects_conflicting_modifiers_when_field_missing() -> None:
+    # FIX: C6-H-10 — guard against the early-return-hides-bad-rule case the reviewer flagged
+    with pytest.raises(ValueError, match="conflicting operator modifiers"):
+        validate_detection_replay.field_matches({}, "FieldName|contains|gte", "x")
+
+
+@pytest.mark.parametrize(
+    "expression,event_value,expected,want",
+    [
+        ("FieldName|contains", "openclaw runtime", "claw", True),
+        ("FieldName|all|contains", "docker run --cap-drop ALL", ["docker", "ALL"], True),
+        ("FieldName|gte", 42, 10, True),
+        ("FieldName|all|gte", 42, [10, 20, 30], True),
+        ("FieldName|all|gte", 15, [10, 20, 30], False),
+        ("FieldName|endswith", "value.exe", ".exe", True),
+    ],
+)
+def test_field_matches_accepts_single_operator_with_or_without_all(
+    expression: str, event_value: object, expected: object, want: bool
+) -> None:
+    assert validate_detection_replay.field_matches({"FieldName": event_value}, expression, expected) is want
+
+
+def test_evaluate_sigma_case_surfaces_conflict_as_failed_replayresult(tmp_path: Path) -> None:
+    rule_path = tmp_path / "rule.yml"
+    rule_path.write_text(
+        "title: bad-rule\n"
+        "detection:\n"
+        "  selection:\n"
+        "    FieldName|contains|gte: 1\n"
+        "  condition: selection\n",
+        encoding="utf-8",
+    )
+    fixture_path = tmp_path / "fixture.json"
+    fixture_path.write_text(json.dumps({"FieldName": "anything"}), encoding="utf-8")
+    case = {
+        "name": "conflict-case",
+        "rule": str(rule_path),
+        "fixture": str(fixture_path),
+        "should_match": True,
+    }
+    result = validate_detection_replay.evaluate_sigma_case(case)
+    assert result.passed is False
+    assert "invalid-rule" in result.details
+    assert "conflicting operator modifiers" in result.details
+
+
+# --- C6-H-10: malformed Sigma rules must surface as failed cases, not crash ---
+
+@pytest.mark.parametrize(
+    "rule_yaml,why",
+    [
+        # missing detection block
+        ("title: no-detection\n", "missing-detection"),
+        # missing condition inside detection
+        (
+            "title: no-condition\n"
+            "detection:\n"
+            "  selection:\n"
+            "    FieldName: x\n",
+            "missing-condition",
+        ),
+        # non-dict detection (list)
+        (
+            "title: list-detection\n"
+            "detection:\n"
+            "  - selection\n"
+            "  - condition\n",
+            "non-dict-detection",
+        ),
+        # non-dict detection (string)
+        (
+            "title: string-detection\n"
+            "detection: just-a-string\n",
+            "string-detection",
+        ),
+    ],
+)
+def test_evaluate_sigma_case_surfaces_malformed_rule_as_failed_replayresult(
+    tmp_path: Path, rule_yaml: str, why: str
+) -> None:
+    rule_path = tmp_path / f"{why}.yml"
+    rule_path.write_text(rule_yaml, encoding="utf-8")
+    fixture_path = tmp_path / "fixture.json"
+    fixture_path.write_text(json.dumps({"FieldName": "anything"}), encoding="utf-8")
+    case = {
+        "name": why,
+        "rule": str(rule_path),
+        "fixture": str(fixture_path),
+        "should_match": True,
+    }
+    result = validate_detection_replay.evaluate_sigma_case(case)
+    assert result.passed is False
+    assert "invalid-rule" in result.details
+
+
+# --- C6-H-10: per-modifier numeric coverage that C5-H-05 omitted ---
+
+@pytest.mark.parametrize(
+    "operator,event_value,expected,want",
+    [
+        # gte: matching
+        ("gte", 10, 10, True),
+        ("gte", 11, 10, True),
+        # gte: non-matching
+        ("gte", 9, 10, False),
+        # lte: matching / non-matching
+        ("lte", 10, 10, True),
+        ("lte", 9, 10, True),
+        ("lte", 11, 10, False),
+        # gt: matching / non-matching
+        ("gt", 11, 10, True),
+        ("gt", 10, 10, False),
+        # lt: matching / non-matching
+        ("lt", 9, 10, True),
+        ("lt", 10, 10, False),
+    ],
+)
+def test_numeric_operators_match_and_nonmatch(
+    operator: str, event_value: float, expected: float, want: bool
+) -> None:
+    expression = f"FieldName|{operator}"
+    assert validate_detection_replay.field_matches(
+        {"FieldName": event_value}, expression, expected
+    ) is want
+
+
+@pytest.mark.parametrize(
+    "operator,event_value,expected,want",
+    [
+        # gte: coerces numeric string, matches when >=
+        ("gte", "10", 10, True),
+        ("gte", "9", 10, False),
+        # lte: coerces numeric string, matches when <=
+        ("lte", "10", 10, True),
+        ("lte", "11", 10, False),
+        # gt: coerces numeric string, matches when >
+        ("gt", "11", 10, True),
+        ("gt", "10", 10, False),
+        # lt: coerces numeric string, matches when <
+        ("lt", "9", 10, True),
+        ("lt", "10", 10, False),
+    ],
+)
+def test_numeric_string_event_values_are_coerced(
+    operator: str, event_value: str, expected: float, want: bool
+) -> None:
+    # Existing code uses float(actual) which coerces numeric strings — assert that behavior.
+    expression = f"FieldName|{operator}"
+    assert validate_detection_replay.field_matches(
+        {"FieldName": event_value}, expression, expected
+    ) is want
+
+
+@pytest.mark.parametrize("operator", ["gte", "lte", "gt", "lt"])
+def test_non_numeric_event_values_return_false_without_crash(operator: str) -> None:
+    expression = f"FieldName|{operator}"
+    # Per C5-H-05 code path: float("abc") raises ValueError -> caught -> returns False
+    assert validate_detection_replay.field_matches(
+        {"FieldName": "abc"}, expression, 10
+    ) is False
+
+
+def test_field_all_gte_with_list_requires_all_values_satisfied() -> None:
+    expression = "FieldName|all|gte"
+    # actual=100 must be >= every expected; 100 >= 10, 50, 99 -> True
+    assert validate_detection_replay.field_matches(
+        {"FieldName": 100}, expression, [10, 50, 99]
+    ) is True
+    # actual=50 fails for expected=99 -> False
+    assert validate_detection_replay.field_matches(
+        {"FieldName": 50}, expression, [10, 50, 99]
+    ) is False

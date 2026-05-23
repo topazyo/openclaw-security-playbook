@@ -19,6 +19,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASES_PATH = REPO_ROOT / "tests" / "security" / "fixtures" / "detection-replay" / "replay_cases.json"
 SIGMA_REGEX_MODIFIERS = {"re", "regex", "match"}
+SIGMA_OPERATOR_MODIFIERS = frozenset({"contains", "endswith", "gte", "lte", "gt", "lt"})  # FIX: C6-H-10
 GROUP_OPEN_TOKEN = "("  # nosec B105
 HIGH_RISK_YARA_PATTERNS = (
     re.compile(r"\(\.\*\)\+"),
@@ -90,6 +91,12 @@ def find_high_risk_yara_patterns(rule_text: str) -> list[str]:
 
 def field_matches(event: dict[str, Any], expression: str, expected: Any) -> bool:
     field_name, modifiers = parse_field_expression(expression)
+    operator_modifiers = sorted(SIGMA_OPERATOR_MODIFIERS.intersection(modifiers))  # FIX: C6-H-10
+    if len(operator_modifiers) > 1:  # FIX: C6-H-10 — validate before reading the event so missing fields can't hide a malformed rule
+        raise ValueError(  # FIX: C6-H-10
+            f"Sigma field expression {expression!r} has conflicting operator modifiers: "  # FIX: C6-H-10
+            f"{operator_modifiers}. At most one of contains/endswith/gte/lte/gt/lt may be present."  # FIX: C6-H-10
+        )  # FIX: C6-H-10
     actual = event.get(field_name)
     if actual is None:
         return False
@@ -237,15 +244,18 @@ def evaluate_sigma_case(case: dict[str, Any]) -> ReplayResult:
     with open(fixture_path, encoding="utf-8") as handle:
         event = json.load(handle)
 
-    detection = rule["detection"]
-    validate_sigma_detection(detection)
-    selector_results = {
-        name: selector_matches(event, selector)
-        for name, selector in detection.items()
-        if name != "condition"
-    }
-    parser = ConditionParser(tokenize_condition(detection["condition"]), selector_results)
-    matched = parser.parse()
+    try:  # FIX: C6-H-10 — surface malformed Sigma rules as failed cases, not uncaught crashes
+        detection = rule["detection"]  # FIX: C6-H-10 — KeyError here means rule has no detection block
+        validate_sigma_detection(detection)  # FIX: C6-H-10
+        selector_results = {  # FIX: C6-H-10
+            name: selector_matches(event, selector)  # FIX: C6-H-10
+            for name, selector in detection.items()  # FIX: C6-H-10
+            if name != "condition"  # FIX: C6-H-10
+        }  # FIX: C6-H-10
+        parser = ConditionParser(tokenize_condition(detection["condition"]), selector_results)  # FIX: C6-H-10
+        matched = parser.parse()  # FIX: C6-H-10
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:  # FIX: C6-H-10 — KeyError: missing detection/condition; TypeError/AttributeError: non-dict detection
+        return ReplayResult(case["name"], "sigma", False, f"invalid-rule: {exc}")  # FIX: C6-H-10
     expected = bool(case["should_match"])
     details = f"matched={matched} expected={expected} selectors={selector_results}"
     return ReplayResult(case["name"], "sigma", matched == expected, details)
