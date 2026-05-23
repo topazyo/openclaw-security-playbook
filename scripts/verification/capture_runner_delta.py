@@ -9,6 +9,7 @@ import subprocess  # nosec B404
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast  # pylance: cast/Any used to narrow object-typed snapshot dicts
 
 
 INTERESTING_ENV_VARS = (
@@ -55,17 +56,20 @@ def command_snapshot(name: str, version_args: list[str] | None = None) -> dict[s
 
 def gather_snapshot() -> dict[str, object]:
     docker_path = shutil.which("docker")
-    docker_info = run_command([docker_path, "info", "--format", "{{json .SecurityOptions}}"])
-    if not docker_path:
+    if docker_path:  # pylance: only run docker subprocess when binary resolved (str, not None)
+        docker_info: dict[str, object] = run_command(  # pylance: typed dict for downstream narrowing
+            [docker_path, "info", "--format", "{{json .SecurityOptions}}"]
+        )
+        docker_version: dict[str, object] = run_command(  # pylance: typed dict for downstream narrowing
+            [docker_path, "version", "--format", "{{json .}}"]
+        )
+    else:
         docker_info = {
             "command": ["docker", "info", "--format", "{{json .SecurityOptions}}"],
             "returncode": 127,
             "stdout": "",
             "stderr": "docker command not available",
         }
-
-    docker_version = run_command([docker_path, "version", "--format", "{{json .}}"])
-    if not docker_path:
         docker_version = {
             "command": ["docker", "version", "--format", "{{json .}}"],
             "returncode": 127,
@@ -102,15 +106,16 @@ def gather_snapshot() -> dict[str, object]:
 
 
 def render_markdown(snapshot: dict[str, object]) -> str:
-    environment = snapshot["environment"]
-    commands = snapshot["commands"]
-    docker = commands["docker"]
+    environment = cast(dict[str, Any], snapshot["environment"])  # pylance: snapshot dict values are object; narrow for indexing
+    commands = cast(dict[str, Any], snapshot["commands"])  # pylance: narrow nested dict for indexing
+    docker = cast(dict[str, Any], commands["docker"])  # pylance: narrow nested dict for indexing
+    platform_info = cast(dict[str, Any], snapshot["platform"])  # pylance: narrow nested dict for indexing
     return "\n".join(
         [
             "# Runner Delta Snapshot",
             "",
             f"- Captured: {snapshot['captured_at']}",
-            f"- Runner OS: {environment.get('RUNNER_OS') or snapshot['platform']['system']}",
+            f"- Runner OS: {environment.get('RUNNER_OS') or platform_info['system']}",  # pylance: use narrowed local
             f"- Image: {environment.get('ImageOS', 'unknown')} {environment.get('ImageVersion', '').strip()}",
             f"- Python: {commands['python'].get('version', {}).get('stdout', '') or commands['python'].get('version', {}).get('stderr', '')}",
             f"- Docker available: {docker['available']}",

@@ -659,6 +659,34 @@ def test_main_claim_returns_nonzero_when_all_notifications_fail():
             assert module.main() == 1
 
 
+def test_save_manifest_handles_degraded_network_capture_without_keyerror(tmp_path):
+    module = _load_forensics_collector_module("forensics_collector_save_manifest_degraded")
+    collector = module.ForensicsCollector("IRP-DEGRADED-001", "quick")
+    collector.evidence_dir = tmp_path / "forensics-degraded"
+    collector.evidence_dir.mkdir(parents=True, exist_ok=True)
+    collector.manifest["evidence_items"] = []
+
+    # Drive the degraded branch by removing tcpdump from PATH.
+    with patch.object(module.shutil, "which", return_value=None):
+        assert collector.collect_network_capture(duration=1) is False
+
+    # save_manifest must not raise KeyError on the degraded item.
+    collector.save_manifest()
+
+    checksums_text = (collector.evidence_dir / "CHECKSUMS.txt").read_text(encoding="utf-8")
+    # Main C6-H-08 format: "# DEGRADED  <name>: <reason>" (two spaces, no colon between DEGRADED and name).
+    assert "# DEGRADED  network_capture:" in checksums_text
+    assert "tcpdump" in checksums_text
+    # No bogus checksum line was written for the missing file.
+    assert "None  None" not in checksums_text
+
+    manifest = json.loads((collector.evidence_dir / "chain-of-custody.json").read_text(encoding="utf-8"))
+    degraded = next(item for item in manifest["evidence_items"] if item["name"] == "network_capture")
+    assert degraded["status"] == "degraded"
+    assert degraded["checksum_sha256"] is None
+    assert degraded["file_path"] is None
+
+
 def test_collect_logs_claim_surfaces_system_log_collection_failure(tmp_path):
     module = _load_forensics_collector_module("forensics_collector_claim_logs")
     collector = module.ForensicsCollector("IRP-LOGS-001", "quick")

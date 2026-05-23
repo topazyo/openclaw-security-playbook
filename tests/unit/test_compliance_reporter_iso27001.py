@@ -215,6 +215,109 @@ class TestT5SoaInternalInconsistencyRaises:  # FIX: C6-H-05
 
 
 # ---------------------------------------------------------------------------
+# T4b — OVER_MAPPING warning uses 'mapping excess' and positive over_mapped_by
+# ---------------------------------------------------------------------------
+
+class TestT4bOverMappingWarningShape:
+    """_emit_iso27001_coverage_warning emits a distinct message for OVER_MAPPING."""
+
+    def test_over_mapping_warning_uses_excess_message_and_positive_over_mapped_by(self, capsys):
+        # SoA applicable = 5 + 5 = 10, but corpus has 15 controls -> OVER_MAPPING
+        statement = _make_statement(total=20, implemented=5, planned=5, not_applicable=10)
+        corpus = _make_corpus_controls(n_implemented=15)
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == "OVER_MAPPING"
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        assert "mapping excess" in err
+        assert "coverage gap" not in err, "OVER_MAPPING must not use the 'coverage gap' wording"
+        assert "over_mapped_by=5" in err, f"over_mapped_by must be positive 5; got: {err!r}"
+        assert "gap=-" not in err, f"Negative gap=… must not appear; got: {err!r}"
+        assert "basis=loaded_corpus" in err
+
+
+# ---------------------------------------------------------------------------
+# T5c — _validate_soa_internal_consistency fails closed on malformed types
+# ---------------------------------------------------------------------------
+
+class TestT5cValidatorFailsClosedOnBadTypes:
+    """_validate_soa_internal_consistency must raise, not silently return, on bad types."""
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("total_controls", "93"),
+            ("total_controls", None),
+            ("implemented", None),
+            ("planned", 25.0),
+            ("planned", True),
+            ("not_applicable", "23"),
+        ],
+    )
+    def test_validator_raises_named_value_error_for_bad_types(self, field, value):
+        statement = _make_statement()
+        statement[field] = value
+        with pytest.raises(ValueError) as exc_info:
+            ComplianceReporter._validate_soa_internal_consistency(statement)
+        assert field in str(exc_info.value)
+
+    def test_validator_raises_for_missing_required_field(self):
+        statement = _make_statement()
+        del statement["implemented"]
+        with pytest.raises(ValueError, match="implemented"):
+            ComplianceReporter._validate_soa_internal_consistency(statement)
+
+
+# ---------------------------------------------------------------------------
+# T5b — strict int validation on SoA fields before any arithmetic
+# ---------------------------------------------------------------------------
+
+class TestT5bSoaIntFieldStrictValidation:
+    """_build_iso27001_coverage_summary rejects non-int SoA fields with a clear ValueError."""
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("total_controls", "93"),
+            ("total_controls", None),
+            ("implemented", "45"),
+            ("implemented", None),
+            ("planned", 25.0),
+            ("planned", True),
+            ("not_applicable", "23"),
+        ],
+    )
+    def test_non_int_soa_field_raises_named_value_error(self, field, value):
+        statement = _make_statement()
+        statement[field] = value
+
+        with pytest.raises(ValueError) as exc_info:
+            ComplianceReporter._build_iso27001_coverage_summary(
+                _make_corpus_controls(n_implemented=0), statement
+            )
+        msg = str(exc_info.value)
+        assert field in msg, f"Error message must name the offending field {field!r}; got: {msg!r}"
+
+    def test_not_applicable_defaults_to_zero_when_missing(self):
+        statement = _make_statement()
+        del statement["not_applicable"]
+        # implemented=45, planned=25, not_applicable=0 (default) -> 70 applicable
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(
+            _make_corpus_controls(n_implemented=70), statement
+        )
+        assert coverage["soa_not_applicable"] == 0
+        assert coverage["soa_applicable_controls"] == 70
+
+    def test_required_field_missing_raises_named_value_error(self):
+        statement = _make_statement()
+        del statement["implemented"]
+
+        with pytest.raises(ValueError, match="implemented"):
+            ComplianceReporter._build_iso27001_coverage_summary([], statement)
+
+
+# ---------------------------------------------------------------------------
 # T6 — applicable_controls == 0 still raises ValueError (D4 preservation)
 # ---------------------------------------------------------------------------
 
@@ -270,6 +373,58 @@ class TestT7Soc2GdprUnchanged:  # FIX: C6-H-05
         assert "coverage_summary" not in gdpr, (  # FIX: C6-H-05
             "GDPR report must NOT contain coverage_summary (ISO-only field)"  # FIX: C6-H-05
         )  # FIX: C6-H-05
+
+
+# ---------------------------------------------------------------------------
+# T9 — warning emission matches gap_status across all three classifications
+# ---------------------------------------------------------------------------
+
+class TestT9WarningEmissionMatchesGapStatus:
+    """Consolidated coverage for the SoA warning-emission contract.
+
+    Verifies ask #4 from the review checklist in one place: warnings are
+    emitted only when appropriate, with the right wording and field names.
+    """
+
+    @pytest.mark.parametrize(
+        "n_mapped, expected_status, expected_substrings, forbidden_substrings",
+        [
+            (19, "INCOMPLETE_MAPPING", ["WARNING:", "coverage gap", "gap=51"], ["mapping excess", "over_mapped_by", "gap=-"]),
+            (80, "OVER_MAPPING", ["WARNING:", "mapping excess", "over_mapped_by=10"], ["coverage gap", "gap="]),
+        ],
+        ids=["incomplete-warns-with-gap", "over-mapped-warns-with-excess"],
+    )
+    def test_warning_shape_per_gap_status(
+        self,
+        capsys,
+        n_mapped,
+        expected_status,
+        expected_substrings,
+        forbidden_substrings,
+    ):
+        statement = _make_statement(total=93, implemented=45, planned=25, not_applicable=23)
+        corpus = _make_corpus_controls(n_implemented=n_mapped)
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == expected_status
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        for substring in expected_substrings:
+            assert substring in err, f"expected {substring!r} in stderr; got: {err!r}"
+        for substring in forbidden_substrings:
+            assert substring not in err, f"forbidden {substring!r} found in stderr; got: {err!r}"
+        # Exactly one WARNING line is emitted.
+        assert err.count("WARNING:") == 1, f"expected exactly one WARNING line; got: {err!r}"
+
+    def test_complete_mapping_emits_nothing(self, capsys):
+        statement = _make_statement(total=93, implemented=45, planned=25, not_applicable=23)
+        corpus = _make_corpus_controls(n_implemented=70)  # 70 == soa_applicable
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)
+        assert coverage["gap_status"] == "COMPLETE_MAPPING"
+
+        ComplianceReporter._emit_iso27001_coverage_warning(coverage)
+        err = capsys.readouterr().err
+        assert err == "", f"COMPLETE_MAPPING must be silent; stderr: {err!r}"
 
 
 # ---------------------------------------------------------------------------

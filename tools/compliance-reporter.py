@@ -10,7 +10,7 @@ import json
 import sys  # FIX: C6-H-05
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypeAlias, cast  # FIX: C5-finding-4
+from typing import Any, Optional, TypeAlias, cast  # FIX: C5-finding-4
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -76,24 +76,52 @@ class ComplianceReporter:
     def _validate_soa_internal_consistency(statement: ControlRecord) -> None:  # FIX: C6-H-05
         """Assert that statement_of_applicability fields sum to total_controls.
 
-        Catches the prior failure mode where a worker set implemented=19, planned=0,
-        not_applicable=23 (sum=42) while total_controls remained 93 — an inconsistency
-        that the old code silently accepted.  Raises ValueError with all four numbers
-        so the offending field is immediately identifiable.
+        Fail-closed: each required field is validated as a strict int (rejects
+        bool) via _require_soa_int_field, then the sum is checked. A missing
+        required field, a wrong-typed field, or a sum mismatch all raise
+        ValueError naming the offending field so the caller (typically the
+        load helper) cannot mistake malformed SoA data for a clean record.
         """  # FIX: C6-H-05
-        total = statement.get("total_controls")  # FIX: C6-H-05
-        implemented = statement.get("implemented")  # FIX: C6-H-05
-        planned = statement.get("planned")  # FIX: C6-H-05
-        not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
-        if not all(isinstance(v, int) and not isinstance(v, bool) for v in (total, implemented, planned, not_applicable)):  # FIX: C6-H-05
-            return  # type checking handled by _calculate_statement_summary  # FIX: C6-H-05
-        actual_sum = implemented + planned + not_applicable  # FIX: C6-H-05
+        total = ComplianceReporter._require_soa_int_field(statement, "total_controls")
+        implemented = ComplianceReporter._require_soa_int_field(statement, "implemented")
+        planned = ComplianceReporter._require_soa_int_field(statement, "planned")
+        not_applicable = ComplianceReporter._require_soa_int_field(
+            statement, "not_applicable", default_when_missing=0
+        )
+        actual_sum = implemented + planned + not_applicable
         if actual_sum != total:  # FIX: C6-H-05
             raise ValueError(  # FIX: C6-H-05
                 f"ISO27001 statement_of_applicability internal inconsistency: "  # FIX: C6-H-05
                 f"implemented({implemented}) + planned({planned}) + not_applicable({not_applicable}) "  # FIX: C6-H-05
                 f"= {actual_sum} must equal total_controls({total})"  # FIX: C6-H-05
             )  # FIX: C6-H-05
+
+    @staticmethod
+    def _require_soa_int_field(
+        statement: ControlRecord,
+        field_name: str,
+        *,
+        default_when_missing: Optional[int] = None,
+    ) -> int:
+        """Return statement[field_name] as a strict int (bool excluded).
+
+        Raises ValueError naming the field when the value is missing without a
+        default, or when it is not an int (or is a bool, since bool subclasses
+        int in Python but is never the intended type for a control count).
+        """
+        if field_name not in statement:
+            if default_when_missing is not None:
+                return default_when_missing
+            raise ValueError(
+                f"ISO27001 statement_of_applicability missing required integer field {field_name!r}"
+            )
+        value = statement[field_name]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"ISO27001 statement_of_applicability field {field_name!r} must be an int, "
+                f"got {type(value).__name__}: {value!r}"
+            )
+        return value
 
     @staticmethod  # FIX: C6-H-05
     def _build_iso27001_coverage_summary(  # FIX: C6-H-05
@@ -112,10 +140,15 @@ class ComplianceReporter:
           OVER_MAPPING        — mapped controls > soa_applicable_controls
         """  # FIX: C6-H-05
         mapped = len(corpus_controls)  # FIX: C6-H-05
-        soa_total = statement.get("total_controls", 0)  # FIX: C6-H-05
-        soa_implemented = statement.get("implemented", 0)  # FIX: C6-H-05
-        soa_planned = statement.get("planned", 0)  # FIX: C6-H-05
-        soa_not_applicable = statement.get("not_applicable", 0)  # FIX: C6-H-05
+        # Strict int validation before any arithmetic; raises ValueError naming
+        # the offending field if a corpus entry is the wrong type (str, None,
+        # bool, etc.) instead of letting TypeError leak out of the arithmetic.
+        soa_total = ComplianceReporter._require_soa_int_field(statement, "total_controls")
+        soa_implemented = ComplianceReporter._require_soa_int_field(statement, "implemented")
+        soa_planned = ComplianceReporter._require_soa_int_field(statement, "planned")
+        soa_not_applicable = ComplianceReporter._require_soa_int_field(
+            statement, "not_applicable", default_when_missing=0
+        )
         soa_applicable = soa_implemented + soa_planned  # FIX: C6-H-05
 
         unmapped = soa_applicable - mapped  # FIX: C6-H-05 (signed: negative means OVER_MAPPING)
@@ -147,29 +180,45 @@ class ComplianceReporter:
             "gap_status": gap_status,  # FIX: C6-H-05
         }  # FIX: C6-H-05
 
-    @staticmethod  # FIX: C6-H-05
-    def _emit_iso27001_coverage_warning(coverage: dict[str, Any]) -> None:  # FIX: C6-H-05
-        """Write a single-line WARNING to stderr when corpus mapping is incomplete.
+    @staticmethod
+    def _emit_iso27001_coverage_warning(coverage: dict[str, Any]) -> None:
+        """Write a single-line WARNING to stderr for non-complete corpus mapping.
 
-        No-op when gap_status is COMPLETE_MAPPING (corpus fully covers SoA applicable
-        controls).  The WARNING: prefix is picked up by CI log scanners and most
-        Splunk parsers without configuration.
+        The WARNING: prefix is picked up by CI log scanners and most Splunk
+        parsers without configuration. Message and fields branch on
+        gap_status so OVER_MAPPING does not surface a negative 'gap' value
+        (which would confuse field-based assertions in CI scanners).
 
-        Format (machine-parseable, one line, no newlines):
-          WARNING: ISO27001 compliance_mapping coverage gap: mapped=<n> soa_applicable=<n> gap=<n> (coverage=<n.nn>%) basis=loaded_corpus
-        """  # FIX: C6-H-05
-        if coverage.get("gap_status") == "COMPLETE_MAPPING":  # FIX: C6-H-05
-            return  # FIX: C6-H-05
-        mapped = coverage["mapped_controls"]  # FIX: C6-H-05
-        soa_applicable = coverage["soa_applicable_controls"]  # FIX: C6-H-05
-        gap = soa_applicable - mapped  # FIX: C6-H-05
-        pct = coverage["corpus_to_soa_coverage_percentage"]  # FIX: C6-H-05
-        print(  # FIX: C6-H-05
-            f"WARNING: ISO27001 compliance_mapping coverage gap: "  # FIX: C6-H-05
-            f"mapped={mapped} soa_applicable={soa_applicable} gap={gap} "  # FIX: C6-H-05
-            f"(coverage={pct}%) basis=loaded_corpus",  # FIX: C6-H-05
-            file=sys.stderr,  # FIX: C6-H-05
-        )  # FIX: C6-H-05
+        Formats (machine-parseable, one line, no newlines):
+          INCOMPLETE_MAPPING:
+            WARNING: ISO27001 compliance_mapping coverage gap: mapped=<n> soa_applicable=<n> gap=<n> (coverage=<n.nn>%) basis=loaded_corpus
+          OVER_MAPPING:
+            WARNING: ISO27001 compliance_mapping mapping excess: mapped=<n> soa_applicable=<n> over_mapped_by=<n> (coverage=<n.nn>%) basis=loaded_corpus
+          COMPLETE_MAPPING:
+            no-op
+        """
+        gap_status = coverage.get("gap_status")
+        if gap_status == "COMPLETE_MAPPING":
+            return
+        mapped = coverage["mapped_controls"]
+        soa_applicable = coverage["soa_applicable_controls"]
+        pct = coverage["corpus_to_soa_coverage_percentage"]
+        if gap_status == "OVER_MAPPING":
+            over_mapped_by = mapped - soa_applicable
+            print(
+                f"WARNING: ISO27001 compliance_mapping mapping excess: "
+                f"mapped={mapped} soa_applicable={soa_applicable} over_mapped_by={over_mapped_by} "
+                f"(coverage={pct}%) basis=loaded_corpus",
+                file=sys.stderr,
+            )
+            return
+        gap = soa_applicable - mapped
+        print(
+            f"WARNING: ISO27001 compliance_mapping coverage gap: "
+            f"mapped={mapped} soa_applicable={soa_applicable} gap={gap} "
+            f"(coverage={pct}%) basis=loaded_corpus",
+            file=sys.stderr,
+        )
 
     @staticmethod
     def _normalize_control_list(mapping_name: str, controls: list[Any]) -> list[ControlRecord]:  # FIX: C5-finding-4

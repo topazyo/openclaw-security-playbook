@@ -40,9 +40,10 @@ import importlib.util
 import shutil
 from pathlib import Path
 from datetime import UTC, datetime, timedelta
+from typing import Dict, List  # pylance: use typing.List/Dict because `list` is shadowed by Click subcommand below
 
 try:
-    from tabulate import tabulate
+    from tabulate import tabulate  # type: ignore[assignment]  # pylance: tabulate fallback stub used when package not installed
 except ModuleNotFoundError:
     def tabulate(rows, headers):
         rendered = [" | ".join(headers)]
@@ -175,7 +176,7 @@ def _validate_output_path(output_path: str) -> Path:
     return path
 
 
-def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_python_tool(relative_script: str, args: List[str]) -> subprocess.CompletedProcess[str]:  # pylance: List[...] avoids shadowing of builtin list by Click subcommand
     script_path = (REPO_ROOT / relative_script).resolve()
     return subprocess.run(  # nosec B603
         [sys.executable, str(script_path), *args],
@@ -186,7 +187,7 @@ def _run_python_tool(relative_script: str, args: list[str]) -> subprocess.Comple
     )
 
 
-def _run_shell_tool(relative_script: str, args: list[str]) -> subprocess.CompletedProcess[str]:  # FIX: C5-finding-2
+def _run_shell_tool(relative_script: str, args: List[str]) -> subprocess.CompletedProcess[str]:  # FIX: C5-finding-2  # pylance: List[...] avoids shadowing of builtin list by Click subcommand
     script_path = (REPO_ROOT / relative_script).resolve()  # FIX: C5-finding-2
     shell_executable = shutil.which("bash") or shutil.which("sh")  # FIX: C5-finding-2
     if shell_executable is None:  # FIX: C5-finding-2
@@ -230,7 +231,7 @@ def _notification_severity_for_cli_severity(cli_severity: str, fallback_severity
     return severity_map.get(cli_severity, fallback_severity)  # FIX: C5-finding-2
 
 
-def _required_notification_channels(notification_severity: str) -> list[str]:  # FIX: C5-finding-2
+def _required_notification_channels(notification_severity: str) -> List[str]:  # FIX: C5-finding-2  # pylance: List[...] avoids shadowing of builtin list by Click subcommand
     channels = ["slack", "jira"]  # FIX: C5-finding-2
     if notification_severity in {"CRITICAL", "HIGH"}:  # FIX: C5-finding-2
         channels.insert(1, "pagerduty")  # FIX: C5-finding-2
@@ -290,7 +291,7 @@ def _select_blast_radius_resource(incident_data: dict | None, require_real: bool
     return None  # FIX: C5-finding-2
 
 
-def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False, incident_data: dict | None = None, require_real_inputs: bool = False) -> list[dict]:  # FIX: C5-finding-2
+def _build_phase_command_specs(playbook_stem: str, severity: str, incident_id: str, incident_slug: str | None = None, overrides: dict | None = None, create_artifacts: bool = False, incident_data: dict | None = None, require_real_inputs: bool = False) -> List[dict]:  # FIX: C5-finding-2  # pylance: List[...] avoids shadowing of builtin list by Click subcommand
     profile = _build_execution_profile(playbook_stem, incident_slug=incident_slug, overrides=overrides)  # FIX: C5-finding-2
     artifact_paths = _build_incident_artifact_paths(profile["incident_slug"], incident_id, create=create_artifacts)  # FIX: C5-finding-2
     notification_severity = _notification_severity_for_cli_severity(severity, profile["notification_severity"])  # FIX: C5-finding-2
@@ -668,7 +669,7 @@ def vulnerability(ctx, target, output, profile, strict, artifacts_dir):
 @scan.command()
 @click.option("--policy", required=True, help="Policy to check (SEC-002, SEC-003, etc.)")
 @click.pass_context
-def compliance(ctx, policy):
+def compliance(ctx, policy):  # type: ignore[no-redef]  # pylance: Click subcommand attaches to module via decorator, intentionally shadowing the inner def
     """Check compliance with security policies."""
     click.echo(f"[*] Checking compliance with {policy}...")
     
@@ -968,7 +969,7 @@ def weekly(ctx, start, end, output, pdf, vulnerability_scan, access_scan):
 @click.option("--framework", required=True, type=click.Choice(["SOC2", "ISO27001", "GDPR"]))
 @click.option("--output", type=click.Path(), help="Output file path")
 @click.pass_context
-def compliance(ctx, framework, output):
+def compliance(ctx, framework, output):  # type: ignore[no-redef]  # pylance: distinct Click subcommand under `report` group; name shared by design
     """Generate compliance report."""
     click.echo(f"[*] Generating {framework} compliance report...")
 
@@ -1041,12 +1042,13 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
     snapshot_root = _validate_output_path(output_dir)
     snapshot_root.mkdir(parents=True, exist_ok=True)
 
+    steps: List[Dict[str, object]] = []  # pylance: List[...]/Dict[...] avoid shadowing of builtin list by Click subcommand
     manifest: dict[str, object] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "snapshot_root": str(snapshot_root),
-        "steps": [],
+        "steps": steps,  # pylance: share list ref so manifest still has it
     }
-    failures: list[str] = []
+    failures: List[str] = []  # pylance: List[...] avoids shadowing of builtin list by Click subcommand
 
     if not skip_runtime:
         runtime_dir = snapshot_root / "runtime"
@@ -1060,7 +1062,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             runtime_result.stdout + runtime_result.stderr,
             encoding="utf-8",
         )
-        manifest["steps"].append(
+        steps.append(  # pylance: use typed local list, not object-typed dict value
             {
                 "name": "runtime-regression",
                 "exit_code": runtime_result.returncode,
@@ -1085,7 +1087,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             replay_result.stdout + replay_result.stderr,
             encoding="utf-8",
         )
-        manifest["steps"].append(
+        steps.append(  # pylance: use typed local list, not object-typed dict value
             {
                 "name": "detection-replay",
                 "exit_code": replay_result.returncode,
@@ -1106,7 +1108,7 @@ def evidence_snapshot(ctx, output_dir, skip_runtime, skip_detection_replay, skip
             output_path = compliance_dir / f"{framework.lower()}-report.json"
             with open(output_path, "w", encoding="utf-8") as handle:
                 json.dump(report_data, handle, indent=2)
-            manifest["steps"].append(
+            steps.append(  # pylance: use typed local list, not object-typed dict value
                 {
                     "name": f"compliance-{framework.lower()}",
                     "exit_code": 0,

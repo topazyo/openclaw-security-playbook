@@ -29,7 +29,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional  # pylance: Optional for nullable param annotations
 
 try:
     import requests
@@ -105,7 +105,7 @@ class NotificationManager:
         self.severity = normalized_severity  # FIX: C5-finding-3
         self.notifications_sent = []
     
-    def send_slack_notification(self, message: str, thread_ts: str = None) -> bool:
+    def send_slack_notification(self, message: str, thread_ts: Optional[str] = None) -> bool:  # pylance: default None requires Optional
         """Send Slack notification"""
         if not SLACK_WEBHOOK_URL:
             logger.warning("SLACK_WEBHOOK_URL not set, skipping Slack")
@@ -217,7 +217,9 @@ class NotificationManager:
         if not all([JIRA_API_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL]):
             logger.warning("Jira credentials not set, skipping")
             return False
-        
+        # pylance: above all() guard ensures both are non-None; assert narrows Optional[str] -> str for auth tuple
+        assert JIRA_USER_EMAIL is not None and JIRA_API_TOKEN is not None
+
         logger.info(f"Updating Jira ticket: {self.incident_id}")
         
         url = f"{JIRA_API_URL}/rest/api/3/issue/{self.incident_id}/comment"
