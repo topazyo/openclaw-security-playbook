@@ -10,10 +10,10 @@ import sys
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "verification" / "runtime_security_regression.py"
 SPEC = importlib.util.spec_from_file_location("runtime_security_regression", MODULE_PATH)
-assert SPEC is not None and SPEC.loader is not None  # pylance: narrow ModuleSpec|None before use
-runtime_security_regression = importlib.util.module_from_spec(SPEC)  # pylance: SPEC narrowed above
-sys.modules[SPEC.name] = runtime_security_regression  # pylance: SPEC narrowed above
-SPEC.loader.exec_module(runtime_security_regression)  # pylance: loader narrowed above
+assert SPEC is not None and SPEC.loader is not None
+runtime_security_regression = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = runtime_security_regression
+SPEC.loader.exec_module(runtime_security_regression)
 
 
 def test_scenario_selection_all_returns_both_paths() -> None:

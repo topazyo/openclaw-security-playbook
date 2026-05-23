@@ -78,7 +78,7 @@ def test_vault_key_manager_creates_keys_and_rotates_versions(encryption_module):
     fake_client.secrets = SimpleNamespace(transit=Mock())  # FIX: C5-finding-4
     fake_client.secrets.transit.read_key.return_value = {"data": {"latest_version": 3}}  # FIX: C5-finding-4
     fake_hvac = ModuleType("hvac")  # FIX: C5-finding-4
-    fake_hvac.Client = Mock(return_value=fake_client)  # type: ignore[attr-defined]  # FIX: C5-finding-4  # pylance: synthetic module stub
+    fake_hvac.Client = Mock(return_value=fake_client)  # type: ignore[attr-defined]  # FIX: C5-finding-4
     with patch.dict(sys.modules, {"hvac": fake_hvac}):  # FIX: C5-finding-4
         manager = encryption_module.VaultKeyManager("http://vault.local", "token")  # FIX: C5-finding-4
         key_name = manager.create_key("openclaw-conversations")  # FIX: C5-finding-4
@@ -96,7 +96,7 @@ def test_vault_key_manager_encrypts_and_decrypts_via_transit(encryption_module):
     fake_client.secrets.transit.encrypt_data.return_value = {"data": {"ciphertext": "vault:v1:encrypted"}}  # FIX: C5-finding-4
     fake_client.secrets.transit.decrypt_data.return_value = {"data": {"plaintext": base64.b64encode(b"secret").decode("utf-8")}}  # FIX: C5-finding-4
     fake_hvac = ModuleType("hvac")  # FIX: C5-finding-4
-    fake_hvac.Client = Mock(return_value=fake_client)  # type: ignore[attr-defined]  # FIX: C5-finding-4  # pylance: synthetic module stub
+    fake_hvac.Client = Mock(return_value=fake_client)  # type: ignore[attr-defined]  # FIX: C5-finding-4
     with patch.dict(sys.modules, {"hvac": fake_hvac}):  # FIX: C5-finding-4
         manager = encryption_module.VaultKeyManager("http://vault.local", "token")  # FIX: C5-finding-4
         ciphertext = manager.encrypt_with_vault("openclaw-conversations", b"secret")  # FIX: C5-finding-4
