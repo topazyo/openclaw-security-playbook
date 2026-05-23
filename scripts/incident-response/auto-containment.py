@@ -36,9 +36,11 @@ import json
 import logging
 import os
 import sys
+import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
 
 try:
     import boto3  # FIX: C5-finding-3
@@ -58,6 +60,11 @@ CONTAINMENT_LOG_DIR = Path("/var/log/openclaw/containment")
 BLOCK_NETWORK_ACL_ID = os.getenv("BLOCK_NETWORK_ACL_ID")  # FIX: C5-finding-3
 DNS_FIREWALL_DOMAIN_LIST_ID = os.getenv("DNS_FIREWALL_DOMAIN_LIST_ID")  # FIX: C5-finding-3
 RATE_LIMIT_CONFIG_PATH = os.getenv("RATE_LIMIT_CONFIG_PATH")  # FIX: C5-finding-3
+# Allowlisted base directory the rate-limit config path must resolve under.
+# When unset, ContainmentManager defaults the base to its log directory so
+# RATE_LIMIT_CONFIG_PATH cannot point the script at arbitrary files (e.g.
+# /etc/passwd) if the env is attacker-influenced and the process is privileged.
+RATE_LIMIT_ALLOWED_BASE_DIR = os.getenv("RATE_LIMIT_ALLOWED_BASE_DIR")
 
 # Logging
 logging.basicConfig(
@@ -92,17 +99,49 @@ class ContainmentManager:
         if docker is not None:  # FIX: C5-finding-3
             try:
                 self.docker_client = docker.from_env()  # FIX: C5-finding-3
-            except (docker.errors.DockerException, OSError, Exception) as e:  # FIX: C5-M-02
+            except (docker.errors.DockerException, OSError) as e:  # FIX: C6-M-03  # type: ignore[attr-defined]  # pylance: docker module attrs unknown to pyright when stubs absent
                 self.docker_client = None  # FIX: C5-M-02
-                self.log_action("init_docker_client", "self", "FAIL", {"error": str(e)})  # FIX: C5-M-02
+                self.log_action("init_docker_client", "self", "failed", {"error": str(e)})  # FIX: C5-M-02
                 logger.warning("Docker not available: %s", e)  # FIX: C5-M-02
         else:
             logger.warning("docker SDK not available")  # FIX: C5-finding-3
         
-        # Create log directory
-        CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
-    
-    def log_action(self, action: str, target: str, status: str, details: Dict = None):
+        # Resolve a writable log directory; fall back to a tempdir if the
+        # default isn't writable so the tool can still run (stdout/stderr
+        # logging is always available). None disables file logging entirely.
+        self.log_dir: Optional[Path] = CONTAINMENT_LOG_DIR
+        try:
+            CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            fallback = Path(tempfile.gettempdir()) / "openclaw" / "containment"
+            try:
+                fallback.mkdir(parents=True, exist_ok=True)
+                self.log_dir = fallback
+                logger.warning(
+                    "Containment log dir %s not writable (%s); falling back to %s",
+                    CONTAINMENT_LOG_DIR, e, fallback,
+                )
+            except OSError as e2:
+                self.log_dir = None
+                logger.error(
+                    "Cannot create containment log dir (%s) or fallback (%s); file logging disabled",
+                    e, e2,
+                )
+
+        # Per-run action-log file: PID + microsecond UTC timestamp ensures
+        # concurrent ContainmentManager processes never share a writer, so
+        # JSONL appends cannot interleave. The threading.Lock additionally
+        # serializes same-process appends if this class is ever used from
+        # multiple threads.
+        self.run_id = f"{os.getpid()}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+        self.log_file_path: Optional[Path] = (
+            self.log_dir / f"{self.incident_id}-{self.run_id}.jsonl"
+            if self.log_dir is not None
+            else None
+        )
+        self._log_lock = threading.Lock()
+
+    def log_action(self, action: str, target: str, status: str, details: Optional[Dict] = None):  # pylance: details defaults to None so type must be Optional
         """Log containment action"""
         action_record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -115,13 +154,16 @@ class ContainmentManager:
         }
         
         self.actions_taken.append(action_record)
-        
-        log_file = CONTAINMENT_LOG_DIR / f"{self.incident_id}.json"
-        
-        # Append to log file
+
+        if self.log_file_path is None:
+            return
+
+        # Same-process serial appends are guarded by self._log_lock; cross-
+        # process serialization is provided by the per-run filename.
         try:
-            with open(log_file, 'a') as f:
-                f.write(json.dumps(action_record) + "\n")
+            with self._log_lock:
+                with open(self.log_file_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(action_record) + "\n")
         except Exception as e:
             logger.error(f"Failed to write log: {e}")
 
@@ -139,45 +181,108 @@ class ContainmentManager:
             "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
         )  # FIX: C6-H-01
 
-    def _resolve_firewall_domain_list_id(self) -> str:  # FIX: C5-finding-3
-        """Resolve the DNS firewall domain list used for domain blocking."""  # FIX: C5-finding-3
-        if self.route53resolver is None:  # FIX: C5-finding-3
-            raise RuntimeError("boto3 is required for Route53 Resolver management")  # FIX: C5-finding-3
-        if DNS_FIREWALL_DOMAIN_LIST_ID:  # FIX: C5-finding-3
-            return DNS_FIREWALL_DOMAIN_LIST_ID  # FIX: C5-finding-3
-        response = self.route53resolver.list_firewall_domain_lists(MaxResults=100)  # FIX: C5-finding-3
-        firewall_domain_lists = response.get("FirewallDomainLists", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
-        for firewall_domain_list in firewall_domain_lists:  # FIX: C5-finding-3
-            if isinstance(firewall_domain_list, dict) and firewall_domain_list.get("Name") == "openclaw-auto-containment":  # FIX: C5-finding-3
-                return firewall_domain_list["Id"]  # FIX: C5-finding-3
-        created_domain_list = self.route53resolver.create_firewall_domain_list(  # FIX: C5-finding-3
-            CreatorRequestId=f"{self.incident_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",  # FIX: C5-finding-3
-            Name="openclaw-auto-containment",  # FIX: C5-finding-3
-        )  # FIX: C5-finding-3
-        created_record = created_domain_list.get("FirewallDomainList", {}) if isinstance(created_domain_list, dict) else {}  # FIX: C5-finding-3
-        if not isinstance(created_domain_list, dict) or not isinstance(created_record, dict) or not created_record.get("Id"):  # FIX: C6-H-01
-            raise RuntimeError(  # FIX: C6-H-01
-                "firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID to a valid pre-existing list"  # FIX: C6-H-01
-            )  # FIX: C6-H-01
-        return created_record["Id"]  # FIX: C6-H-01
+    def _allocate_acl_rule_numbers(self, network_acl_id: str, cidr_block: str):
+        """Find collision-free NACL rule numbers for an emergency deny on cidr_block.
 
-    def block_ip_address(self, ip_address: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+        Scans existing entries on the NACL. If a matching deny-all entry for the
+        same CIDR already exists in a given direction, reuses that rule number
+        and signals the caller to skip the create (idempotent re-block). For
+        any direction without an existing match, returns the lowest unused rule
+        number in [100, 32766]. Returns a dict with rule numbers and presence
+        flags so the caller can avoid both create-on-collision failures and
+        spurious rollback entries for rules it did not create.
+        """
+        if self.ec2 is None:
+            raise RuntimeError("boto3 is required for network ACL management")
+        response = self.ec2.describe_network_acls(NetworkAclIds=[network_acl_id])
+        network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []
+        entries = (
+            network_acls[0].get("Entries", [])
+            if network_acls and isinstance(network_acls[0], dict)
+            else []
+        )
+
+        ingress_used: set = set()
+        egress_used: set = set()
+        existing_ingress: Optional[int] = None
+        existing_egress: Optional[int] = None
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            rule_number = entry.get("RuleNumber")
+            if not isinstance(rule_number, int):
+                continue
+            is_egress = bool(entry.get("Egress"))
+            (egress_used if is_egress else ingress_used).add(rule_number)
+            if (
+                entry.get("CidrBlock") == cidr_block
+                and entry.get("RuleAction") == "deny"
+                and str(entry.get("Protocol")) == "-1"
+            ):
+                if is_egress:
+                    existing_egress = rule_number
+                else:
+                    existing_ingress = rule_number
+
+        def _next_free(used: set) -> int:
+            for candidate in range(100, 32767):
+                if candidate not in used:
+                    return candidate
+            raise RuntimeError("No free NACL rule numbers available in range 100-32766")
+
+        return {
+            "ingress_rule_number": existing_ingress if existing_ingress is not None else _next_free(ingress_used),
+            "egress_rule_number": existing_egress if existing_egress is not None else _next_free(egress_used),
+            "ingress_already_present": existing_ingress is not None,
+            "egress_already_present": existing_egress is not None,
+        }
+
+    def _resolve_firewall_domain_list_id(self) -> str:
+        """Resolve the DNS firewall domain list used for domain blocking.
+
+        Requires DNS_FIREWALL_DOMAIN_LIST_ID to point at a list that is already
+        referenced by a Route53 Resolver DNS Firewall rule group associated
+        with the target VPC(s). Creating a list on demand is intentionally not
+        supported: an orphan list enforces no policy, so reporting "success"
+        after creating one would be a false claim.
+        """
+        if self.route53resolver is None:
+            raise RuntimeError("boto3 is required for Route53 Resolver management")
+        if not DNS_FIREWALL_DOMAIN_LIST_ID:
+            raise RuntimeError(
+                "DNS_FIREWALL_DOMAIN_LIST_ID is not set. Provide the Id of a "
+                "Route53 Resolver DNS Firewall domain list that is already "
+                "referenced by a rule group associated with the target VPC(s); "
+                "this script will not create an unenforced list."
+            )
+        return DNS_FIREWALL_DOMAIN_LIST_ID
+
+    def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
         """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
         logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
             network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
-            rule_seed = sum(ord(character) for character in cidr_block) % 10000  # FIX: C5-finding-3
-            ingress_rule_number = 100 + rule_seed  # FIX: C5-finding-3
-            egress_rule_number = 200 + rule_seed  # FIX: C5-finding-3
+            assert self.ec2 is not None  # pylance: _resolve_network_acl_id raises if self.ec2 is None
+            allocation = self._allocate_acl_rule_numbers(network_acl_id, cidr_block)
+            ingress_rule_number = allocation["ingress_rule_number"]
+            egress_rule_number = allocation["egress_rule_number"]
+            ingress_already_present = allocation["ingress_already_present"]
+            egress_already_present = allocation["egress_already_present"]
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C5-finding-3
-                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
                 return True  # FIX: C5-finding-3
-            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)  # FIX: C5-finding-3
-            self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=egress_rule_number, Protocol='-1', RuleAction='deny', Egress=True, CidrBlock=cidr_block)  # FIX: C5-finding-3
-            self.rollback_commands.append({"action": "delete_network_acl_entry", "network_acl_id": network_acl_id, "rule_numbers": [ingress_rule_number, egress_rule_number]})  # FIX: C5-finding-3
-            self.log_action("block_ip", ip_address, "success", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id})  # FIX: C5-finding-3
+            created_rule_numbers = []
+            if not ingress_already_present:
+                self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)
+                created_rule_numbers.append(ingress_rule_number)
+            if not egress_already_present:
+                self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=egress_rule_number, Protocol='-1', RuleAction='deny', Egress=True, CidrBlock=cidr_block)
+                created_rule_numbers.append(egress_rule_number)
+            if created_rule_numbers:
+                self.rollback_commands.append({"action": "delete_network_acl_entry", "network_acl_id": network_acl_id, "rule_numbers": created_rule_numbers})
+            self.log_action("block_ip", ip_address, "success", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
             logger.info(f"✓ IP address {ip_address} blocked successfully")  # FIX: C5-finding-3
             return True  # FIX: C5-finding-3
         except Exception as e:  # FIX: C5-finding-3
@@ -185,7 +290,7 @@ class ContainmentManager:
             self.log_action("block_ip", ip_address, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def block_domain_name(self, domain: str, duration: str = None, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def block_domain_name(self, domain: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
         """Block a domain by adding it to the emergency DNS firewall list."""  # FIX: C5-finding-3
         logger.info(f"Blocking domain: {domain}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
@@ -193,6 +298,7 @@ class ContainmentManager:
             if not normalized_domain:  # FIX: C5-finding-3
                 raise ValueError("Domain cannot be empty")  # FIX: C5-finding-3
             firewall_domain_list_id = self._resolve_firewall_domain_list_id()  # FIX: C5-finding-3
+            assert self.route53resolver is not None  # pylance: _resolve_firewall_domain_list_id raises if self.route53resolver is None
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would add the domain to the emergency DNS firewall list")  # FIX: C5-finding-3
                 self.log_action("block_domain", normalized_domain, "dry_run", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3
@@ -207,7 +313,7 @@ class ContainmentManager:
             self.log_action("block_domain", domain, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def isolate_container(self, container_id: str, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def isolate_container(self, container_id: str, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
         logger.info(f"Isolating container: {container_id}")  # FIX: C5-finding-3
         if not self.docker_client:  # FIX: C5-finding-3
@@ -229,7 +335,7 @@ class ContainmentManager:
             container_labels = {'quarantine': self.incident_id}  # FIX: C5-finding-3
             if reason:  # FIX: C5-finding-3
                 container_labels['containment_reason'] = reason  # FIX: C5-finding-3
-            container.update(labels=container_labels)  # FIX: C5-finding-3
+            container.update(labels=container_labels)  # type: ignore[call-arg]  # FIX: C5-finding-3  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
             self.log_action("isolate_container", container_id, "success", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
             logger.info(f"✓ Container {container_id} isolated successfully")  # FIX: C5-finding-3
             return True  # FIX: C5-finding-3
@@ -238,19 +344,61 @@ class ContainmentManager:
             self.log_action("isolate_container", container_id, "failed", {"error": str(e), "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def update_rate_limits(self, mode: str, limits: Dict, reason: str = None) -> bool:  # FIX: C5-finding-3
+    def update_rate_limits(self, mode: str, limits: Dict, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Write an emergency rate-limit override profile for the requested mode."""  # FIX: C5-finding-3
         logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
-            rate_limit_profile_path = Path(RATE_LIMIT_CONFIG_PATH) if RATE_LIMIT_CONFIG_PATH else CONTAINMENT_LOG_DIR / f"{self.incident_id}-rate-limits.json"  # FIX: C5-finding-3
+            if RATE_LIMIT_CONFIG_PATH:  # FIX: C5-finding-3
+                candidate_path = Path(RATE_LIMIT_CONFIG_PATH)
+                allowed_base = (
+                    Path(RATE_LIMIT_ALLOWED_BASE_DIR) if RATE_LIMIT_ALLOWED_BASE_DIR else self.log_dir
+                )
+                if allowed_base is None:
+                    logger.error(
+                        "Refusing to honor RATE_LIMIT_CONFIG_PATH: no allowlisted base "
+                        "(set RATE_LIMIT_ALLOWED_BASE_DIR or restore log directory)"
+                    )
+                    self.log_action("update_rate_limits", mode, "failed", {"error": "no allowlisted base", "config_path": str(candidate_path)})
+                    return False
+                resolved_candidate = candidate_path.resolve()
+                resolved_base = allowed_base.resolve()
+                if not resolved_candidate.is_relative_to(resolved_base):
+                    logger.error(
+                        "RATE_LIMIT_CONFIG_PATH %s is not under allowlisted base %s; refusing to write",
+                        resolved_candidate, resolved_base,
+                    )
+                    self.log_action("update_rate_limits", mode, "failed", {"error": "path outside allowlisted base", "config_path": str(resolved_candidate), "allowed_base": str(resolved_base)})
+                    return False
+                rate_limit_profile_path = candidate_path
+            elif self.log_dir is not None:
+                rate_limit_profile_path = self.log_dir / f"{self.incident_id}-rate-limits.json"
+            else:
+                logger.error("No writable path for rate-limit profile (set RATE_LIMIT_CONFIG_PATH)")
+                self.log_action("update_rate_limits", mode, "failed", {"error": "no writable path"})
+                return False
             rate_limit_payload = {"incident_id": self.incident_id, "mode": mode, "updated_at": datetime.now(timezone.utc).isoformat(), "limits": limits, "reason": reason}  # FIX: C5-finding-3
             if self.dry_run:  # FIX: C5-finding-3
                 logger.info("[DRY-RUN] Would write the emergency rate-limit override profile")  # FIX: C5-finding-3
                 self.log_action("update_rate_limits", mode, "dry_run", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
                 return True  # FIX: C5-finding-3
             rate_limit_profile_path.parent.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
-            with open(rate_limit_profile_path, 'w', encoding='utf-8') as f:  # FIX: C5-finding-3
-                json.dump(rate_limit_payload, f, indent=2)  # FIX: C5-finding-3
+            # Atomic write: emit to a sibling temp file then rename, so a crash
+            # mid-write cannot leave a half-written rate-limit config in place.
+            fd, temp_path_str = tempfile.mkstemp(
+                prefix=f".{rate_limit_profile_path.name}.",
+                suffix=".tmp",
+                dir=str(rate_limit_profile_path.parent),
+            )
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(rate_limit_payload, f, indent=2)
+                os.replace(temp_path_str, rate_limit_profile_path)
+            except Exception:
+                try:
+                    os.unlink(temp_path_str)
+                except OSError:
+                    pass
+                raise
             self.rollback_commands.append({"action": "restore_rate_limits", "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
             self.log_action("update_rate_limits", mode, "success", {"mode": mode, "limits": limits, "reason": reason, "config_path": str(rate_limit_profile_path)})  # FIX: C5-finding-3
             logger.info(f"✓ Rate limits updated successfully using mode {mode}")  # FIX: C5-finding-3
@@ -302,6 +450,7 @@ class ContainmentManager:
                 logger.info(f"✓ Snapshot created: {snapshot['SnapshotId']}")
             
             # Apply quarantine security group
+            quarantine_sg: Optional[str] = None  # pylance: ensure bound on all paths for log_action below
             if QUARANTINE_SG_ID:
                 logger.info(f"Applying quarantine security group: {QUARANTINE_SG_ID}")
                 self.ec2.modify_instance_attribute(
@@ -486,7 +635,7 @@ class ContainmentManager:
                 })
             
             # Add quarantine label
-            container.update(labels={'quarantine': self.incident_id})
+            container.update(labels={'quarantine': self.incident_id})  # type: ignore[call-arg]  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
             
             self.log_action("isolate_docker", container_id, "success", {
                 "original_networks": original_networks
@@ -510,12 +659,13 @@ class ContainmentManager:
             "rollback_commands": self.rollback_commands
         }
         
-        report_file = CONTAINMENT_LOG_DIR / f"{self.incident_id}-report.json"
-        
-        with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
-        
-        logger.info(f"✓ Containment report saved: {report_file}")
+        if self.log_dir is None:
+            logger.error("No writable log directory; skipping containment report file")
+        else:
+            report_file = self.log_dir / f"{self.incident_id}-report.json"
+            with open(report_file, 'w') as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"✓ Containment report saved: {report_file}")
         
         # Print summary
         print("\n" + "=" * 80)

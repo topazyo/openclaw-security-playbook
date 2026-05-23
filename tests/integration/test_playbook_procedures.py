@@ -69,7 +69,7 @@ def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
     with patch.dict(sys.modules, {"boto3": fake_boto3, "docker": fake_docker}):  # FIX: C5-finding-3
         sys.modules[spec.name] = module  # FIX: C5-finding-3
         spec.loader.exec_module(module)  # FIX: C5-finding-3
-    module.CONTAINMENT_LOG_DIR = log_dir  # FIX: C5-finding-3
+    module.CONTAINMENT_LOG_DIR = log_dir  # type: ignore[attr-defined]  # FIX: C5-finding-3
     return module, log_dir, fake_ec2, fake_route53resolver, fake_docker_client, fake_network, fake_container  # FIX: C5-finding-3
 
 
@@ -86,21 +86,21 @@ def _read_single_report(log_dir):  # FIX: C5-finding-3
 
 def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
     fake_psutil = ModuleType("psutil")  # FIX: C5-finding-3
-    fake_psutil.Error = RuntimeError  # FIX: C5-finding-3
-    fake_psutil.NoSuchProcess = RuntimeError  # FIX: C5-finding-3
-    fake_psutil.AccessDenied = RuntimeError  # FIX: C5-finding-3
-    fake_psutil.disk_partitions = Mock()  # FIX: C5-finding-3
-    fake_psutil.disk_usage = Mock()  # FIX: C5-finding-3
-    fake_psutil.process_iter = Mock()  # FIX: C5-finding-3
-    fake_psutil.net_connections = Mock()  # FIX: C5-finding-3
+    fake_psutil.Error = RuntimeError  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.NoSuchProcess = RuntimeError  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.AccessDenied = RuntimeError  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.disk_partitions = Mock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.disk_usage = Mock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.process_iter = Mock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_psutil.net_connections = Mock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_cryptography = ModuleType("cryptography")  # FIX: C5-finding-3
     fake_hazmat = ModuleType("cryptography.hazmat")  # FIX: C5-finding-3
     fake_primitives = ModuleType("cryptography.hazmat.primitives")  # FIX: C5-finding-3
-    fake_primitives.hashes = ModuleType("hashes")  # FIX: C5-finding-3
-    fake_primitives.serialization = ModuleType("serialization")  # FIX: C5-finding-3
+    fake_primitives.hashes = ModuleType("hashes")  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_primitives.serialization = ModuleType("serialization")  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_asymmetric = ModuleType("cryptography.hazmat.primitives.asymmetric")  # FIX: C5-finding-3
-    fake_asymmetric.rsa = ModuleType("rsa")  # FIX: C5-finding-3
-    fake_asymmetric.padding = ModuleType("padding")  # FIX: C5-finding-3
+    fake_asymmetric.rsa = ModuleType("rsa")  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_asymmetric.padding = ModuleType("padding")  # type: ignore[attr-defined]  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, FORENSICS_COLLECTOR_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
@@ -118,8 +118,8 @@ def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
 
 def _load_ioc_scanner_module(module_name):  # FIX: C5-finding-3
     fake_requests = ModuleType("requests")  # FIX: C5-finding-3
-    fake_requests.get = Mock()  # FIX: C5-finding-3
-    fake_requests.exceptions = SimpleNamespace(RequestException=Exception)  # FIX: C5-finding-3
+    fake_requests.get = Mock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    fake_requests.exceptions = SimpleNamespace(RequestException=Exception)  # type: ignore[attr-defined]  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, IOC_SCANNER_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
@@ -161,11 +161,11 @@ def _load_timeline_generator_module(module_name):  # FIX: C5-finding-3
     fake_logs_client = MagicMock()  # FIX: C5-finding-3
     fake_cloudtrail_client = MagicMock()  # FIX: C5-finding-3
     fake_elasticsearch = ModuleType("elasticsearch")  # FIX: C5-finding-3
-    fake_elasticsearch.Elasticsearch = MagicMock(return_value=fake_es_client)  # FIX: C5-finding-3
+    fake_elasticsearch.Elasticsearch = MagicMock(return_value=fake_es_client)  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
-    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"logs": fake_logs_client, "cloudtrail": fake_cloudtrail_client}[service_name])  # FIX: C5-finding-3
+    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"logs": fake_logs_client, "cloudtrail": fake_cloudtrail_client}[service_name])  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_pandas = ModuleType("pandas")  # FIX: C5-finding-3
-    fake_pandas.DataFrame = MagicMock()  # FIX: C5-finding-3
+    fake_pandas.DataFrame = MagicMock()  # type: ignore[attr-defined]  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, TIMELINE_GENERATOR_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
@@ -180,9 +180,9 @@ def _load_impact_analyzer_module(module_name):  # FIX: C5-finding-3
     fake_iam = MagicMock()  # FIX: C5-finding-3
     fake_graph = MagicMock()  # FIX: C5-finding-3
     fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
-    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"ec2": fake_ec2, "iam": fake_iam}[service_name])  # FIX: C5-finding-3
+    fake_boto3.client = MagicMock(side_effect=lambda service_name, region_name=None: {"ec2": fake_ec2, "iam": fake_iam}[service_name])  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_networkx = ModuleType("networkx")  # FIX: C5-finding-3
-    fake_networkx.DiGraph = MagicMock(return_value=fake_graph)  # FIX: C5-finding-3
+    fake_networkx.DiGraph = MagicMock(return_value=fake_graph)  # type: ignore[attr-defined]  # FIX: C5-finding-3
     spec = importlib.util.spec_from_file_location(module_name, IMPACT_ANALYZER_PATH)  # FIX: C5-finding-3
     assert spec is not None and spec.loader is not None  # FIX: C5-finding-3
     module = importlib.util.module_from_spec(spec)  # FIX: C5-finding-3
@@ -259,7 +259,7 @@ class TestDetectionPhase:
     def test_ioc_scanner_threat_intel(self, incident_simulator):  # FIX: C5-finding-3
         """Test IOC scanner queries threat intelligence through the real AbuseIPDB path."""  # FIX: C5-finding-3
         module, fake_requests = _load_ioc_scanner_module("ioc_scanner_detection_issue_7_tests")  # FIX: C5-finding-3
-        module.ABUSEIPDB_API_KEY = "abuseipdb-test-key"  # FIX: C5-finding-3
+        module.ABUSEIPDB_API_KEY = "abuseipdb-test-key"  # type: ignore[attr-defined]  # FIX: C5-finding-3
         fake_response = Mock()  # FIX: C5-finding-3
         fake_response.raise_for_status.return_value = None  # FIX: C5-finding-3
         fake_response.json.return_value = {  # FIX: C5-finding-3
@@ -432,8 +432,8 @@ class TestForensicsCollectorRuntimeParity:
     def test_notification_manager_sends_pagerduty(self, incident_simulator):  # FIX: C5-finding-3
         """Test notification-manager.py sends PagerDuty alert."""  # FIX: C5-finding-3
         module = _load_notification_manager_module("notification_manager_issue_7_tests")  # FIX: C5-finding-3
-        module.PAGERDUTY_API_KEY = "pagerduty-token"  # FIX: C5-finding-3
-        module.PAGERDUTY_SERVICE_ID = "service-12345"  # FIX: C5-finding-3
+        module.PAGERDUTY_API_KEY = "pagerduty-token"  # type: ignore[attr-defined]  # FIX: C5-finding-3
+        module.PAGERDUTY_SERVICE_ID = "service-12345"  # type: ignore[attr-defined]  # FIX: C5-finding-3
         manager = module.NotificationManager(incident_simulator["incident_id"], "critical")  # FIX: C5-finding-3
         fake_response = Mock()  # FIX: C5-finding-3
         fake_response.raise_for_status.return_value = None  # FIX: C5-finding-3
@@ -698,8 +698,8 @@ class TestRecoveryPhase:
         fake_conn = MagicMock()  # FIX: C5-finding-3
         fake_conn.cursor.return_value = fake_cursor  # FIX: C5-finding-3
         fake_psycopg2 = ModuleType("psycopg2")  # FIX: C5-finding-3
-        fake_psycopg2.connect = Mock(return_value=fake_conn)  # FIX: C5-finding-3
-        fake_psycopg2.Error = Exception  # FIX: C5-finding-3
+        fake_psycopg2.connect = Mock(return_value=fake_conn)  # type: ignore[attr-defined]  # FIX: C5-finding-3
+        fake_psycopg2.Error = Exception  # type: ignore[attr-defined]  # FIX: C5-finding-3
 
         with patch.dict(sys.modules, {"psycopg2": fake_psycopg2}):  # FIX: C5-finding-3
             manager._run_smoke_tests("postgresql://restore-target")  # FIX: C5-finding-3

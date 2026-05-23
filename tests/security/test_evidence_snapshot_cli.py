@@ -13,8 +13,8 @@ from click.testing import CliRunner
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "tools" / "openclaw-cli.py"
 SPEC = importlib.util.spec_from_file_location("openclaw_cli", MODULE_PATH)
+assert SPEC is not None and SPEC.loader is not None
 openclaw_cli = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
 sys.modules[SPEC.name] = openclaw_cli
 SPEC.loader.exec_module(openclaw_cli)
 

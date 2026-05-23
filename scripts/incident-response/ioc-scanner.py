@@ -48,6 +48,7 @@ except ImportError:
 # API Configuration
 ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+IOC_SCANNER_TLD_INDICATOR_ENABLED = os.getenv("IOC_SCANNER_TLD_INDICATOR_ENABLED", "false").lower() in ("true", "1", "yes")  # FIX: C6-M-05
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -243,10 +244,16 @@ class IOCScanner:
             result["dns_status"] = "No DNS record found"
             result["indicators"].append("DNS lookup failed")
 
-        # Check for suspicious TLDs
-        suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz']
-        if any(domain.endswith(tld) for tld in suspicious_tlds):
-            result["indicators"].append("Suspicious TLD")
+        # Check for suspicious TLDs — when IOC_SCANNER_TLD_INDICATOR_ENABLED is  # FIX: C6-M-05
+        # set, treat a TLD match as a partial signal: record the indicator AND  # FIX: C6-M-05
+        # bump threat_score by 5. The domain is NOT flagged malicious from TLD  # FIX: C6-M-05
+        # alone (would be a false-positive on every .tk / .ml / .ga / etc.); it  # FIX: C6-M-05
+        # only contributes to the cumulative threat_score so the indicator is  # FIX: C6-M-05
+        # load-bearing rather than purely informational.  # FIX: C6-M-05
+        suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz']  # FIX: C6-M-05
+        if IOC_SCANNER_TLD_INDICATOR_ENABLED and any(domain.endswith(tld) for tld in suspicious_tlds):  # FIX: C6-M-05
+            result["indicators"].append("Suspicious TLD")  # FIX: C6-M-05
+            self.results["threat_score"] += 5  # FIX: C6-M-05
 
         # WHOIS and certificate transparency checks are NOT implemented.  # FIX: C5-H-02
         # They are listed in result["unsupported_checks"] above.          # FIX: C5-H-02

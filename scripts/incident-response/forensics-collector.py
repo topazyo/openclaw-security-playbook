@@ -309,9 +309,11 @@ class ForensicsCollector:
         logs_dir = self.evidence_dir / "logs"  # FIX: C5-finding-3
         logs_dir.mkdir(exist_ok=True)  # FIX: C5-finding-3
         collection_succeeded = True  # FIX: C5-finding-3
-        
+        log_source_found = False  # FIX: C6-M-04
+
         # Collect journal logs (Linux)  # FIX: C5-finding-3
         if shutil.which("journalctl"):  # FIX: C5-finding-3
+            log_source_found = True  # FIX: C6-M-04
             journal_file = logs_dir / "journalctl.log"  # FIX: C5-finding-3
             try:  # FIX: C5-finding-3
                 with open(journal_file, 'w') as journal_handle:  # FIX: C5-finding-3
@@ -335,6 +337,7 @@ class ForensicsCollector:
         # Collect OpenClaw logs  # FIX: C5-finding-3
         openclaw_logs_dir = LOG_DIR  # FIX: C5-finding-3
         if openclaw_logs_dir.exists():  # FIX: C5-finding-3
+            log_source_found = True  # FIX: C6-M-04
             try:  # FIX: C5-finding-3
                 shutil.copytree(openclaw_logs_dir, logs_dir / "openclaw", dirs_exist_ok=True)  # FIX: C5-finding-3
                 
@@ -349,7 +352,18 @@ class ForensicsCollector:
             except Exception as e:  # FIX: C5-finding-3
                 logger.warning(f"Failed to collect OpenClaw logs: {e}")  # FIX: C5-finding-3
                 collection_succeeded = False  # FIX: C5-finding-3
-        
+
+        if not log_source_found:  # FIX: C6-M-04
+            self.manifest["evidence_items"].append({  # FIX: C6-M-04
+                "name": "log_collection_degraded",  # FIX: C6-M-04
+                "file_path": None,  # FIX: C6-M-04
+                "description": "no log source available on host",  # FIX: C6-M-04
+                "status": "degraded",  # FIX: C6-M-04
+                "reason": f"neither journalctl nor {LOG_DIR_STRING} is available",  # FIX: C6-M-04
+                "collected_at": datetime.now(timezone.utc).isoformat(),  # FIX: C6-M-04
+            })  # FIX: C6-M-04
+            return False  # FIX: C6-M-04
+
         return collection_succeeded  # FIX: C5-finding-3
     
     def collect_network_capture(self, duration: int = 60) -> bool:
@@ -435,17 +449,11 @@ class ForensicsCollector:
             f.write("# Evidence Items\n")
             
             for item in self.manifest["evidence_items"]:
-                # Degraded/failed items have no file on disk to checksum.
-                # Record their existence as a comment so operators can see
-                # the gap without claiming a checksum that does not exist.
-                if item.get("file_path") is None or item.get("checksum_sha256") is None:
-                    f.write(
-                        f"# DEGRADED: {item.get('name')} "
-                        f"(status={item.get('status', 'unknown')}, "
-                        f"reason={item.get('reason', 'unknown')})\n"
-                    )
-                    continue
-                f.write(f"{item['checksum_sha256']}  {item['file_path']}\n")
+                if item.get("status") in ("degraded", "failed") or item.get("file_path") is None:  # FIX: C6-H-08
+                    detail = item.get("reason") or item.get("description") or "no detail"  # FIX: C6-H-08
+                    f.write(f"# DEGRADED  {item.get('name', 'unnamed')}: {detail}\n")  # FIX: C6-H-08
+                    continue  # FIX: C6-H-08
+                f.write(f"{item.get('checksum_sha256', 'N/A')}  {item.get('file_path', 'N/A')}\n")  # FIX: C6-H-08
         
         logger.info(f"✓ Chain of custody manifest saved: {manifest_file}")
         logger.info(f"✓ Checksums saved: {checksum_file}")
@@ -491,7 +499,7 @@ class ForensicsCollector:
         logger.info(f"Incident ID: {self.incident_id}")  # FIX: C5-finding-3
         logger.info(f"Evidence Directory: {self.evidence_dir}")  # FIX: C5-finding-3
         logger.info(f"Items Collected: {len(self.manifest['evidence_items'])}")  # FIX: C5-finding-3
-        logger.info(f"Total Size: {sum(item.get('file_size_bytes', 0) for item in self.manifest['evidence_items']) / 1024 / 1024:.2f} MB")  # FIX: C5-finding-3 FIX: C5-M-04
+        logger.info(f"Total Size: {sum(item.get('file_size_bytes', 0) for item in self.manifest['evidence_items'] if item.get('status') not in ('degraded', 'failed')) / 1024 / 1024:.2f} MB")  # FIX: C5-finding-3 FIX: C5-M-04 FIX: C6-M-04
         logger.info("=" * 80)  # FIX: C5-finding-3
         if failed_steps:  # FIX: C5-finding-3
             raise RuntimeError(f"Incomplete forensic collection: {', '.join(failed_steps)}")  # FIX: C5-finding-3

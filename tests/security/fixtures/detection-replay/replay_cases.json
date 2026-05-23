@@ -332,5 +332,33 @@
     "rule": "detections/sigma/openclaw-mcp-path-traversal.yml",
     "fixture": "tests/security/fixtures/detection-replay/mcp-path-traversal-evasion-overlong-upper.json",
     "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-3space",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-3space.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-4space",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-4space.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-crlf",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-crlf.json",
+    "should_match": true
+  },
+  {
+    "name": "agent-impersonation-webhook-positive-nbsp",
+    "kind": "sigma",
+    "rule": "detections/sigma/openclaw-agent-impersonation-webhook.yml",
+    "fixture": "tests/security/fixtures/detection-replay/agent-impersonation-webhook-positive-nbsp.json",
+    "should_match": true
   }
 ]

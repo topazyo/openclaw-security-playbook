@@ -77,6 +77,28 @@ def test_analyze_domain_claim_propagates_nested_reputation_failure(monkeypatch):
     assert any(scan_result["status"] == "error" for scan_result in scanner.results["scan_results"])
 
 
+def test_C6_M_05_tld_indicator_is_load_bearing_partial_signal_when_enabled(monkeypatch):  # FIX: C6-M-05
+    monkeypatch.setattr(_IOC_MOD, "ABUSEIPDB_API_KEY", "")  # FIX: C6-M-05
+    monkeypatch.setattr(_IOC_MOD.socket, "gethostbyname", lambda _domain: "8.8.8.8")  # FIX: C6-M-05
+
+    # Gate OFF: TLD match must not appear in indicators and must not move threat_score  # FIX: C6-M-05
+    monkeypatch.setattr(_IOC_MOD, "IOC_SCANNER_TLD_INDICATOR_ENABLED", False)  # FIX: C6-M-05
+    scanner_off = _IOC_MOD.IOCScanner()  # FIX: C6-M-05
+    base_score_off = scanner_off.results["threat_score"]  # FIX: C6-M-05
+    result_off = scanner_off.analyze_domain("benignsite.tk")  # FIX: C6-M-05
+    assert "Suspicious TLD" not in result_off.get("indicators", [])  # FIX: C6-M-05
+    assert scanner_off.results["threat_score"] == base_score_off  # FIX: C6-M-05
+
+    # Gate ON: indicator is appended, threat_score bumps by 5, is_malicious stays False  # FIX: C6-M-05
+    monkeypatch.setattr(_IOC_MOD, "IOC_SCANNER_TLD_INDICATOR_ENABLED", True)  # FIX: C6-M-05
+    scanner_on = _IOC_MOD.IOCScanner()  # FIX: C6-M-05
+    base_score_on = scanner_on.results["threat_score"]  # FIX: C6-M-05
+    result_on = scanner_on.analyze_domain("benignsite.tk")  # FIX: C6-M-05
+    assert "Suspicious TLD" in result_on.get("indicators", [])  # FIX: C6-M-05
+    assert scanner_on.results["threat_score"] == base_score_on + 5  # FIX: C6-M-05
+    assert result_on.get("is_malicious") is False  # FIX: C6-M-05
+
+
 def test_scan_file_claim_records_missing_file_errors(tmp_path):
     scanner = _IOC_MOD.IOCScanner()
     result = scanner.scan_file(tmp_path / "missing.bin")
