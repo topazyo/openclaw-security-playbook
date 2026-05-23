@@ -47,13 +47,26 @@ def _run_hook(file_path: Path) -> tuple[int, str]:  # FIX: C6-H-09
     hook_posix = _to_posix(_HOOK_PATH)  # FIX: C6-H-09
     file_posix = _to_posix(file_path)  # FIX: C6-H-09
     payload = json.dumps({"tool_input": {"file_path": file_posix}})  # FIX: C6-H-09
-    result = subprocess.run(  # FIX: C6-H-09
-        ["bash", hook_posix],  # FIX: C6-H-09
-        input=payload.encode('utf-8'),  # FIX: C6-H-09
-        stdout=subprocess.PIPE,  # FIX: C6-H-09
-        stderr=subprocess.PIPE,  # FIX: C6-H-09
-        timeout=15,  # FIX: C6-H-09
-    )
+    try:  # FIX: C6-H-09
+        result = subprocess.run(  # FIX: C6-H-09
+            ["bash", hook_posix],  # FIX: C6-H-09
+            input=payload.encode('utf-8'),  # FIX: C6-H-09
+            stdout=subprocess.PIPE,  # FIX: C6-H-09
+            stderr=subprocess.PIPE,  # FIX: C6-H-09
+            timeout=15,  # FIX: C6-H-09
+        )
+    except subprocess.TimeoutExpired as exc:  # FIX: C6-H-09
+        # Convert opaque TimeoutExpired into an actionable pytest failure that  # FIX: C6-H-09
+        # surfaces whatever the hook had written before the timeout. Without  # FIX: C6-H-09
+        # this, a hung hook reports only "TimeoutExpired" with no clue why.  # FIX: C6-H-09
+        partial_stdout = (exc.stdout or b'').decode('utf-8', errors='replace')  # FIX: C6-H-09
+        partial_stderr = (exc.stderr or b'').decode('utf-8', errors='replace')  # FIX: C6-H-09
+        pytest.fail(  # FIX: C6-H-09
+            f"Hook timed out after {exc.timeout}s invoking bash {hook_posix} on {file_posix}.\n"  # FIX: C6-H-09
+            f"Partial stdout:\n{partial_stdout}\n"  # FIX: C6-H-09
+            f"Partial stderr:\n{partial_stderr}",  # FIX: C6-H-09
+            pytrace=False,  # FIX: C6-H-09
+        )
     combined = (  # FIX: C6-H-09
         (result.stdout or b'').decode('utf-8', errors='replace')  # FIX: C6-H-09
         + (result.stderr or b'').decode('utf-8', errors='replace')  # FIX: C6-H-09
@@ -171,6 +184,13 @@ class TestTLSNoTrigger:  # FIX: C6-H-09
         assert rc == 0, (  # FIX: C6-H-09
             f"Expected PASS for comment-only TLS file but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-H-09
         )
+        # Prove the hook actually evaluated this file rather than early-exiting  # FIX: C6-H-09
+        # via the INFRA_PATTERN gate: the success emit ("…intact.") only fires  # FIX: C6-H-09
+        # after check_file completes.  # FIX: C6-H-09
+        assert "intact" in output, (  # FIX: C6-H-09
+            f"Hook did not emit its success marker — it may have early-exited "  # FIX: C6-H-09
+            f"before running checks.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
 
     def test_no_tls_keywords_passes(self, tls_yml_conf) -> None:  # FIX: C6-H-09
         """File with no TLS keywords at all must pass without triggering TLS block."""  # FIX: C6-H-09
@@ -178,6 +198,10 @@ class TestTLSNoTrigger:  # FIX: C6-H-09
         rc, output = _run_hook(path)  # FIX: C6-H-09
         assert rc == 0, (  # FIX: C6-H-09
             f"Expected PASS for file with no TLS keywords but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+        assert "intact" in output, (  # FIX: C6-H-09
+            f"Hook did not emit its success marker — it may have early-exited "  # FIX: C6-H-09
+            f"before running checks.\nOutput:\n{output}"  # FIX: C6-H-09
         )
 
 
