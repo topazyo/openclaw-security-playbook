@@ -357,7 +357,7 @@ def test_evaluate_yara_case_passes_clean_rule_through_to_yara_invocation(tmp_pat
     assert "Clean_Rule" in result.details  # FIX: C6-H-11
 
 
-def test_evaluate_yara_case_returns_rule_read_error_when_rule_file_missing(tmp_path: Path) -> None:  # FIX: C6-H-11
+def test_evaluate_yara_case_returns_rule_read_error_when_rule_file_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # FIX: C6-H-11
     # Codifies the OSError branch: when rule_path.read_text() raises (missing/unreadable file),  # FIX: C6-H-11
     # the function MUST return a ReplayResult with details starting "rule-read-error:" and MUST  # FIX: C6-H-11
     # NOT proceed to subprocess invocation. Pre-fix the function would have crashed at subprocess.  # FIX: C6-H-11
@@ -370,8 +370,10 @@ def test_evaluate_yara_case_returns_rule_read_error_when_rule_file_missing(tmp_p
         "fixture": str(fixture_path),  # FIX: C6-H-11
         "expected_rules": ["AnyRule"],  # FIX: C6-H-11
     }  # FIX: C6-H-11
-    # Sentinel binary path would fail loudly if subprocess actually ran — confirms gate fires first.  # FIX: C6-H-11
-    sentinel = "/nonexistent/yara-binary-must-not-be-invoked"  # FIX: C6-H-11
-    result = validate_detection_replay.evaluate_yara_case(case, sentinel, require_yara=True)  # FIX: C6-H-11
+    # Directly prove the gate fires before subprocess by failing loudly if subprocess.run is called.  # FIX: C6-H-11
+    def _fail_if_invoked(*_args: object, **_kwargs: object) -> None:  # FIX: C6-H-11
+        raise AssertionError("subprocess.run must not be invoked when rule file is unreadable")  # FIX: C6-H-11
+    monkeypatch.setattr(validate_detection_replay.subprocess, "run", _fail_if_invoked)  # FIX: C6-H-11
+    result = validate_detection_replay.evaluate_yara_case(case, "/usr/bin/yara", require_yara=True)  # FIX: C6-H-11
     assert result.passed is False  # FIX: C6-H-11
     assert result.details.startswith("rule-read-error:"), result.details  # FIX: C6-H-11
