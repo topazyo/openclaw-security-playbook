@@ -331,3 +331,37 @@ class TestContainerUserRegex:  # FIX: C6-M-12
         assert "Container user:" not in output, (  # FIX: C6-M-12
             f"URL userinfo / per_user substring tripped Container user check.\nGot:\n{output}"  # FIX: C6-M-12
         )
+
+    def test_non_compose_file_with_root_user_is_skipped(self, tmp_path: Path) -> None:  # FIX: C6-M-12
+        # Codifies the intentional docker-compose-only scope of the Container-user check.  # FIX: C6-M-12
+        # The C6-M-12 fix added a `grep -q '^services:'` scope guard so the check fires  # FIX: C6-M-12
+        # ONLY on docker-compose-format files. Kubernetes manifests, Helm values, OPA  # FIX: C6-M-12
+        # policies, and other YAML shapes with `user: "root"` declarations are NOT covered  # FIX: C6-M-12
+        # by this immutable-default check. If a future change removes the scope guard,  # FIX: C6-M-12
+        # this test will start failing — that is the signal to either expand coverage  # FIX: C6-M-12
+        # explicitly OR keep the narrowing and update this test.  # FIX: C6-M-12
+        #  # FIX: C6-M-12
+        # Fixture shape note: the YAML below is intentionally NOT a canonical Kubernetes  # FIX: C6-M-12
+        # Pod spec — real K8s uses `securityContext.runAsUser: <int>`, not `user: "root"`.  # FIX: C6-M-12
+        # The only requirement of this fixture is "any non-compose YAML that contains the  # FIX: C6-M-12
+        # substring `user: \"root\"`", which is what proves the scope guard is what skips  # FIX: C6-M-12
+        # the file (rather than absence of the substring). Do NOT "fix" this to `runAsUser`:  # FIX: C6-M-12
+        # that would silently destroy the test by removing the very substring under test.  # FIX: C6-M-12
+        non_compose = tmp_path / "k8s-pod.yaml"  # FIX: C6-M-12
+        non_compose.write_text(  # FIX: C6-M-12
+            "apiVersion: v1\n"  # FIX: C6-M-12
+            "kind: Pod\n"  # FIX: C6-M-12
+            "spec:\n"  # FIX: C6-M-12
+            "  containers:\n"  # FIX: C6-M-12
+            "  - name: app\n"  # FIX: C6-M-12
+            "    securityContext:\n"  # FIX: C6-M-12
+            '      user: "root"  # intentionally non-canonical K8s; see test docstring above\n',  # FIX: C6-M-12
+            encoding="utf-8",  # FIX: C6-M-12
+        )  # FIX: C6-M-12
+        rc, output = _run_hook(non_compose)  # FIX: C6-M-12
+        assert rc == 0, (  # FIX: C6-M-12
+            f"Non-compose file should be skipped by the docker-compose-only scope guard; got exit {rc}.\nOutput:\n{output}"  # FIX: C6-M-12
+        )  # FIX: C6-M-12
+        assert "Container user:" not in output, (  # FIX: C6-M-12
+            f"Container-user check fired on a non-compose file — the `^services:` scope guard has regressed.\nGot:\n{output}"  # FIX: C6-M-12
+        )  # FIX: C6-M-12
