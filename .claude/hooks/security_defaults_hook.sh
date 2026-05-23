@@ -110,12 +110,21 @@ check_file() {
     fi
   fi
 
-  # TLS version — only TLS 1.3 permitted
-  if grep -qE 'ssl_protocols|tls_version|TLSv' "$FILE"; then
-    if echo "$CONTENT" | grep -qE 'TLSv1(\b|\.[12])'; then
-      VIOLATIONS+=("TLS: only TLS 1.3 permitted in $FILE — found older version reference")
-    fi
-  fi
+  # TLS version — only TLS 1.3 permitted ## FIX: C6-H-09
+  if grep -qE 'ssl_protocols|tls_version|TLSv' "$FILE"; then ## FIX: C6-H-09
+    # Negative check: reject TLSv1, TLSv1.0, TLSv1.1, TLSv1.2 but NOT TLSv1.3 ## FIX: C6-H-09
+    # Regex breakdown: ## FIX: C6-H-09
+    #   TLSv1\.[012]\b   — matches TLSv1.0/1.1/1.2 with word boundary ## FIX: C6-H-09
+    #   TLSv1[^.0-9]     — matches TLSv1 followed by non-version char (space, ;, newline) ## FIX: C6-H-09
+    #   TLSv1$           — matches TLSv1 at end of line ## FIX: C6-H-09
+    if echo "$CONTENT" | grep -qE 'TLSv1\.[012]\b|TLSv1[^.0-9]|TLSv1$'; then ## FIX: C6-H-09
+      VIOLATIONS+=("TLS: only TLS 1.3 permitted in $FILE — found older version reference") ## FIX: C6-H-09
+    fi ## FIX: C6-H-09
+    # Positive check: TLS keyword present but TLSv1.3 is NOT explicitly configured ## FIX: C6-H-09
+    if ! echo "$CONTENT" | grep -qE 'TLSv1\.3'; then ## FIX: C6-H-09
+      VIOLATIONS+=("TLS: TLS 1.3 must be explicitly configured in $FILE") ## FIX: C6-H-09
+    fi ## FIX: C6-H-09
+  fi ## FIX: C6-H-09
 }
 
 check_file "$CHANGED_FILE"
