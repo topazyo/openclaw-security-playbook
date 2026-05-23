@@ -152,7 +152,13 @@ class ComplianceReporter:
         soa_applicable = soa_implemented + soa_planned  # FIX: C6-H-05
 
         unmapped = soa_applicable - mapped  # FIX: C6-H-05 (signed: negative means OVER_MAPPING)
-        coverage_pct = round(mapped / soa_applicable * 100, 2) if soa_applicable > 0 else 0.0  # FIX: C6-H-05
+        if soa_applicable == 0 and mapped > 0:  # FIX: C6-M-13
+            raise ValueError(  # FIX: C6-M-13
+                f"ISO27001 coverage misconfiguration: soa_applicable=0 but mapped={mapped} "  # FIX: C6-M-13
+                f"controls exist in corpus — SOA declares no applicable controls; "  # FIX: C6-M-13
+                f"review not_applicable over-count or corpus scope"  # FIX: C6-M-13
+            )  # FIX: C6-M-13
+        coverage_pct = round(mapped / soa_applicable * 100, 2) if soa_applicable > 0 else 0.0  # FIX: C6-H-05  # FIX: C6-M-13
 
         if mapped < soa_applicable:  # FIX: C6-H-05
             gap_status = "INCOMPLETE_MAPPING"  # FIX: C6-H-05

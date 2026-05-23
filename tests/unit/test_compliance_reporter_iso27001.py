@@ -494,3 +494,45 @@ class TestT8CoverageSummaryInvariants:  # FIX: C6-H-05
         assert coverage["gap_status"] == expected_gap_status, (  # FIX: C6-H-05
             f"gap_status must be {expected_gap_status!r}; got {coverage['gap_status']!r}"  # FIX: C6-H-05
         )  # FIX: C6-H-05
+
+
+# ---------------------------------------------------------------------------
+# T9 — soa_applicable=0 coverage_pct contradiction fix (C6-M-13)
+# ---------------------------------------------------------------------------
+
+class TestT9SoaApplicableZeroCoverageContradiction:  # FIX: C6-M-13
+    """T9: soa_applicable=0 with mapped>0 raises ValueError; mapped==0 returns 0.0."""  # FIX: C6-M-13
+
+    def test_soa_applicable_zero_mapped_nonzero_raises_value_error(self):  # FIX: C6-M-13
+        """Misconfiguration: SOA has no applicable controls but corpus has controls.
+
+        Pre-fix behaviour: coverage_pct=0.0 contradicted gap_status=OVER_MAPPING.
+        Post-fix (Option A): raises ValueError naming the misconfiguration.
+        """  # FIX: C6-M-13
+        statement = _make_statement(  # FIX: C6-M-13
+            total=5, implemented=0, planned=0, not_applicable=5  # FIX: C6-M-13
+        )  # FIX: C6-M-13
+        corpus = _make_corpus_controls(n_implemented=2)  # FIX: C6-M-13
+
+        with pytest.raises(ValueError, match="soa_applicable=0"):  # FIX: C6-M-13
+            ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)  # FIX: C6-M-13
+
+    def test_soa_applicable_zero_mapped_zero_returns_zero_pct(self):  # FIX: C6-M-13
+        """Truly-empty state: SOA has no applicable controls AND corpus is empty.
+
+        Both mapped and soa_applicable are zero — unambiguous empty state.
+        Must return 0.0 (no ValueError) and gap_status COMPLETE_MAPPING (0==0).
+        """  # FIX: C6-M-13
+        statement = _make_statement(  # FIX: C6-M-13
+            total=5, implemented=0, planned=0, not_applicable=5  # FIX: C6-M-13
+        )  # FIX: C6-M-13
+        corpus: list[dict] = []  # FIX: C6-M-13
+
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)  # FIX: C6-M-13
+
+        assert coverage["corpus_to_soa_coverage_percentage"] == 0.0, (  # FIX: C6-M-13
+            f"Truly-empty state must return 0.0; got {coverage['corpus_to_soa_coverage_percentage']!r}"  # FIX: C6-M-13
+        )  # FIX: C6-M-13
+        assert coverage["gap_status"] == "COMPLETE_MAPPING", (  # FIX: C6-M-13
+            f"gap_status must be COMPLETE_MAPPING when 0==0; got {coverage['gap_status']!r}"  # FIX: C6-M-13
+        )  # FIX: C6-M-13
