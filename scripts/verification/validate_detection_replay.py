@@ -280,6 +280,18 @@ def evaluate_yara_case(case: dict[str, Any], yara_command: str | None, require_y
 
     rule_path = REPO_ROOT / case["rule"]
     fixture_path = REPO_ROOT / case["fixture"]
+    try:  # FIX: C6-H-11 — scan rule text for catastrophic-backtracking regex before invoking yara
+        rule_text = rule_path.read_text(encoding="utf-8")  # FIX: C6-H-11
+    except OSError as exc:  # FIX: C6-H-11 — missing/unreadable rule file surfaces as failure, not crash
+        return ReplayResult(case["name"], "yara", False, f"rule-read-error: {exc}")  # FIX: C6-H-11
+    high_risk_matches = find_high_risk_yara_patterns(rule_text)  # FIX: C6-H-11
+    if high_risk_matches:  # FIX: C6-H-11 — fail-fast: never run yara binary against a ReDoS-prone rule
+        return ReplayResult(  # FIX: C6-H-11
+            case["name"],  # FIX: C6-H-11
+            "yara",  # FIX: C6-H-11
+            False,  # FIX: C6-H-11
+            f"high-risk-regex-patterns: {sorted(set(high_risk_matches))}",  # FIX: C6-H-11
+        )  # FIX: C6-H-11
     result = subprocess.run(  # nosec B603
         [yara_command, str(rule_path), str(fixture_path)],
         capture_output=True,

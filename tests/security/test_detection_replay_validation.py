@@ -290,3 +290,68 @@ def test_field_all_gte_with_list_requires_all_values_satisfied() -> None:
     assert validate_detection_replay.field_matches(
         {"FieldName": 50}, expression, [10, 50, 99]
     ) is False
+
+
+# --- C6-H-11: evaluate_yara_case must reject ReDoS-prone rule text before invoking yara ---
+
+def test_evaluate_yara_case_rejects_high_risk_regex_before_invoking_yara(tmp_path: Path) -> None:  # FIX: C6-H-11
+    rule_path = tmp_path / "redos.yar"  # FIX: C6-H-11
+    rule_path.write_text(  # FIX: C6-H-11
+        'rule ReDoS_Trigger {\n'  # FIX: C6-H-11
+        '    strings:\n'  # FIX: C6-H-11
+        '        $re = /(.*)+evil/\n'  # FIX: C6-H-11
+        '    condition:\n'  # FIX: C6-H-11
+        '        $re\n'  # FIX: C6-H-11
+        '}\n',  # FIX: C6-H-11
+        encoding="utf-8",  # FIX: C6-H-11
+    )  # FIX: C6-H-11
+    fixture_path = tmp_path / "sample.txt"  # FIX: C6-H-11
+    fixture_path.write_text("trigger text\n", encoding="utf-8")  # FIX: C6-H-11
+    case = {  # FIX: C6-H-11
+        "name": "redos-trigger",  # FIX: C6-H-11
+        "rule": str(rule_path),  # FIX: C6-H-11
+        "fixture": str(fixture_path),  # FIX: C6-H-11
+        "expected_rules": ["ReDoS_Trigger"],  # FIX: C6-H-11
+    }  # FIX: C6-H-11
+    # Pass a sentinel "yara_command" that would fail loudly if invoked; gate must fire first.  # FIX: C6-H-11
+    sentinel = "/nonexistent/yara-binary-must-not-be-invoked"  # FIX: C6-H-11
+    result = validate_detection_replay.evaluate_yara_case(case, sentinel, require_yara=True)  # FIX: C6-H-11
+    assert result.passed is False  # FIX: C6-H-11
+    assert "high-risk-regex-patterns" in result.details  # FIX: C6-H-11
+    assert "(.*)+" in result.details  # FIX: C6-H-11
+
+
+def test_evaluate_yara_case_passes_clean_rule_through_to_yara_invocation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # FIX: C6-H-11
+    rule_path = tmp_path / "clean.yar"  # FIX: C6-H-11
+    rule_path.write_text(  # FIX: C6-H-11
+        'rule Clean_Rule {\n'  # FIX: C6-H-11
+        '    strings:\n'  # FIX: C6-H-11
+        '        $literal = "openclaw-trigger"\n'  # FIX: C6-H-11
+        '    condition:\n'  # FIX: C6-H-11
+        '        $literal\n'  # FIX: C6-H-11
+        '}\n',  # FIX: C6-H-11
+        encoding="utf-8",  # FIX: C6-H-11
+    )  # FIX: C6-H-11
+    fixture_path = tmp_path / "sample.txt"  # FIX: C6-H-11
+    fixture_path.write_text("openclaw-trigger present\n", encoding="utf-8")  # FIX: C6-H-11
+    case = {  # FIX: C6-H-11
+        "name": "clean-rule",  # FIX: C6-H-11
+        "rule": str(rule_path),  # FIX: C6-H-11
+        "fixture": str(fixture_path),  # FIX: C6-H-11
+        "expected_rules": ["Clean_Rule"],  # FIX: C6-H-11
+    }  # FIX: C6-H-11
+
+    class _FakeCompleted:  # FIX: C6-H-11
+        def __init__(self) -> None:  # FIX: C6-H-11
+            self.returncode = 0  # FIX: C6-H-11
+            self.stdout = "Clean_Rule " + str(fixture_path) + "\n"  # FIX: C6-H-11
+            self.stderr = ""  # FIX: C6-H-11
+
+    def _fake_run(*_args: object, **_kwargs: object) -> _FakeCompleted:  # FIX: C6-H-11
+        return _FakeCompleted()  # FIX: C6-H-11
+
+    monkeypatch.setattr(validate_detection_replay.subprocess, "run", _fake_run)  # FIX: C6-H-11
+    result = validate_detection_replay.evaluate_yara_case(case, "/usr/bin/yara", require_yara=True)  # FIX: C6-H-11
+    assert result.passed is True  # FIX: C6-H-11
+    assert "high-risk-regex-patterns" not in result.details  # FIX: C6-H-11
+    assert "Clean_Rule" in result.details  # FIX: C6-H-11
