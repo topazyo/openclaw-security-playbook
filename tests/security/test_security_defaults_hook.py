@@ -8,6 +8,7 @@ had no positive verification that TLSv1.3 is explicitly configured.
 from __future__ import annotations  # FIX: C6-H-09
 
 import json  # FIX: C6-H-09
+import shutil  # FIX: C6-H-09
 import subprocess  # FIX: C6-H-09
 from pathlib import Path  # FIX: C6-H-09
 
@@ -15,6 +16,12 @@ import pytest  # FIX: C6-H-09
 
 _HOOK_PATH = (  # FIX: C6-H-09
     Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "security_defaults_hook.sh"
+)  # FIX: C6-H-09
+
+_BASH = shutil.which("bash")  # FIX: C6-H-09
+pytestmark = pytest.mark.skipif(  # FIX: C6-H-09
+    not _BASH or not _HOOK_PATH.exists(),  # FIX: C6-H-09
+    reason=f"bash unavailable on PATH or hook missing at {_HOOK_PATH}",  # FIX: C6-H-09
 )  # FIX: C6-H-09
 
 
