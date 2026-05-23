@@ -244,8 +244,8 @@ def evaluate_sigma_case(case: dict[str, Any]) -> ReplayResult:
     with open(fixture_path, encoding="utf-8") as handle:
         event = json.load(handle)
 
-    detection = rule["detection"]
-    try:  # FIX: C6-H-10 — surface invalid-rule ValueErrors as failed cases, not crashes
+    try:  # FIX: C6-H-10 — surface malformed Sigma rules as failed cases, not uncaught crashes
+        detection = rule["detection"]  # FIX: C6-H-10 — KeyError here means rule has no detection block
         validate_sigma_detection(detection)  # FIX: C6-H-10
         selector_results = {  # FIX: C6-H-10
             name: selector_matches(event, selector)  # FIX: C6-H-10
@@ -254,7 +254,7 @@ def evaluate_sigma_case(case: dict[str, Any]) -> ReplayResult:
         }  # FIX: C6-H-10
         parser = ConditionParser(tokenize_condition(detection["condition"]), selector_results)  # FIX: C6-H-10
         matched = parser.parse()  # FIX: C6-H-10
-    except ValueError as exc:  # FIX: C6-H-10
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:  # FIX: C6-H-10 — KeyError: missing detection/condition; TypeError/AttributeError: non-dict detection
         return ReplayResult(case["name"], "sigma", False, f"invalid-rule: {exc}")  # FIX: C6-H-10
     expected = bool(case["should_match"])
     details = f"matched={matched} expected={expected} selectors={selector_results}"

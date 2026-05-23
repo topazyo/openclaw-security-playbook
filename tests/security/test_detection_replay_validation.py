@@ -164,6 +164,55 @@ def test_evaluate_sigma_case_surfaces_conflict_as_failed_replayresult(tmp_path: 
     assert "conflicting operator modifiers" in result.details
 
 
+# --- C6-H-10: malformed Sigma rules must surface as failed cases, not crash ---
+
+@pytest.mark.parametrize(
+    "rule_yaml,why",
+    [
+        # missing detection block
+        ("title: no-detection\n", "missing-detection"),
+        # missing condition inside detection
+        (
+            "title: no-condition\n"
+            "detection:\n"
+            "  selection:\n"
+            "    FieldName: x\n",
+            "missing-condition",
+        ),
+        # non-dict detection (list)
+        (
+            "title: list-detection\n"
+            "detection:\n"
+            "  - selection\n"
+            "  - condition\n",
+            "non-dict-detection",
+        ),
+        # non-dict detection (string)
+        (
+            "title: string-detection\n"
+            "detection: just-a-string\n",
+            "string-detection",
+        ),
+    ],
+)
+def test_evaluate_sigma_case_surfaces_malformed_rule_as_failed_replayresult(
+    tmp_path: Path, rule_yaml: str, why: str
+) -> None:
+    rule_path = tmp_path / f"{why}.yml"
+    rule_path.write_text(rule_yaml, encoding="utf-8")
+    fixture_path = tmp_path / "fixture.json"
+    fixture_path.write_text(json.dumps({"FieldName": "anything"}), encoding="utf-8")
+    case = {
+        "name": why,
+        "rule": str(rule_path),
+        "fixture": str(fixture_path),
+        "should_match": True,
+    }
+    result = validate_detection_replay.evaluate_sigma_case(case)
+    assert result.passed is False
+    assert "invalid-rule" in result.details
+
+
 # --- C6-H-10: per-modifier numeric coverage that C5-H-05 omitted ---
 
 @pytest.mark.parametrize(
