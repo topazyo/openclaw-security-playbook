@@ -26,7 +26,14 @@ pytestmark = pytest.mark.skipif(  # FIX: C6-H-09
 
 
 def _to_posix(path: Path) -> str:  # FIX: C6-H-09
-    """Convert a Windows C:\\... path to /mnt/c/... for WSL bash."""  # FIX: C6-H-09
+    """Convert a Windows C:\\... path to /mnt/c/... for WSL bash.  # FIX: C6-H-09
+
+    Scope note: this translation is WSL-specific. Git Bash on Windows uses  # FIX: C6-H-09
+    `/c/…` rather than `/mnt/c/…`, so these tests will skip on non-WSL  # FIX: C6-H-09
+    Windows runners via the module-level `pytestmark` (which only matches  # FIX: C6-H-09
+    `bash` on PATH). On Linux/macOS the path has no drive letter, so the  # FIX: C6-H-09
+    backslash-to-slash replace is a no-op and the path is returned as-is.  # FIX: C6-H-09
+    """  # FIX: C6-H-09
     s = str(path)  # FIX: C6-H-09
     s = s.replace(chr(92), "/")  # FIX: C6-H-09  (chr(92) == backslash)
     if len(s) >= 2 and s[1] == ":":  # FIX: C6-H-09

@@ -48,7 +48,7 @@ check_file() {
   CONTENT=$(cat "$FILE")
 
   # Gateway bind address — accept both combined 127.0.0.1:18789 and split address:/port: keys ## FIX: C6-M-07
-  if grep -qE '(^|[[:space:]])gateway:|127\.0\.0\.1:18789' "$FILE"; then ## FIX: C6-M-07
+  if grep -qE '(^|[[:space:]])gateway:|127\.0\.0\.1:18789' <<< "$CONTENT"; then ## FIX: C6-H-09
     local gw_combined gw_split_addr gw_split_port ## FIX: C6-M-07
     gw_combined=$(echo "$CONTENT" | grep -cE '127\.0\.0\.1:18789' || true) ## FIX: C6-M-07
     gw_split_addr=$(echo "$CONTENT" | grep -cE 'address:[[:space:]]*"?127\.0\.0\.1"?' || true) ## FIX: C6-M-07
@@ -59,7 +59,7 @@ check_file() {
   fi ## FIX: C6-M-07
 
   # MCP server bind — accept both combined 127.0.0.1:8443 and split address:/port: keys ## FIX: C6-M-07
-  if grep -qE '(^|[[:space:]])mcp[._]server:|(^|[[:space:]])mcp:|127\.0\.0\.1:8443' "$FILE"; then ## FIX: C6-M-07
+  if grep -qE '(^|[[:space:]])mcp[._]server:|(^|[[:space:]])mcp:|127\.0\.0\.1:8443' <<< "$CONTENT"; then ## FIX: C6-H-09
     local mcp_combined mcp_split_addr mcp_split_port ## FIX: C6-M-07
     mcp_combined=$(echo "$CONTENT" | grep -cE '127\.0\.0\.1:8443' || true) ## FIX: C6-M-07
     mcp_split_addr=$(echo "$CONTENT" | grep -cE 'address:[[:space:]]*"?127\.0\.0\.1"?' || true) ## FIX: C6-M-07
@@ -70,35 +70,35 @@ check_file() {
   fi ## FIX: C6-M-07
 
   # Container user (non-root)
-  if grep -q 'user:' "$FILE"; then
+  if grep -q 'user:' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep -E 'user:' | grep -qvE '"?1000:1000"?'; then
       VIOLATIONS+=("Container user: must be 1000:1000 in $FILE")
     fi
   fi
 
   # cap_drop ALL
-  if grep -q 'cap_drop' "$FILE"; then
+  if grep -q 'cap_drop' <<< "$CONTENT"; then ## FIX: C6-H-09
     if ! echo "$CONTENT" | grep -A3 'cap_drop' | grep -qE '^\s*-\s*ALL'; then
       VIOLATIONS+=("cap_drop: must include ALL in $FILE")
     fi
   fi
 
   # read_only filesystem
-  if grep -q 'read_only' "$FILE"; then
+  if grep -q 'read_only' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'read_only' | grep -qE 'false'; then
       VIOLATIONS+=("read_only: must not be false in $FILE")
     fi
   fi
 
   # no-new-privileges
-  if grep -q 'no-new-privileges' "$FILE"; then
+  if grep -q 'no-new-privileges' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'no-new-privileges' | grep -qE 'false'; then
       VIOLATIONS+=("no-new-privileges: must not be false in $FILE")
     fi
   fi
 
   # Skills config
-  if grep -qE 'autoUpdate|autoInstall|requireSignature' "$FILE"; then
+  if grep -qE 'autoUpdate|autoInstall|requireSignature' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'autoUpdate' | grep -qE 'true'; then
       VIOLATIONS+=("Skills autoUpdate: must be false in $FILE")
     fi
