@@ -22,6 +22,8 @@ def test_collect_evidence_surfaces_capture_command_failures(tmp_path):
 
     script_input = b"ss() { return 3; }\n" + _SCRIPT_PATH.read_bytes().replace(b"\r", b"")
 
+    if _BASH_PATH is None:
+        pytest.skip("bash is required to execute collect_evidence.sh")
     result = subprocess.run(
         [_BASH_PATH, "-s"],
         capture_output=True,

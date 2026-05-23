@@ -50,7 +50,7 @@ def _fake_boto3_with_backup_pages(pages, snapshots=None):  # FIX: C5-finding-3
     fake_ec2_client = MagicMock()  # FIX: C5-finding-3
     fake_ec2_client.describe_snapshots.return_value = {"Snapshots": snapshots or []}  # FIX: C5-finding-3
     fake_boto3 = ModuleType("boto3")  # FIX: C5-finding-3
-    fake_boto3.client = Mock(side_effect=lambda service_name, region_name=None: {"s3": fake_s3_client, "ec2": fake_ec2_client}[service_name])  # FIX: C5-finding-3
+    fake_boto3.client = Mock(side_effect=lambda service_name, region_name=None: {"s3": fake_s3_client, "ec2": fake_ec2_client}[service_name])  # type: ignore[attr-defined]  # FIX: C5-finding-3
     return fake_boto3, fake_s3_client, fake_paginator, fake_ec2_client  # FIX: C5-finding-3
 
 

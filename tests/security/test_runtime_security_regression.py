@@ -10,8 +10,8 @@ import sys
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "verification" / "runtime_security_regression.py"
 SPEC = importlib.util.spec_from_file_location("runtime_security_regression", MODULE_PATH)
+assert SPEC is not None and SPEC.loader is not None
 runtime_security_regression = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
 sys.modules[SPEC.name] = runtime_security_regression
 SPEC.loader.exec_module(runtime_security_regression)
 
