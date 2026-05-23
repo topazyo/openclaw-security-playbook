@@ -48,7 +48,7 @@ check_file() {
   CONTENT=$(cat "$FILE")
 
   # Gateway bind address — accept both combined 127.0.0.1:18789 and split address:/port: keys ## FIX: C6-M-07
-  if grep -qE '(^|[[:space:]])gateway:|127\.0\.0\.1:18789' "$FILE"; then ## FIX: C6-M-07
+  if grep -qE '(^|[[:space:]])gateway:|127\.0\.0\.1:18789' <<< "$CONTENT"; then ## FIX: C6-H-09
     local gw_combined gw_split_addr gw_split_port ## FIX: C6-M-07
     gw_combined=$(echo "$CONTENT" | grep -cE '127\.0\.0\.1:18789' || true) ## FIX: C6-M-07
     gw_split_addr=$(echo "$CONTENT" | grep -cE 'address:[[:space:]]*"?127\.0\.0\.1"?' || true) ## FIX: C6-M-07
@@ -59,7 +59,7 @@ check_file() {
   fi ## FIX: C6-M-07
 
   # MCP server bind — accept both combined 127.0.0.1:8443 and split address:/port: keys ## FIX: C6-M-07
-  if grep -qE '(^|[[:space:]])mcp[._]server:|(^|[[:space:]])mcp:|127\.0\.0\.1:8443' "$FILE"; then ## FIX: C6-M-07
+  if grep -qE '(^|[[:space:]])mcp[._]server:|(^|[[:space:]])mcp:|127\.0\.0\.1:8443' <<< "$CONTENT"; then ## FIX: C6-H-09
     local mcp_combined mcp_split_addr mcp_split_port ## FIX: C6-M-07
     mcp_combined=$(echo "$CONTENT" | grep -cE '127\.0\.0\.1:8443' || true) ## FIX: C6-M-07
     mcp_split_addr=$(echo "$CONTENT" | grep -cE 'address:[[:space:]]*"?127\.0\.0\.1"?' || true) ## FIX: C6-M-07
@@ -70,35 +70,35 @@ check_file() {
   fi ## FIX: C6-M-07
 
   # Container user (non-root)
-  if grep -q 'user:' "$FILE"; then
+  if grep -q 'user:' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep -E 'user:' | grep -qvE '"?1000:1000"?'; then
       VIOLATIONS+=("Container user: must be 1000:1000 in $FILE")
     fi
   fi
 
   # cap_drop ALL
-  if grep -q 'cap_drop' "$FILE"; then
+  if grep -q 'cap_drop' <<< "$CONTENT"; then ## FIX: C6-H-09
     if ! echo "$CONTENT" | grep -A3 'cap_drop' | grep -qE '^\s*-\s*ALL'; then
       VIOLATIONS+=("cap_drop: must include ALL in $FILE")
     fi
   fi
 
   # read_only filesystem
-  if grep -q 'read_only' "$FILE"; then
+  if grep -q 'read_only' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'read_only' | grep -qE 'false'; then
       VIOLATIONS+=("read_only: must not be false in $FILE")
     fi
   fi
 
   # no-new-privileges
-  if grep -q 'no-new-privileges' "$FILE"; then
+  if grep -q 'no-new-privileges' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'no-new-privileges' | grep -qE 'false'; then
       VIOLATIONS+=("no-new-privileges: must not be false in $FILE")
     fi
   fi
 
   # Skills config
-  if grep -qE 'autoUpdate|autoInstall|requireSignature' "$FILE"; then
+  if grep -qE 'autoUpdate|autoInstall|requireSignature' <<< "$CONTENT"; then ## FIX: C6-H-09
     if echo "$CONTENT" | grep 'autoUpdate' | grep -qE 'true'; then
       VIOLATIONS+=("Skills autoUpdate: must be false in $FILE")
     fi
@@ -110,12 +110,30 @@ check_file() {
     fi
   fi
 
-  # TLS version — only TLS 1.3 permitted
-  if grep -qE 'ssl_protocols|tls_version|TLSv' "$FILE"; then
-    if echo "$CONTENT" | grep -qE 'TLSv1(\b|\.[12])'; then
-      VIOLATIONS+=("TLS: only TLS 1.3 permitted in $FILE — found older version reference")
-    fi
-  fi
+  # TLS version — only TLS 1.3 permitted ## FIX: C6-H-09
+  # Scope the TLS check to real configuration directives (ssl_protocols, ## FIX: C6-H-09
+  # tls_version) anchored at line start so commented-out lines and unrelated ## FIX: C6-H-09
+  # prose mentioning TLSv1.x do not produce false positives or false negatives. ## FIX: C6-H-09
+  # The trailing sed strips any inline `# ...` comment from each directive ## FIX: C6-H-09
+  # line, so `ssl_protocols TLSv1.3;  # was TLSv1.2` is evaluated as ## FIX: C6-H-09
+  # `ssl_protocols TLSv1.3;` only. ## FIX: C6-H-09
+  # `|| true` is required because `set -euo pipefail` (line 8) would otherwise ## FIX: C6-H-09
+  # kill the script when grep returns 1 (no directive lines present). ## FIX: C6-H-09
+  TLS_DIRECTIVES=$(echo "$CONTENT" | grep -E '^[[:space:]]*(ssl_protocols|tls_version)\b' | sed 's/#.*$//' || true) ## FIX: C6-H-09
+  if [[ -n "$TLS_DIRECTIVES" ]]; then ## FIX: C6-H-09
+    # Negative check: reject TLSv1, TLSv1.0, TLSv1.1, TLSv1.2 but NOT TLSv1.3 ## FIX: C6-H-09
+    # Regex breakdown: ## FIX: C6-H-09
+    #   TLSv1\.[012]\b   — matches TLSv1.0/1.1/1.2 with word boundary ## FIX: C6-H-09
+    #   TLSv1[^.0-9]     — matches TLSv1 followed by non-version char (space, ;, newline) ## FIX: C6-H-09
+    #   TLSv1$           — matches TLSv1 at end of line ## FIX: C6-H-09
+    if echo "$TLS_DIRECTIVES" | grep -qE 'TLSv1\.[012]\b|TLSv1[^.0-9]|TLSv1$'; then ## FIX: C6-H-09
+      VIOLATIONS+=("TLS: only TLS 1.3 permitted in $FILE — found older version reference") ## FIX: C6-H-09
+    fi ## FIX: C6-H-09
+    # Positive check: directive present but TLSv1.3 is NOT explicitly configured ## FIX: C6-H-09
+    if ! echo "$TLS_DIRECTIVES" | grep -qE 'TLSv1\.3'; then ## FIX: C6-H-09
+      VIOLATIONS+=("TLS: TLS 1.3 must be explicitly configured in $FILE") ## FIX: C6-H-09
+    fi ## FIX: C6-H-09
+  fi ## FIX: C6-H-09
 }
 
 check_file "$CHANGED_FILE"
