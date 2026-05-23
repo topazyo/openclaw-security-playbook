@@ -313,6 +313,38 @@ class ContainmentManager:
             self.log_action("block_domain", domain, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
+    def _write_quarantine_manifest(  # FIX: C6-H-07
+        self,  # FIX: C6-H-07
+        incident_id: str,  # FIX: C6-H-07
+        container_id: str,  # FIX: C6-H-07
+        reason: Optional[str],  # FIX: C6-H-07
+        original_networks: list,  # FIX: C6-H-07
+    ) -> None:  # FIX: C6-H-07
+        """Persist quarantine state to a JSON manifest file.  # FIX: C6-H-07
+
+        Docker container labels are immutable post-creation; container.update(labels=...)  # FIX: C6-H-07
+        raises TypeError at runtime. Quarantine state is instead recorded here so it  # FIX: C6-H-07
+        survives container restarts and does not depend on runtime label mutation.  # FIX: C6-H-07
+
+        File: <log_dir>/<incident_id>-quarantined-containers.json  # FIX: C6-H-07
+        Append-style: loads existing records and appends the new entry.  # FIX: C6-H-07
+        Raises OSError or json.JSONDecodeError on failure (caller handles).  # FIX: C6-H-07
+        """  # FIX: C6-H-07
+        if self.log_dir is None:  # FIX: C6-H-07
+            raise OSError("No writable log directory; cannot persist quarantine manifest")  # FIX: C6-H-07
+        manifest_path = self.log_dir / f"{incident_id}-quarantined-containers.json"  # FIX: C6-H-07
+        records: list = []  # FIX: C6-H-07
+        if manifest_path.exists():  # FIX: C6-H-07
+            records = json.loads(manifest_path.read_text(encoding="utf-8"))  # FIX: C6-H-07
+        records.append({  # FIX: C6-H-07
+            "incident_id": incident_id,  # FIX: C6-H-07
+            "container_id": container_id,  # FIX: C6-H-07
+            "reason": reason,  # FIX: C6-H-07
+            "original_networks": original_networks,  # FIX: C6-H-07
+            "quarantined_at": datetime.now(timezone.utc).isoformat(),  # FIX: C6-H-07
+        })  # FIX: C6-H-07
+        manifest_path.write_text(json.dumps(records, indent=2), encoding="utf-8")  # FIX: C6-H-07
+
     def isolate_container(self, container_id: str, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
         logger.info(f"Isolating container: {container_id}")  # FIX: C5-finding-3
@@ -332,10 +364,22 @@ class ContainmentManager:
                 network = self.docker_client.networks.get(network_name)  # FIX: C5-finding-3
                 network.disconnect(container)  # FIX: C5-finding-3
                 self.rollback_commands.append({"action": "reconnect_docker_network", "container_id": container_id, "network_name": network_name})  # FIX: C5-finding-3
-            container_labels = {'quarantine': self.incident_id}  # FIX: C5-finding-3
-            if reason:  # FIX: C5-finding-3
-                container_labels['containment_reason'] = reason  # FIX: C5-finding-3
-            container.update(labels=container_labels)  # type: ignore[call-arg]  # FIX: C5-finding-3  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
+            # FIX: C6-H-07 - container.update(labels=...) raises TypeError at runtime because
+            # Docker container labels are immutable post-creation. Persist quarantine state
+            # to a manifest file instead; failure rolls back network disconnects.
+            try:  # FIX: C6-H-07
+                self._write_quarantine_manifest(self.incident_id, container_id, reason, original_networks)  # FIX: C6-H-07
+            except Exception as persist_err:  # FIX: C6-H-07
+                logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
+                self.log_action("isolate_container", container_id, "failed", {"error": str(persist_err), "stage": "label_persist", "reason": reason})  # FIX: C6-H-07
+                # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
+                for rb in self.rollback_commands:  # FIX: C6-H-07
+                    if rb.get("action") == "reconnect_docker_network" and rb.get("container_id") == container_id:  # FIX: C6-H-07
+                        try:  # FIX: C6-H-07
+                            self.docker_client.networks.get(rb["network_name"]).connect(container)  # FIX: C6-H-07
+                        except Exception as rb_err:  # FIX: C6-H-07
+                            logger.error(f"Rollback reconnect failed for {rb['network_name']}: {rb_err}")  # FIX: C6-H-07
+                return False  # FIX: C6-H-07
             self.log_action("isolate_container", container_id, "success", {"original_networks": original_networks, "reason": reason})  # FIX: C5-finding-3
             logger.info(f"✓ Container {container_id} isolated successfully")  # FIX: C5-finding-3
             return True  # FIX: C5-finding-3
@@ -634,8 +678,22 @@ class ContainmentManager:
                     "network_name": network_name
                 })
             
-            # Add quarantine label
-            container.update(labels={'quarantine': self.incident_id})  # type: ignore[call-arg]  # pylance: docker SDK Container.update accepts labels at runtime; stubs incomplete
+            # FIX: C6-H-07 - container.update(labels=...) raises TypeError at runtime because
+            # Docker container labels are immutable post-creation. Persist quarantine state
+            # to a manifest file instead (same as isolate_container above).
+            try:  # FIX: C6-H-07
+                self._write_quarantine_manifest(self.incident_id, container_id, None, original_networks)  # FIX: C6-H-07
+            except Exception as persist_err:  # FIX: C6-H-07
+                logger.error(f"Failed to persist quarantine manifest: {persist_err}")  # FIX: C6-H-07
+                self.log_action("isolate_docker", container_id, "failed", {"error": str(persist_err), "stage": "label_persist"})  # FIX: C6-H-07
+                # Roll back network disconnects so the container is not silently stranded  # FIX: C6-H-07
+                for rb in self.rollback_commands:  # FIX: C6-H-07
+                    if rb.get("action") == "reconnect_docker_network" and rb.get("container_id") == container_id:  # FIX: C6-H-07
+                        try:  # FIX: C6-H-07
+                            self.docker_client.networks.get(rb["network_name"]).connect(container)  # FIX: C6-H-07
+                        except Exception as rb_err:  # FIX: C6-H-07
+                            logger.error(f"Rollback reconnect failed for {rb['network_name']}: {rb_err}")  # FIX: C6-H-07
+                return False  # FIX: C6-H-07
             
             self.log_action("isolate_docker", container_id, "success", {
                 "original_networks": original_networks

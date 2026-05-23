@@ -277,21 +277,83 @@ def test_block_domain_name_claim_blocks_attack_domain(tmp_path):
     assert manager.actions_taken[-1]["status"] == "failed"
 
 
-def test_isolate_container_claim_isolates_documented_container(tmp_path):
+def test_isolate_container_claim_isolates_documented_container(tmp_path):  # FIX: C6-H-07
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_isolate_container")
     manager = ctx.module.ContainmentManager("INC-CONTAINER")
 
-    assert manager.isolate_container("agent-prod-42", reason="Potential compromise") is True
+    assert manager.isolate_container("agent-prod-42", reason="Potential compromise") is True  # FIX: C6-H-07
     ctx.fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")
     assert ctx.fake_network.disconnect.call_count == 2
     assert len(manager.rollback_commands) == 2
-    labels = ctx.fake_container.update.call_args.kwargs["labels"]
-    assert labels["quarantine"] == "INC-CONTAINER"
-    assert labels["containment_reason"] == "Potential compromise"
+    # FIX: C6-H-07 - container.update(labels=...) was removed; quarantine state is now
+    # persisted to a manifest file because Docker labels are immutable post-creation.
+    manifest_path = ctx.log_dir / "INC-CONTAINER-quarantined-containers.json"  # FIX: C6-H-07
+    assert manifest_path.exists(), "Quarantine manifest file was not written"  # FIX: C6-H-07
+    records = json.loads(manifest_path.read_text(encoding="utf-8"))  # FIX: C6-H-07
+    assert len(records) == 1  # FIX: C6-H-07
+    assert records[0]["incident_id"] == "INC-CONTAINER"  # FIX: C6-H-07
+    assert records[0]["container_id"] == "agent-prod-42"  # FIX: C6-H-07
+    assert records[0]["reason"] == "Potential compromise"  # FIX: C6-H-07
+    assert set(records[0]["original_networks"]) == {"openclaw-network", "bridge"}  # FIX: C6-H-07
+    assert "quarantined_at" in records[0]  # FIX: C6-H-07
 
     no_docker_manager = ctx.module.ContainmentManager("INC-NODOCKER")
     no_docker_manager.docker_client = None
     assert no_docker_manager.isolate_container("agent-prod-42", reason="Missing Docker") is False
+
+
+def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path):  # FIX: C6-H-07
+    """Regression lock: any future re-introduction of container.update(labels=...) or
+    other unsupported kwargs must fail at test time rather than silently passing.
+
+    Uses create_autospec with a minimal class mirroring docker-py Container.update()
+    (only blkio_weight, cpu_*, mem_* are valid). create_autospec enforces the actual
+    method signature at call time without requiring the docker SDK to be installed.
+    """  # FIX: C6-H-07
+    from unittest.mock import create_autospec  # FIX: C6-H-07
+
+    class _ContainerSpec:  # FIX: C6-H-07
+        """Minimal spec mirroring docker.models.containers.Container.update().
+        The real update_container API accepts resource-constraint args only;
+        'labels' is NOT a valid argument and must not silently pass.
+        """  # FIX: C6-H-07
+        attrs: dict  # FIX: C6-H-07
+
+        def update(  # FIX: C6-H-07
+            self,  # FIX: C6-H-07
+            blkio_weight: int = 0,  # FIX: C6-H-07
+            cpu_period: int = 0,  # FIX: C6-H-07
+            cpu_quota: int = 0,  # FIX: C6-H-07
+            cpu_shares: int = 0,  # FIX: C6-H-07
+            cpuset_cpus: str = "",  # FIX: C6-H-07
+            cpuset_mems: str = "",  # FIX: C6-H-07
+            mem_limit: int = 0,  # FIX: C6-H-07
+            mem_reservation: int = 0,  # FIX: C6-H-07
+            memswap_limit: int = 0,  # FIX: C6-H-07
+            kernel_memory: int = 0,  # FIX: C6-H-07
+            restart_policy: dict = None,  # type: ignore[assignment]  # FIX: C6-H-07
+        ) -> dict:  # FIX: C6-H-07
+            ...  # FIX: C6-H-07
+
+    # create_autospec enforces the method signature at call time (MagicMock(spec=...) does not)
+    spec_container = create_autospec(_ContainerSpec)  # FIX: C6-H-07
+    # Calling .update() with labels= must raise TypeError because 'labels' is not in the signature.
+    with pytest.raises(TypeError):  # FIX: C6-H-07
+        spec_container.update(labels={"quarantine": "INC-TEST"})  # FIX: C6-H-07
+
+    # Confirm the production path no longer calls container.update() at all:
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_spec_regression")
+    # Replace fake_container.update with a create_autospec so any .update(labels=...) regress fails
+    ctx.fake_container.update = create_autospec(_ContainerSpec.update)  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-SPEC")
+    # Must succeed without calling container.update(labels=...)
+    assert manager.isolate_container("spec-test-01", reason="Regression check") is True  # FIX: C6-H-07
+    # update should NOT have been called with labels kwarg at all
+    for call in ctx.fake_container.update.call_args_list:  # FIX: C6-H-07
+        assert "labels" not in call.kwargs, (  # FIX: C6-H-07
+            f"container.update was called with labels= kwarg: {call}; "
+            "C6-H-07 regression detected"  # FIX: C6-H-07
+        )  # FIX: C6-H-07
 
 
 def test_C6_H_08_save_manifest_does_not_crash_on_degraded_evidence_items(tmp_path):  # FIX: C6-H-08
