@@ -355,3 +355,23 @@ def test_evaluate_yara_case_passes_clean_rule_through_to_yara_invocation(tmp_pat
     assert result.passed is True  # FIX: C6-H-11
     assert "high-risk-regex-patterns" not in result.details  # FIX: C6-H-11
     assert "Clean_Rule" in result.details  # FIX: C6-H-11
+
+
+def test_evaluate_yara_case_returns_rule_read_error_when_rule_file_missing(tmp_path: Path) -> None:  # FIX: C6-H-11
+    # Codifies the OSError branch: when rule_path.read_text() raises (missing/unreadable file),  # FIX: C6-H-11
+    # the function MUST return a ReplayResult with details starting "rule-read-error:" and MUST  # FIX: C6-H-11
+    # NOT proceed to subprocess invocation. Pre-fix the function would have crashed at subprocess.  # FIX: C6-H-11
+    missing_rule = tmp_path / "does-not-exist.yar"  # FIX: C6-H-11
+    fixture_path = tmp_path / "sample.txt"  # FIX: C6-H-11
+    fixture_path.write_text("payload\n", encoding="utf-8")  # FIX: C6-H-11
+    case = {  # FIX: C6-H-11
+        "name": "missing-rule",  # FIX: C6-H-11
+        "rule": str(missing_rule),  # FIX: C6-H-11
+        "fixture": str(fixture_path),  # FIX: C6-H-11
+        "expected_rules": ["AnyRule"],  # FIX: C6-H-11
+    }  # FIX: C6-H-11
+    # Sentinel binary path would fail loudly if subprocess actually ran — confirms gate fires first.  # FIX: C6-H-11
+    sentinel = "/nonexistent/yara-binary-must-not-be-invoked"  # FIX: C6-H-11
+    result = validate_detection_replay.evaluate_yara_case(case, sentinel, require_yara=True)  # FIX: C6-H-11
+    assert result.passed is False  # FIX: C6-H-11
+    assert result.details.startswith("rule-read-error:"), result.details  # FIX: C6-H-11
