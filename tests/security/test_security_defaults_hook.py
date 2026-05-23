@@ -340,6 +340,13 @@ class TestContainerUserRegex:  # FIX: C6-M-12
         # by this immutable-default check. If a future change removes the scope guard,  # FIX: C6-M-12
         # this test will start failing — that is the signal to either expand coverage  # FIX: C6-M-12
         # explicitly OR keep the narrowing and update this test.  # FIX: C6-M-12
+        #  # FIX: C6-M-12
+        # Fixture shape note: the YAML below is intentionally NOT a canonical Kubernetes  # FIX: C6-M-12
+        # Pod spec — real K8s uses `securityContext.runAsUser: <int>`, not `user: "root"`.  # FIX: C6-M-12
+        # The only requirement of this fixture is "any non-compose YAML that contains the  # FIX: C6-M-12
+        # substring `user: \"root\"`", which is what proves the scope guard is what skips  # FIX: C6-M-12
+        # the file (rather than absence of the substring). Do NOT "fix" this to `runAsUser`:  # FIX: C6-M-12
+        # that would silently destroy the test by removing the very substring under test.  # FIX: C6-M-12
         non_compose = tmp_path / "k8s-pod.yaml"  # FIX: C6-M-12
         non_compose.write_text(  # FIX: C6-M-12
             "apiVersion: v1\n"  # FIX: C6-M-12
@@ -348,7 +355,7 @@ class TestContainerUserRegex:  # FIX: C6-M-12
             "  containers:\n"  # FIX: C6-M-12
             "  - name: app\n"  # FIX: C6-M-12
             "    securityContext:\n"  # FIX: C6-M-12
-            '      user: "root"\n',  # FIX: C6-M-12
+            '      user: "root"  # intentionally non-canonical K8s; see test docstring above\n',  # FIX: C6-M-12
             encoding="utf-8",  # FIX: C6-M-12
         )  # FIX: C6-M-12
         rc, output = _run_hook(non_compose)  # FIX: C6-M-12
