@@ -48,7 +48,7 @@ except ImportError:
     boto3 = None  # FIX: C5-finding-3
 
 try:
-    import docker  # FIX: C5-finding-3
+    import docker  # pyright: ignore[reportMissingModuleSource]  # pylance: docker source absent in CI/dev envs; runtime import guarded by except below
 except ImportError:
     docker = None  # FIX: C5-finding-3
 
@@ -658,7 +658,8 @@ class ContainmentManager:
             "actions_taken": self.actions_taken,
             "rollback_commands": self.rollback_commands
         }
-        
+
+        report_file: Optional[Path] = None  # pylance: ensure bound on all paths for rollback summary below
         if self.log_dir is None:
             logger.error("No writable log directory; skipping containment report file")
         else:
@@ -681,7 +682,10 @@ class ContainmentManager:
         
         if self.rollback_commands:
             print(f"\nRollback commands available: {len(self.rollback_commands)}")
-            print(f"See: {report_file}")
+            if report_file is not None:  # pylance: only reference when bound
+                print(f"See: {report_file}")
+            else:
+                print("Report file not written (no writable log directory).")
         print("=" * 80)
 
 
