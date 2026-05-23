@@ -450,19 +450,18 @@ def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path): 
     with pytest.raises(TypeError):  # FIX: C6-H-07
         spec_container.update(labels={"quarantine": "INC-TEST"})  # FIX: C6-H-07
 
-    # Confirm the production path no longer calls container.update() at all:
-    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_spec_regression")
-    # Replace fake_container.update with a create_autospec so any .update(labels=...) regress fails
-    ctx.fake_container.update = create_autospec(_ContainerSpec.update)  # FIX: C6-H-07
-    manager = ctx.module.ContainmentManager("INC-SPEC")
-    # Must succeed without calling container.update(labels=...)
+    # Confirm the production path no longer calls container.update() at all.  # FIX: C6-H-07
+    # The actual invariant we want to lock in is "isolate_container does not  # FIX: C6-H-07
+    # invoke container.update at any signature" — the first block above already  # FIX: C6-H-07
+    # provides the signature-enforcement evidence (instance-bound autospec  # FIX: C6-H-07
+    # correctly rejects labels=). Using assert_not_called() here keeps intent  # FIX: C6-H-07
+    # direct and avoids autospec'ing an unbound function (which would raise  # FIX: C6-H-07
+    # "missing required argument: 'self'" instead of the intended unknown-kwarg  # FIX: C6-H-07
+    # signal if a future regression re-introduced a call).  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_spec_regression")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-SPEC")  # FIX: C6-H-07
     assert manager.isolate_container("spec-test-01", reason="Regression check") is True  # FIX: C6-H-07
-    # update should NOT have been called with labels kwarg at all
-    for call in ctx.fake_container.update.call_args_list:  # FIX: C6-H-07
-        assert "labels" not in call.kwargs, (  # FIX: C6-H-07
-            f"container.update was called with labels= kwarg: {call}; "
-            "C6-H-07 regression detected"  # FIX: C6-H-07
-        )  # FIX: C6-H-07
+    ctx.fake_container.update.assert_not_called()  # FIX: C6-H-07
 
 
 def test_C6_H_08_save_manifest_does_not_crash_on_degraded_evidence_items(tmp_path):  # FIX: C6-H-08
