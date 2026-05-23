@@ -286,10 +286,16 @@ def test_isolate_container_claim_isolates_documented_container(tmp_path):  # FIX
     assert ctx.fake_network.disconnect.call_count == 2
     assert len(manager.rollback_commands) == 2
     # FIX: C6-H-07 - container.update(labels=...) was removed; quarantine state is now
-    # persisted to a manifest file because Docker labels are immutable post-creation.
-    manifest_path = ctx.log_dir / "INC-CONTAINER-quarantined-containers.json"  # FIX: C6-H-07
+    # persisted to a JSON-Lines manifest because Docker labels are immutable
+    # post-creation. JSONL append is used so concurrent writers cannot
+    # lose each other's records (see _write_quarantine_manifest docstring).
+    manifest_path = ctx.log_dir / "INC-CONTAINER-quarantined-containers.jsonl"  # FIX: C6-H-07
     assert manifest_path.exists(), "Quarantine manifest file was not written"  # FIX: C6-H-07
-    records = json.loads(manifest_path.read_text(encoding="utf-8"))  # FIX: C6-H-07
+    records = [  # FIX: C6-H-07
+        json.loads(line)  # FIX: C6-H-07
+        for line in manifest_path.read_text(encoding="utf-8").splitlines()  # FIX: C6-H-07
+        if line.strip()  # FIX: C6-H-07
+    ]  # FIX: C6-H-07
     assert len(records) == 1  # FIX: C6-H-07
     assert records[0]["incident_id"] == "INC-CONTAINER"  # FIX: C6-H-07
     assert records[0]["container_id"] == "agent-prod-42"  # FIX: C6-H-07
@@ -300,6 +306,38 @@ def test_isolate_container_claim_isolates_documented_container(tmp_path):  # FIX
     no_docker_manager = ctx.module.ContainmentManager("INC-NODOCKER")
     no_docker_manager.docker_client = None
     assert no_docker_manager.isolate_container("agent-prod-42", reason="Missing Docker") is False
+
+
+def test_C6_H_07_quarantine_manifest_appends_without_clobbering_prior_records(tmp_path):  # FIX: C6-H-07
+    """Regression lock: the JSONL manifest must append, never read-modify-write.
+
+    Locks in the structural property that eliminates the lost-update race a
+    JSON-array implementation would have. Writing two records for the same
+    incident must yield both records in the file — if a future change
+    re-introduces a read step before write, a concurrent second writer could
+    silently overwrite the first's record and this test would still pass for
+    the sequential case. So we additionally assert the file is parseable as
+    JSONL (one JSON object per line) and is NOT a JSON array.
+    """  # FIX: C6-H-07
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_c6_h_07_manifest_append")  # FIX: C6-H-07
+    manager = ctx.module.ContainmentManager("INC-MULTI")  # FIX: C6-H-07
+
+    manager._write_quarantine_manifest("INC-MULTI", "container-one", "first reason", ["net-a"])  # FIX: C6-H-07
+    manager._write_quarantine_manifest("INC-MULTI", "container-two", "second reason", ["net-b", "net-c"])  # FIX: C6-H-07
+
+    manifest_path = ctx.log_dir / "INC-MULTI-quarantined-containers.jsonl"  # FIX: C6-H-07
+    raw = manifest_path.read_text(encoding="utf-8")  # FIX: C6-H-07
+    # Format invariant: JSONL, not a JSON array. A leading '[' would indicate  # FIX: C6-H-07
+    # someone re-introduced the read-modify-write pattern.  # FIX: C6-H-07
+    assert not raw.lstrip().startswith("["), (  # FIX: C6-H-07
+        "Manifest must be JSONL (one record per line), not a JSON array — "  # FIX: C6-H-07
+        "an array implementation would reintroduce the lost-update race."  # FIX: C6-H-07
+    )  # FIX: C6-H-07
+    records = [json.loads(line) for line in raw.splitlines() if line.strip()]  # FIX: C6-H-07
+    assert len(records) == 2, f"Both records must be preserved; got {records!r}"  # FIX: C6-H-07
+    assert records[0]["container_id"] == "container-one"  # FIX: C6-H-07
+    assert records[1]["container_id"] == "container-two"  # FIX: C6-H-07
+    assert records[1]["original_networks"] == ["net-b", "net-c"]  # FIX: C6-H-07
 
 
 def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path):  # FIX: C6-H-07

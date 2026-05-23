@@ -320,30 +320,33 @@ class ContainmentManager:
         reason: Optional[str],  # FIX: C6-H-07
         original_networks: list,  # FIX: C6-H-07
     ) -> None:  # FIX: C6-H-07
-        """Persist quarantine state to a JSON manifest file.  # FIX: C6-H-07
+        """Persist quarantine state to a JSON-Lines manifest.  # FIX: C6-H-07
 
         Docker container labels are immutable post-creation; container.update(labels=...)  # FIX: C6-H-07
         raises TypeError at runtime. Quarantine state is instead recorded here so it  # FIX: C6-H-07
         survives container restarts and does not depend on runtime label mutation.  # FIX: C6-H-07
 
-        File: <log_dir>/<incident_id>-quarantined-containers.json  # FIX: C6-H-07
-        Append-style: loads existing records and appends the new entry.  # FIX: C6-H-07
-        Raises OSError or json.JSONDecodeError on failure (caller handles).  # FIX: C6-H-07
+        File: <log_dir>/<incident_id>-quarantined-containers.jsonl  # FIX: C6-H-07
+        Format: JSON Lines (one record per line) opened in append mode. This  # FIX: C6-H-07
+        deliberately avoids any read-modify-write step: concurrent  # FIX: C6-H-07
+        ContainmentManager processes for the same incident cannot lose each  # FIX: C6-H-07
+        other's writes, and an interrupted write cannot corrupt prior records.  # FIX: C6-H-07
+        Do not "helpfully" switch this back to a JSON array — that would  # FIX: C6-H-07
+        reintroduce the lost-update race the JSONL format eliminates.  # FIX: C6-H-07
+        Raises OSError on write failure (caller handles).  # FIX: C6-H-07
         """  # FIX: C6-H-07
         if self.log_dir is None:  # FIX: C6-H-07
             raise OSError("No writable log directory; cannot persist quarantine manifest")  # FIX: C6-H-07
-        manifest_path = self.log_dir / f"{incident_id}-quarantined-containers.json"  # FIX: C6-H-07
-        records: list = []  # FIX: C6-H-07
-        if manifest_path.exists():  # FIX: C6-H-07
-            records = json.loads(manifest_path.read_text(encoding="utf-8"))  # FIX: C6-H-07
-        records.append({  # FIX: C6-H-07
+        manifest_path = self.log_dir / f"{incident_id}-quarantined-containers.jsonl"  # FIX: C6-H-07
+        record = {  # FIX: C6-H-07
             "incident_id": incident_id,  # FIX: C6-H-07
             "container_id": container_id,  # FIX: C6-H-07
             "reason": reason,  # FIX: C6-H-07
             "original_networks": original_networks,  # FIX: C6-H-07
             "quarantined_at": datetime.now(timezone.utc).isoformat(),  # FIX: C6-H-07
-        })  # FIX: C6-H-07
-        manifest_path.write_text(json.dumps(records, indent=2), encoding="utf-8")  # FIX: C6-H-07
+        }  # FIX: C6-H-07
+        with open(manifest_path, "a", encoding="utf-8") as handle:  # FIX: C6-H-07
+            handle.write(json.dumps(record) + "\n")  # FIX: C6-H-07
 
     def isolate_container(self, container_id: str, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Isolate a container using the documented playbook action name."""  # FIX: C5-finding-3
