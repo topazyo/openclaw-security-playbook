@@ -536,3 +536,27 @@ class TestT9SoaApplicableZeroCoverageContradiction:  # FIX: C6-M-13
         assert coverage["gap_status"] == "COMPLETE_MAPPING", (  # FIX: C6-M-13
             f"gap_status must be COMPLETE_MAPPING when 0==0; got {coverage['gap_status']!r}"  # FIX: C6-M-13
         )  # FIX: C6-M-13
+
+    def test_soa_applicable_positive_behavior_unchanged(self):  # FIX: C6-M-13
+        """Positive control: when soa_applicable > 0, the new misconfig guard is silent
+        and coverage math is identical to pre-C6-M-13 behavior.
+
+        Codifies acceptance criterion #3 — "When soa_applicable > 0, behavior is
+        unchanged." If the new guard ever expands incorrectly to trigger on positive
+        states, this test will fail.
+        """  # FIX: C6-M-13
+        statement = _make_statement(  # FIX: C6-M-13
+            total=70, implemented=30, planned=20, not_applicable=20  # FIX: C6-M-13
+        )  # soa_applicable = 30 + 20 = 50  # FIX: C6-M-13
+        corpus = _make_corpus_controls(n_implemented=25)  # FIX: C6-M-13
+
+        coverage = ComplianceReporter._build_iso27001_coverage_summary(corpus, statement)  # FIX: C6-M-13
+
+        assert coverage["soa_applicable_controls"] == 50  # FIX: C6-M-13
+        assert coverage["mapped_controls"] == 25  # FIX: C6-M-13
+        assert coverage["corpus_to_soa_coverage_percentage"] == 50.0, (  # FIX: C6-M-13
+            f"coverage_pct must be 50.0 for 25/50; got {coverage['corpus_to_soa_coverage_percentage']!r}"  # FIX: C6-M-13
+        )  # FIX: C6-M-13
+        assert coverage["gap_status"] == "INCOMPLETE_MAPPING", (  # FIX: C6-M-13
+            f"gap_status must be INCOMPLETE_MAPPING when mapped < soa_applicable; got {coverage['gap_status']!r}"  # FIX: C6-M-13
+        )  # FIX: C6-M-13
