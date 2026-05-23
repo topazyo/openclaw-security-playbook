@@ -13,7 +13,8 @@ _FUNCTION_BLOCK = _SCRIPT_PATH.read_bytes().replace(b"\r", b"").split(b"TIMESTAM
 
 
 def _run_function_block(commands: bytes) -> subprocess.CompletedProcess[bytes]:
-    assert _BASH_PATH is not None, "bash required; tests are skipped without it"
+    if _BASH_PATH is None:
+        pytest.skip("bash is required to execute collect_evidence.sh helpers")
     return subprocess.run(
         [_BASH_PATH, "-s"],
         capture_output=True,
