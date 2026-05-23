@@ -244,18 +244,31 @@ def test_numeric_operators_match_and_nonmatch(
     ) is want
 
 
-@pytest.mark.parametrize("operator", ["gte", "lte", "gt", "lt"])
-def test_numeric_string_event_values_are_coerced(operator: str) -> None:
+@pytest.mark.parametrize(
+    "operator,event_value,expected,want",
+    [
+        # gte: coerces numeric string, matches when >=
+        ("gte", "10", 10, True),
+        ("gte", "9", 10, False),
+        # lte: coerces numeric string, matches when <=
+        ("lte", "10", 10, True),
+        ("lte", "11", 10, False),
+        # gt: coerces numeric string, matches when >
+        ("gt", "11", 10, True),
+        ("gt", "10", 10, False),
+        # lt: coerces numeric string, matches when <
+        ("lt", "9", 10, True),
+        ("lt", "10", 10, False),
+    ],
+)
+def test_numeric_string_event_values_are_coerced(
+    operator: str, event_value: str, expected: float, want: bool
+) -> None:
     # Existing code uses float(actual) which coerces numeric strings — assert that behavior.
     expression = f"FieldName|{operator}"
-    if operator == "gte":
-        assert validate_detection_replay.field_matches({"FieldName": "10"}, expression, 10) is True
-    elif operator == "lte":
-        assert validate_detection_replay.field_matches({"FieldName": "10"}, expression, 10) is True
-    elif operator == "gt":
-        assert validate_detection_replay.field_matches({"FieldName": "11"}, expression, 10) is True
-    else:
-        assert validate_detection_replay.field_matches({"FieldName": "9"}, expression, 10) is True
+    assert validate_detection_replay.field_matches(
+        {"FieldName": event_value}, expression, expected
+    ) is want
 
 
 @pytest.mark.parametrize("operator", ["gte", "lte", "gt", "lt"])
