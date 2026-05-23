@@ -267,3 +267,67 @@ class TestTLSCommentRobustness:  # FIX: C6-H-09
         assert "TLS:" not in output, (  # FIX: C6-H-09
             f"Commented-out directive produced a TLS violation.\nOutput:\n{output}"  # FIX: C6-H-09
         )
+
+
+@pytest.fixture()  # FIX: C6-M-12
+def compose_user_conf(tmp_path: Path):  # FIX: C6-M-12
+    """Factory: writes content into docker-compose.yml under tmp_path."""  # FIX: C6-M-12
+    def _write(content: str) -> Path:  # FIX: C6-M-12
+        f = tmp_path / "docker-compose.yml"  # FIX: C6-M-12
+        f.write_text(content, encoding="utf-8")  # FIX: C6-M-12
+        return f  # FIX: C6-M-12
+    return _write  # FIX: C6-M-12
+
+
+class TestContainerUserRegex:  # FIX: C6-M-12
+    """Container user check must match only YAML key context, not URL userinfo or per_user substrings."""  # FIX: C6-M-12
+
+    def test_root_user_trips_violation(self, compose_user_conf) -> None:  # FIX: C6-M-12
+        """user: \"root\" must trigger Container user violation."""  # FIX: C6-M-12
+        content = (  # FIX: C6-M-12
+            "services:\n"  # FIX: C6-M-12
+            "  myservice:\n"  # FIX: C6-M-12
+            "    image: example/app\n"  # FIX: C6-M-12
+            '    user: "root"\n'  # FIX: C6-M-12
+        )
+        path = compose_user_conf(content)  # FIX: C6-M-12
+        rc, output = _run_hook(path)  # FIX: C6-M-12
+        assert rc == 1, f"Expected FAIL for root user but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-M-12
+        assert "Container user:" in output, (  # FIX: C6-M-12
+            f"Expected Container user violation.\nGot:\n{output}"  # FIX: C6-M-12
+        )
+
+    def test_compliant_user_passes(self, compose_user_conf) -> None:  # FIX: C6-M-12
+        """user: \"1000:1000\" must NOT trigger Container user violation."""  # FIX: C6-M-12
+        content = (  # FIX: C6-M-12
+            "services:\n"  # FIX: C6-M-12
+            "  myservice:\n"  # FIX: C6-M-12
+            "    image: example/app\n"  # FIX: C6-M-12
+            '    user: "1000:1000"\n'  # FIX: C6-M-12
+        )
+        path = compose_user_conf(content)  # FIX: C6-M-12
+        rc, output = _run_hook(path)  # FIX: C6-M-12
+        assert rc == 0, f"Expected PASS for compliant user but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-M-12
+        assert "Container user:" not in output, (  # FIX: C6-M-12
+            f"Unexpected Container user violation for 1000:1000.\nGot:\n{output}"  # FIX: C6-M-12
+        )
+
+    def test_url_userinfo_does_not_trip_violation(self, compose_user_conf) -> None:  # FIX: C6-M-12
+        """URL userinfo (postgresql://user:pass@host) must NOT trigger Container user violation."""  # FIX: C6-M-12
+        content = (  # FIX: C6-M-12
+            "database:\n"  # FIX: C6-M-12
+            '  dsn: "postgresql://user:pass@localhost/db"\n'  # FIX: C6-M-12
+            "attributes:\n"  # FIX: C6-M-12
+            "  user:\n"  # FIX: C6-M-12
+            "    - user_id\n"  # FIX: C6-M-12
+            "per_user:\n"  # FIX: C6-M-12
+            "  rate_limit: 100\n"  # FIX: C6-M-12
+        )
+        path = compose_user_conf(content)  # FIX: C6-M-12
+        rc, output = _run_hook(path)  # FIX: C6-M-12
+        assert rc == 0, (  # FIX: C6-M-12
+            f"Expected PASS for file with only URL/OPA user: substrings but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-M-12
+        )
+        assert "Container user:" not in output, (  # FIX: C6-M-12
+            f"URL userinfo / per_user substring tripped Container user check.\nGot:\n{output}"  # FIX: C6-M-12
+        )

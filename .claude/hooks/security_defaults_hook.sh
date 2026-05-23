@@ -69,12 +69,16 @@ check_file() {
     fi ## FIX: C6-M-07
   fi ## FIX: C6-M-07
 
-  # Container user (non-root)
-  if grep -q 'user:' <<< "$CONTENT"; then ## FIX: C6-H-09
-    if echo "$CONTENT" | grep -E 'user:' | grep -qvE '"?1000:1000"?'; then
-      VIOLATIONS+=("Container user: must be 1000:1000 in $FILE")
-    fi
-  fi
+  # Container user (non-root) — scope to docker-compose files only (must have     ## FIX: C6-M-12
+  # top-level 'services:'), then match only YAML key context: 'user:' preceded   ## FIX: C6-M-12
+  # by line-start or whitespace AND followed by whitespace, so URL userinfo       ## FIX: C6-M-12
+  # (user:pass@host), per_user: substrings, and OPA policy keys (user: "user")   ## FIX: C6-M-12
+  # in non-compose files are all excluded.                                        ## FIX: C6-M-12
+  if grep -q '^services:' <<< "$CONTENT" && grep -qE '(^|[[:space:]])user:[[:space:]]' <<< "$CONTENT"; then ## FIX: C6-M-12
+    if echo "$CONTENT" | grep -E '(^|[[:space:]])user:[[:space:]]' | grep -qvE '("1000:1000"|1000:1000)'; then ## FIX: C6-M-12
+      VIOLATIONS+=("Container user: must be 1000:1000 in $FILE") ## FIX: C6-M-12
+    fi ## FIX: C6-M-12
+  fi ## FIX: C6-M-12
 
   # cap_drop ALL
   if grep -q 'cap_drop' <<< "$CONTENT"; then ## FIX: C6-H-09
