@@ -92,8 +92,15 @@ class TestTLSNegativeRegex:  # FIX: C6-H-09
         path = tls_nginx_conf("ssl_protocols TLSv1.3;\n")  # FIX: C6-H-09
         rc, output = _run_hook(path)  # FIX: C6-H-09
         assert rc == 0, f"Expected PASS but got exit {rc}.\nOutput:\n{output}"  # FIX: C6-H-09
-        assert "TLS" not in output or "intact" in output, (  # FIX: C6-H-09
+        # Both TLS violation messages the hook can emit begin with the literal  # FIX: C6-H-09
+        # prefix "TLS:" (see security_defaults_hook.sh lines 121 and 125).  # FIX: C6-H-09
+        # Asserting that prefix is absent positively proves neither TLS branch  # FIX: C6-H-09
+        # fired, without false-passing on unrelated "intact" text from other checks.  # FIX: C6-H-09
+        assert "TLS:" not in output, (  # FIX: C6-H-09
             f"Unexpected TLS violation for hardened config.\nOutput:\n{output}"  # FIX: C6-H-09
+        )
+        assert "REGRESSION BLOCKER" not in output, (  # FIX: C6-H-09
+            f"Hook reported a violation block for hardened config.\nOutput:\n{output}"  # FIX: C6-H-09
         )
 
     def test_mixed_tls13_and_tls12_fails_with_older_version(  # FIX: C6-H-09
