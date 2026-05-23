@@ -185,21 +185,15 @@ def test__resolve_firewall_domain_list_id_claim_resolves_domain_blocklist(tmp_pa
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_resolve_domain_list")
     manager = ctx.module.ContainmentManager("INC-DOMAIN")
 
-    ctx.fake_route53resolver.list_firewall_domain_lists.return_value = {
-        "FirewallDomainLists": [{"Name": "openclaw-auto-containment", "Id": "fdl-existing"}]
-    }
-    assert manager._resolve_firewall_domain_list_id() == "fdl-existing"
+    # Returns the pre-wired list when DNS_FIREWALL_DOMAIN_LIST_ID is set.
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-prewired"
+    assert manager._resolve_firewall_domain_list_id() == "fdl-prewired"
 
-    ctx.fake_route53resolver.list_firewall_domain_lists.return_value = {
-        "FirewallDomainLists": [{"Name": "other-list", "Id": "fdl-other"}]
-    }
-    ctx.fake_route53resolver.create_firewall_domain_list.return_value = {"unexpected": "shape"}  # FIX: C6-H-01
-    with pytest.raises(  # FIX: C6-H-01
-        RuntimeError,  # FIX: C6-H-01
-        match=r"^firewall domain list creation returned malformed response; set DNS_FIREWALL_DOMAIN_LIST_ID",  # FIX: C6-H-01
-    ):  # FIX: C6-H-01
-        manager._resolve_firewall_domain_list_id()  # FIX: C6-H-01
-    ctx.fake_route53resolver.create_firewall_domain_list.assert_called_once()
+    # Refuses to silently create an unenforced list when the env var is unset.
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = None
+    with pytest.raises(RuntimeError, match=r"^DNS_FIREWALL_DOMAIN_LIST_ID is not set"):
+        manager._resolve_firewall_domain_list_id()
+    ctx.fake_route53resolver.create_firewall_domain_list.assert_not_called()
 
 
 def test_block_ip_address_claim_blocks_attack_ip(tmp_path):
@@ -224,8 +218,47 @@ def test_block_ip_address_claim_blocks_attack_ip(tmp_path):
     assert manager.actions_taken[-1]["status"] == "failed"
 
 
+def test_block_ip_address_allocates_unused_rule_number_and_is_idempotent(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_block_ip_alloc")
+    manager = ctx.module.ContainmentManager("INC-IP-ALLOC")
+
+    # NACL already has entries occupying numbers 100 and 101 in both directions,
+    # plus an existing deny-all for our CIDR on ingress only (egress missing).
+    ctx.fake_ec2.describe_network_acls.return_value = {
+        "NetworkAcls": [{
+            "NetworkAclId": "acl-emergency",
+            "Entries": [
+                {"RuleNumber": 100, "Egress": False, "CidrBlock": "10.0.0.0/8", "Protocol": "6", "RuleAction": "allow"},
+                {"RuleNumber": 101, "Egress": False, "CidrBlock": "203.0.113.10/32", "Protocol": "-1", "RuleAction": "deny"},
+                {"RuleNumber": 100, "Egress": True, "CidrBlock": "10.0.0.0/8", "Protocol": "6", "RuleAction": "allow"},
+            ],
+        }]
+    }
+
+    assert manager.block_ip_address("203.0.113.10", reason="repeat block") is True
+    # Ingress already covers this CIDR → no create; egress missing → create at lowest free (101).
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == 1
+    egress_call = ctx.fake_ec2.create_network_acl_entry.call_args_list[0]
+    assert egress_call.kwargs["Egress"] is True
+    assert egress_call.kwargs["CidrBlock"] == "203.0.113.10/32"
+    assert egress_call.kwargs["RuleNumber"] == 101
+    # Rollback records only the rule we actually created.
+    assert manager.rollback_commands[-1]["rule_numbers"] == [101]
+
+    # Re-running the same block is a no-op (both directions now present).
+    ctx.fake_ec2.describe_network_acls.return_value["NetworkAcls"][0]["Entries"].append(
+        {"RuleNumber": 101, "Egress": True, "CidrBlock": "203.0.113.10/32", "Protocol": "-1", "RuleAction": "deny"}
+    )
+    previous_create_count = ctx.fake_ec2.create_network_acl_entry.call_count
+    previous_rollback_count = len(manager.rollback_commands)
+    assert manager.block_ip_address("203.0.113.10", reason="idempotent retry") is True
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == previous_create_count
+    assert len(manager.rollback_commands) == previous_rollback_count
+
+
 def test_block_domain_name_claim_blocks_attack_domain(tmp_path):
     ctx = _load_auto_containment_context(tmp_path, "auto_containment_claim_block_domain")
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-default"
     manager = ctx.module.ContainmentManager("INC-DNS")
 
     assert manager.block_domain_name(
@@ -299,6 +332,7 @@ def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
     ctx.module.docker = None
     rate_limit_path = tmp_path / "rate-limits" / "override.json"
     ctx.module.RATE_LIMIT_CONFIG_PATH = str(rate_limit_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
     manager = ctx.module.ContainmentManager("INC-RATE")
 
     limits = {
@@ -313,6 +347,120 @@ def test_update_rate_limits_claim_writes_emergency_override_profile(tmp_path):
 
     assert manager.update_rate_limits("aggressive", {"bad": {1, 2}}, reason="Malformed limits") is False
     assert manager.actions_taken[-1]["status"] == "failed"
+
+
+@pytest.mark.parametrize("bad_input", ["", "   ", "not.an.ip", "192.168.1.999", "256.0.0.1"])
+def test_block_ip_address_rejects_invalid_ip_inputs(tmp_path, bad_input):
+    ctx = _load_auto_containment_context(tmp_path, f"auto_containment_bad_ip_{abs(hash(bad_input))}")
+    manager = ctx.module.ContainmentManager("INC-BAD-IP")
+
+    create_calls_before = ctx.fake_ec2.create_network_acl_entry.call_count
+    assert manager.block_ip_address(bad_input, reason="invalid") is False
+    assert ctx.fake_ec2.create_network_acl_entry.call_count == create_calls_before
+    assert manager.actions_taken[-1]["status"] == "failed"
+    assert manager.rollback_commands == []
+
+
+def test_main_rejects_non_dict_limits_payload(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_main_nondict_limits")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "auto-containment.py",
+            "--incident",
+            "INC-NONDICT",
+            "--action",
+            "update_rate_limits",
+            "--mode",
+            "aggressive",
+            "--limits",
+            "[1, 2, 3]",
+        ],
+    ):
+        with pytest.raises(SystemExit) as exc_info:
+            ctx.module.main()
+    assert exc_info.value.code != 0
+
+
+def test_dry_run_skips_mutating_calls_and_records_rollback_on_success(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_dry_run")
+    rate_limit_path = tmp_path / "rate-limits" / "override.json"
+    ctx.module.RATE_LIMIT_CONFIG_PATH = str(rate_limit_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
+    ctx.module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-default"
+
+    # Dry-run path: no mutating AWS/Docker/file-write calls; no rollback entries.
+    dry = ctx.module.ContainmentManager("INC-DRY", dry_run=True)
+    assert dry.block_ip_address("198.51.100.42", reason="dry") is True
+    assert dry.block_domain_name("evil.example", reason="dry") is True
+    assert dry.isolate_container("ctr-1", reason="dry") is True
+    assert dry.update_rate_limits("aggressive", {"global_per_second": 1}, reason="dry") is True
+
+    ctx.fake_ec2.create_network_acl_entry.assert_not_called()
+    ctx.fake_route53resolver.update_firewall_domains.assert_not_called()
+    ctx.fake_network.disconnect.assert_not_called()
+    ctx.fake_container.update.assert_not_called()
+    assert not rate_limit_path.exists()
+    assert dry.rollback_commands == []
+    assert all(record["status"] == "dry_run" for record in dry.actions_taken)
+
+    # Real-run path: the same actions populate rollback_commands with the
+    # expected action names so an operator can undo each step.
+    real = ctx.module.ContainmentManager("INC-REAL")
+    assert real.block_ip_address("198.51.100.42", reason="real") is True
+    assert real.block_domain_name("evil.example", reason="real") is True
+    assert real.update_rate_limits("aggressive", {"global_per_second": 1}, reason="real") is True
+    rollback_actions = [entry["action"] for entry in real.rollback_commands]
+    assert "delete_network_acl_entry" in rollback_actions
+    assert "remove_firewall_domain" in rollback_actions
+    assert "restore_rate_limits" in rollback_actions
+
+
+def test_log_action_per_run_files_isolate_concurrent_instances(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_concurrent_log")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+    ctx.module.CONTAINMENT_LOG_DIR = tmp_path / "containment-concurrent"
+
+    # Two managers for the same incident — different processes would naturally
+    # land here; in-test, two instances suffice because the per-run id derives
+    # from PID + microsecond timestamp.
+    first = ctx.module.ContainmentManager("INC-CONCUR")
+    second = ctx.module.ContainmentManager("INC-CONCUR")
+    assert first.log_file_path != second.log_file_path
+    assert first.log_file_path is not None and second.log_file_path is not None
+
+    first.log_action("block_ip", "1.1.1.1", "success", {"who": "first"})
+    second.log_action("block_ip", "2.2.2.2", "success", {"who": "second"})
+
+    first_lines = first.log_file_path.read_text(encoding="utf-8").splitlines()
+    second_lines = second.log_file_path.read_text(encoding="utf-8").splitlines()
+    assert len(first_lines) == 1
+    assert len(second_lines) == 1
+    assert json.loads(first_lines[0])["details"]["who"] == "first"
+    assert json.loads(second_lines[0])["details"]["who"] == "second"
+
+
+def test_update_rate_limits_rejects_config_path_outside_allowlisted_base(tmp_path):
+    ctx = _load_auto_containment_context(tmp_path, "auto_containment_rate_limits_allowlist")
+    ctx.module.boto3 = None
+    ctx.module.docker = None
+    safe_base = tmp_path / "safe"
+    safe_base.mkdir()
+    outside_path = tmp_path / "outside" / "rate-limits.json"
+    ctx.module.RATE_LIMIT_CONFIG_PATH = str(outside_path)
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(safe_base)
+    manager = ctx.module.ContainmentManager("INC-RATE-DENY")
+
+    assert manager.update_rate_limits("aggressive", {"global_per_second": 100}, reason="path traversal") is False
+    assert not outside_path.exists()
+    failure = manager.actions_taken[-1]
+    assert failure["status"] == "failed"
+    assert failure["details"]["error"] == "path outside allowlisted base"
 
 
 def test_isolate_ec2_instance_claim_isolates_instance_when_requested(tmp_path):
@@ -360,6 +508,7 @@ def test_main_claim_dispatches_requested_containment_action(tmp_path):
     ctx.module.boto3 = None
     ctx.module.docker = None
     ctx.module.RATE_LIMIT_CONFIG_PATH = str(tmp_path / "main-rate-limits.json")
+    ctx.module.RATE_LIMIT_ALLOWED_BASE_DIR = str(tmp_path)
     ctx.module.CONTAINMENT_LOG_DIR = tmp_path / "containment-main"
     ctx.module.CONTAINMENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
