@@ -79,10 +79,19 @@ mkdir -p "$SB/logs" "$SB/q" "$SB/origins" "$SB/skills"
 # so no sed-based suppression is needed.
 # shellcheck disable=SC1090
 source "$SCRIPT"
-set +e +u +o pipefail
+# errexit OFF: restore_skill returns non-zero on every rejection path and we capture $?
+# (with -e on, `restore_skill ...; echo "RC=$?"` would abort before the echo). nounset and
+# pipefail stay ON so unset-var bugs and pipe failures in the driver surface attributably.
+set +e
 QUARANTINE_DIR="$SB/q"
 QUARANTINE_ORIGINS_DIR="$SB/origins"
-_grep_qid() { ls -1 "$SB/q" | grep -F "$1" | head -n1; }
+# Fail loudly (and attributably) if no quarantine id matches, rather than silently using "".
+_grep_qid() {
+    local id
+    id=$(ls -1 "$SB/q" | grep -F "$1" | head -n1)
+    [ -n "$id" ] || { echo "DRIVER_ERROR: no quarantine id matching '$1' (scenario=$SCEN)" >&2; exit 3; }
+    printf '%s\n' "$id"
+}
 
 case "$SCEN" in
   tracked)
