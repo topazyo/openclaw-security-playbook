@@ -521,18 +521,58 @@ verify_signature() {
     return 0
 }
 
+# Emit an operator-visible warning when entries in a dangerous-patterns section ## FIX: C6-M-15
+# are malformed (missing the `pattern` field) or the section is present but is not ## FIX: C6-M-15
+# an array. Detection still proceeds with the valid entries (fail-open by design for ## FIX: C6-M-15
+# backward compatibility), but the operator is no longer left blind to the silent skip. ## FIX: C6-M-15
+# Args: $1 = jq section key (e.g. .patterns, .file_patterns, .network_patterns) ## FIX: C6-M-15
+_warn_malformed_patterns() { ## FIX: C6-M-15
+    local section=$1 ## FIX: C6-M-15
+    local malformed ## FIX: C6-M-15
+    # Count: a present-but-non-array section yields 1 (the whole section is unusable); ## FIX: C6-M-15
+    # an array yields the number of elements that lack a non-null string `pattern`. ## FIX: C6-M-15
+    # A wholly-absent section yields 0 (nothing declared is not a malformation). ## FIX: C6-M-15
+    malformed=$(jq -r --arg sec "${section#.}" ' ## FIX: C6-M-15
+        (.[$sec]) as $s ## FIX: C6-M-15
+        | if ($s == null) then 0 ## FIX: C6-M-15
+          elif (($s | type) != "array") then 1 ## FIX: C6-M-15
+          else ([ $s[] | select((.pattern | type) != "string") ] | length) ## FIX: C6-M-15
+          end ## FIX: C6-M-15
+    ' "$PATTERNS_FILE" 2>/dev/null || echo "0") ## FIX: C6-M-15
+    if ! [[ "$malformed" =~ ^[0-9]+$ ]]; then ## FIX: C6-M-15
+        malformed=0 ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+    if [ "$malformed" -gt 0 ]; then ## FIX: C6-M-15
+        warning "Malformed dangerous-pattern entries skipped in ${section} (${PATTERNS_FILE}): ${malformed} entr(y/ies) missing a 'pattern' field or section is not an array" ## FIX: C6-M-15
+        audit "PATTERN_MALFORMED" "File: $PATTERNS_FILE | Section: $section | Count: $malformed" ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+} ## FIX: C6-M-15
+
 scan_dangerous_patterns() {
     local skill_dir=$1
 
-    if [ ! -f "$PATTERNS_FILE" ]; then
-        return 0
+    if [ ! -f "$PATTERNS_FILE" ]; then ## FIX: C6-M-15
+        # Distinguish "no policy" (error) from "malformed policy" (warn) so operators ## FIX: C6-M-15
+        # can tell whether detection coverage is silently absent vs. partially degraded. ## FIX: C6-M-15
+        error "Dangerous-patterns policy file not found: $PATTERNS_FILE (pattern scanning skipped)" ## FIX: C6-M-15
+        audit "PATTERN_POLICY_MISSING" "File: $PATTERNS_FILE" ## FIX: C6-M-15
+        return 0 ## FIX: C6-M-15
+    fi
+
+    # An unreadable or syntactically-invalid policy file is a distinct error from ## FIX: C6-M-15
+    # a merely-malformed entry: nothing can be parsed, so emit error (not warn). ## FIX: C6-M-15
+    if ! jq empty "$PATTERNS_FILE" >/dev/null 2>&1; then ## FIX: C6-M-15
+        error "Dangerous-patterns policy file is unreadable or not valid JSON: $PATTERNS_FILE (pattern scanning skipped)" ## FIX: C6-M-15
+        audit "PATTERN_POLICY_INVALID" "File: $PATTERNS_FILE" ## FIX: C6-M-15
+        return 0 ## FIX: C6-M-15
     fi
 
     info "Scanning for dangerous patterns..."
 
     local patterns
     local exceptions
-    patterns=$(jq -r '.patterns[].pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    _warn_malformed_patterns ".patterns" ## FIX: C6-M-15
+    patterns=$(jq -r '.patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C6-M-15
     exceptions=$(jq -r '.exceptions[]? // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
     local found_issues=0
 
@@ -568,6 +608,7 @@ scan_dangerous_patterns() {
 
     # Scan file_patterns against file basenames in the skill directory. ## FIX: C5-M-11
     local file_patterns ## FIX: C5-M-11
+    _warn_malformed_patterns ".file_patterns" ## FIX: C6-M-15
     file_patterns=$(jq -r '.file_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
     while IFS= read -r fpattern; do ## FIX: C5-M-11
         if [ -n "$fpattern" ]; then ## FIX: C5-M-11
@@ -589,6 +630,7 @@ scan_dangerous_patterns() {
 
     # Scan network_patterns against file content (URL/IP literals in skill payload). ## FIX: C5-M-11
     local network_patterns ## FIX: C5-M-11
+    _warn_malformed_patterns ".network_patterns" ## FIX: C6-M-15
     network_patterns=$(jq -r '.network_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
     while IFS= read -r npattern; do ## FIX: C5-M-11
         if [ -n "$npattern" ]; then ## FIX: C5-M-11
