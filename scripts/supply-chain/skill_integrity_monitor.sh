@@ -788,6 +788,17 @@ EOF
 restore_skill() {
     local quarantine_id=$1
 
+    # Validate the id is a single safe path component before using it to build paths that are ## FIX: C6-M-17
+    # later read AND rm-ed, so a crafted --restore id cannot traverse out of QUARANTINE_DIR / ## FIX: C6-M-17
+    # QUARANTINE_ORIGINS_DIR. Spaces stay allowed (ids embed the skill basename, which may have ## FIX: C6-M-17
+    # them); '/', the '.'/'..' components, and control characters are rejected. ## FIX: C6-M-17
+    if [ -z "$quarantine_id" ] || [ "$quarantine_id" = "." ] || [ "$quarantine_id" = ".." ] \
+       || [[ "$quarantine_id" == */* ]] || [[ "$quarantine_id" == *[[:cntrl:]]* ]]; then ## FIX: C6-M-17
+        error "Refusing restore: invalid quarantine id (must be a single path component): '$quarantine_id'" ## FIX: C6-M-17
+        audit "RESTORE_REJECTED" "reason=invalid_id | id=$quarantine_id" ## FIX: C6-M-17
+        return 1 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+
     local quarantine_path="${QUARANTINE_DIR}/${quarantine_id}"
 
     if [ ! -d "$quarantine_path" ]; then

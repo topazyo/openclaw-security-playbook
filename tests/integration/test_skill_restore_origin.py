@@ -116,6 +116,9 @@ case "$SCEN" in
     rm -rf "$SB/skills/realdir"; mkdir -p "$SB/evil2"; ln -s "$SB/evil2" "$SB/skills/realdir"
     restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
     [ -e "$SB/evil2/ssk" ] && echo "EVIL=landed" || echo "EVIL=clean" ;;
+  invalid_id)
+    restore_skill "../../escape" >/dev/null 2>&1; echo "RC_slash=$?"
+    restore_skill ".." >/dev/null 2>&1; echo "RC_dotdot=$?" ;;
 esac
 echo "AUDIT<<"; cat "$SB/logs/skill_audit.log" 2>/dev/null; echo ">>AUDIT"
 '''
@@ -177,3 +180,11 @@ def test_symlink_swapped_parent_is_rejected(tmp_path):
     assert "RC=1" in out, out
     assert "EVIL=clean" in out, out
     assert "reason=parent_symlink" in out, out
+
+
+def test_path_traversal_quarantine_id_is_rejected(tmp_path):
+    """A --restore id containing '/' or '..' is rejected before any path is built or rm-ed."""
+    out = _run("invalid_id", tmp_path)
+    assert "RC_slash=1" in out, out
+    assert "RC_dotdot=1" in out, out
+    assert "reason=invalid_id" in out, out
