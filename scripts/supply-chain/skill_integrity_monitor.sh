@@ -76,6 +76,11 @@ STATE_DIR="${HOME}/.openclaw/state"
 
 # Files
 PIDFILE="${STATE_DIR}/skill_monitor.pid"
+# Authoritative restore-origin ledger — kept OUTSIDE the (tamperable) quarantine dir so a ## FIX: C6-M-17
+# rewritten QUARANTINE_INFO.txt cannot redirect a restore. One file per quarantine id. ## FIX: C6-M-17
+# NOTE: still under $HOME, so this is defense-in-depth against the documented vector ## FIX: C6-M-17
+# (in-quarantine-dir tampering), not a boundary against full operator-account compromise. ## FIX: C6-M-17
+QUARANTINE_ORIGINS_DIR="${STATE_DIR}/quarantine-origins" ## FIX: C6-M-17
 LOG_FILE="${LOG_DIR}/skill_monitor.log"
 AUDIT_LOG="${LOG_DIR}/skill_audit.log"
 REPORT_FILE="${LOG_DIR}/skill_report_$(date +%Y%m%d_%H%M%S).json"
@@ -161,6 +166,27 @@ is_valid_ere() {
     return 0
 }
 
+# Portable path canonicalization for the C6-M-17 restore-origin checks. GNU `realpath -m` ## FIX: C6-M-17
+# is coreutils-specific (absent/different on BSD/macOS, and busybox realpath has no -m), so ## FIX: C6-M-17
+# fall back to python3 — os.path.realpath resolves symlinks AND tolerates a non-existent ## FIX: C6-M-17
+# trailing component. Prints the canonical path (rc 0); if neither tool is usable it prints ## FIX: C6-M-17
+# nothing (rc 1) so callers fail safe (origin capture skipped -> restore falls closed). ## FIX: C6-M-17
+canonicalize_path() { ## FIX: C6-M-17
+    local p=$1 out ## FIX: C6-M-17
+    # Accept a backend's output only if it is a sane absolute POSIX path (starts with '/'). ## FIX: C6-M-17
+    # This rejects a busybox realpath that mishandles -m, and a Windows python3 that would ## FIX: C6-M-17
+    # emit a C:\ path — so a foreign/garbage value never feeds the restore security checks. ## FIX: C6-M-17
+    if out=$(realpath -m -- "$p" 2>/dev/null) && [ -n "$out" ] && [ "${out#/}" != "$out" ]; then ## FIX: C6-M-17
+        printf '%s\n' "$out"; return 0 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+    if command -v python3 >/dev/null 2>&1 \
+       && out=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null) \
+       && [ -n "$out" ] && [ "${out#/}" != "$out" ]; then ## FIX: C6-M-17
+        printf '%s\n' "$out"; return 0 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+    return 1 ## FIX: C6-M-17
+} ## FIX: C6-M-17
+
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
@@ -170,7 +196,7 @@ initialize() {
 
     # Create directories
     mkdir -p "$CONFIG_DIR" "$SKILLS_DIR" "$QUARANTINE_DIR" \
-             "$LOG_DIR" "$POLICY_DIR" "$STATE_DIR"
+             "$LOG_DIR" "$POLICY_DIR" "$STATE_DIR" "$QUARANTINE_ORIGINS_DIR" ## FIX: C6-M-17
 
     # Check for required commands
     local missing_cmds=()
@@ -719,6 +745,12 @@ quarantine_skill() {
     timestamp=$(date +%Y%m%d_%H%M%S)
     local quarantine_path="${QUARANTINE_DIR}/${skill_name}_${timestamp}"
 
+    # Capture the canonical origin BEFORE moving (the path still exists now). restore_skill ## FIX: C6-M-17
+    # treats the separately-recorded value as authoritative, so a tampered QUARANTINE_INFO.txt ## FIX: C6-M-17
+    # cannot redirect the restore target. ## FIX: C6-M-17
+    local canonical_origin ## FIX: C6-M-17
+    canonical_origin=$(canonicalize_path "$skill_path" 2>/dev/null || true) ## FIX: C6-M-17
+
     # Move skill to quarantine
     if mv "$skill_path" "$quarantine_path"; then
         success "Skill quarantined: $quarantine_path"
@@ -737,6 +769,14 @@ To restore:
   $SCRIPT_NAME --restore ${skill_name}_${timestamp}
 EOF
 
+        # Record the authoritative origin separately (one file per quarantine id). ## FIX: C6-M-17
+        if [ -n "$canonical_origin" ]; then ## FIX: C6-M-17
+            mkdir -p "$QUARANTINE_ORIGINS_DIR" ## FIX: C6-M-17
+            printf '%s\n' "$canonical_origin" > "${QUARANTINE_ORIGINS_DIR}/${skill_name}_${timestamp}" ## FIX: C6-M-17
+        else ## FIX: C6-M-17
+            warning "Could not resolve canonical origin for $skill_path; restore will require ALLOW_UNTRACKED_RESTORE=1" ## FIX: C6-M-17
+        fi ## FIX: C6-M-17
+
         ((STATS_QUARANTINED++))
         return 0
     else
@@ -748,6 +788,17 @@ EOF
 restore_skill() {
     local quarantine_id=$1
 
+    # Validate the id is a single safe path component before using it to build paths that are ## FIX: C6-M-17
+    # later read AND rm-ed, so a crafted --restore id cannot traverse out of QUARANTINE_DIR / ## FIX: C6-M-17
+    # QUARANTINE_ORIGINS_DIR. Spaces stay allowed (ids embed the skill basename, which may have ## FIX: C6-M-17
+    # them); '/', the '.'/'..' components, and control characters are rejected. ## FIX: C6-M-17
+    if [ -z "$quarantine_id" ] || [ "$quarantine_id" = "." ] || [ "$quarantine_id" = ".." ] \
+       || [[ "$quarantine_id" == */* ]] || [[ "$quarantine_id" == *[[:cntrl:]]* ]]; then ## FIX: C6-M-17
+        error "Refusing restore: invalid quarantine id (must be a single path component): '$quarantine_id'" ## FIX: C6-M-17
+        audit "RESTORE_REJECTED" "reason=invalid_id | id=$quarantine_id" ## FIX: C6-M-17
+        return 1 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+
     local quarantine_path="${QUARANTINE_DIR}/${quarantine_id}"
 
     if [ ! -d "$quarantine_path" ]; then
@@ -757,37 +808,89 @@ restore_skill() {
 
     info "Restoring skill: $quarantine_id"
 
-    # Read original path — awk extracts everything after the 3rd field so paths with spaces round-trip ## FIX: C6-M-06
-    local original_path
-    original_path=$(awk '/^Original Path:/ { $1=$2=""; sub(/^[[:space:]]+/, ""); print }' "${quarantine_path}/QUARANTINE_INFO.txt") ## FIX: C6-M-06
+    # Read the path recorded in the (tamperable) QUARANTINE_INFO.txt — used below for the ## FIX: C6-M-06
+    # tamper cross-check and for the untracked fallback. awk keeps everything after the 3rd ## FIX: C6-M-06
+    # field so paths with spaces round-trip. ## FIX: C6-M-06
+    local info_path ## FIX: C6-M-06
+    info_path=$(awk '/^Original Path:/ { $1=$2=""; sub(/^[[:space:]]+/, ""); print }' "${quarantine_path}/QUARANTINE_INFO.txt") ## FIX: C6-M-06
 
-    if [ -z "$original_path" ]; then
-        error "Could not determine original path"
-        return 1
-    fi
+    # Authoritative origin: recorded at quarantine time OUTSIDE the quarantine dir, so editing ## FIX: C6-M-17
+    # QUARANTINE_INFO.txt alone cannot redirect the restore. This is the source of truth. ## FIX: C6-M-17
+    local origin_record="${QUARANTINE_ORIGINS_DIR}/${quarantine_id}" ## FIX: C6-M-17
+    local target="" ## FIX: C6-M-17
 
-    # Defense-in-depth: the metadata file lives on disk and could be tampered with ## FIX: C6-M-14
-    # after quarantine, so validate the restore target's shape before mv. Note we do ## FIX: C6-M-14
-    # NOT require it to live under SKILLS_DIR — legitimate quarantine sources (and the ## FIX: C6-M-14
-    # C6-M-06 fixture) live elsewhere (e.g. /tmp/...). ## FIX: C6-M-14
-    if [[ "$original_path" != /* ]]; then ## FIX: C6-M-14
-        error "Refusing restore: original_path must be absolute (got: $original_path)" ## FIX: C6-M-14
-        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=not_absolute | path=$original_path" ## FIX: C6-M-14
+    if [ -f "$origin_record" ]; then ## FIX: C6-M-17
+        # TRACKED restore: trust the recorded origin, not QUARANTINE_INFO.txt. ## FIX: C6-M-17
+        local authoritative ## FIX: C6-M-17
+        authoritative=$(head -n1 "$origin_record") ## FIX: C6-M-17
+        if [ -z "$authoritative" ]; then ## FIX: C6-M-17
+            error "Refusing restore: origin record is empty for $quarantine_id" ## FIX: C6-M-17
+            audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=empty_origin_record" ## FIX: C6-M-17
+            return 1 ## FIX: C6-M-17
+        fi ## FIX: C6-M-17
+        # Tamper detection: QUARANTINE_INFO.txt must agree with the recorded origin. Compare ## FIX: C6-M-17
+        # canonically (-m: the original location no longer exists once the skill was moved). ## FIX: C6-M-17
+        if [ -n "$info_path" ]; then ## FIX: C6-M-17
+            local canon_info ## FIX: C6-M-17
+            canon_info=$(canonicalize_path "$info_path" 2>/dev/null || echo "$info_path") ## FIX: C6-M-17
+            if [ "$canon_info" != "$authoritative" ]; then ## FIX: C6-M-17
+                error "Refusing restore: QUARANTINE_INFO.txt path ($info_path) disagrees with recorded origin ($authoritative) — possible tampering" ## FIX: C6-M-17
+                audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=tamper | info=$info_path | recorded=$authoritative" ## FIX: C6-M-17
+                return 1 ## FIX: C6-M-17
+            fi ## FIX: C6-M-17
+        fi ## FIX: C6-M-17
+        target=$authoritative ## FIX: C6-M-17
+    else ## FIX: C6-M-17
+        # UNTRACKED restore (pre-existing quarantine or lost ledger): fail CLOSED unless the ## FIX: C6-M-17
+        # operator explicitly opts into the weaker QUARANTINE_INFO-only path. ## FIX: C6-M-17
+        if [ "${ALLOW_UNTRACKED_RESTORE:-0}" != "1" ]; then ## FIX: C6-M-17
+            error "Refusing restore: no origin record for $quarantine_id (set ALLOW_UNTRACKED_RESTORE=1 to restore from QUARANTINE_INFO.txt with shape checks only)" ## FIX: C6-M-17
+            audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=untracked" ## FIX: C6-M-17
+            return 1 ## FIX: C6-M-17
+        fi ## FIX: C6-M-17
+        warning "Restoring untracked quarantine $quarantine_id from QUARANTINE_INFO.txt (fail-open via ALLOW_UNTRACKED_RESTORE=1)" ## FIX: C6-M-17
+        target=$info_path ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+
+    if [ -z "$target" ]; then ## FIX: C6-M-14
+        error "Could not determine original path" ## FIX: C6-M-14
         return 1 ## FIX: C6-M-14
     fi ## FIX: C6-M-14
-    # Reject '..' only as a path component (/.., ../x, x/../y) — not as a substring of a ## FIX: C6-M-14
-    # legitimate filename like /tmp/a..b (Copilot review: precise segment match over breadth). ## FIX: C6-M-14
+
+    # First-line shape guard (C6-M-14), applied to whichever path we resolved. ## FIX: C6-M-14
+    if [[ "$target" != /* ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must be absolute (got: $target)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=not_absolute | path=$target" ## FIX: C6-M-14
+        return 1 ## FIX: C6-M-14
+    fi ## FIX: C6-M-14
     local _traversal_re='(^|/)\.\.(/|$)' ## FIX: C6-M-14
-    if [[ "$original_path" =~ $_traversal_re ]]; then ## FIX: C6-M-14
-        error "Refusing restore: original_path must not contain '..' path segments (got: $original_path)" ## FIX: C6-M-14
-        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=traversal | path=$original_path" ## FIX: C6-M-14
+    if [[ "$target" =~ $_traversal_re ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must not contain '..' path segments (got: $target)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=traversal | path=$target" ## FIX: C6-M-14
         return 1 ## FIX: C6-M-14
     fi ## FIX: C6-M-14
+
+    # Symlink-safety: the parent must exist and resolve to itself — i.e. no symlink was ## FIX: C6-M-17
+    # swapped in between quarantine and restore to redirect the mv outside the recorded root. ## FIX: C6-M-17
+    local target_parent real_parent ## FIX: C6-M-17
+    target_parent=$(dirname -- "$target") ## FIX: C6-M-17
+    if [ ! -d "$target_parent" ]; then ## FIX: C6-M-17 (explicit: canonicalize_path uses -m and won't error on a missing dir)
+        error "Refusing restore: target parent directory does not exist: $target_parent" ## FIX: C6-M-17
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=parent_missing | path=$target" ## FIX: C6-M-17
+        return 1 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+    real_parent=$(canonicalize_path "$target_parent" 2>/dev/null || true) ## FIX: C6-M-17
+    if [ -z "$real_parent" ] || [ "$real_parent" != "$target_parent" ]; then ## FIX: C6-M-17
+        error "Refusing restore: target parent resolves elsewhere or is unresolvable (symlink?): $target_parent -> ${real_parent:-<none>}" ## FIX: C6-M-17
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=parent_symlink | path=$target | resolved=${real_parent:-none}" ## FIX: C6-M-17
+        return 1 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
 
     # Restore skill
-    if mv "$quarantine_path" "$original_path"; then
-        success "Skill restored: $original_path"
-        audit "RESTORE" "Skill: $quarantine_id | Restored to: $original_path"
+    if mv "$quarantine_path" "$target"; then
+        success "Skill restored: $target"
+        audit "RESTORE" "Skill: $quarantine_id | Restored to: $target"
+        rm -f "$origin_record" ## FIX: C6-M-17 (consume the origin record once restored)
         return 0
     else
         error "Failed to restore skill"
@@ -1117,6 +1220,9 @@ ENVIRONMENT VARIABLES:
     ALLOW_MISSING_PATTERN_POLICY Fail OPEN when the dangerous-patterns policy is absent or
                                  unparseable (1 = log warning, skip scan, return success;
                                  default 0 = fail closed: log error, count an issue)
+    ALLOW_UNTRACKED_RESTORE      Allow --restore of a quarantine with no recorded origin
+                                 (pre-existing/lost ledger): 1 = restore from QUARANTINE_INFO.txt
+                                 with shape checks only; default 0 = fail closed (refuse)
 
 For more information, see: docs/guides/06-supply-chain-security.md
 
@@ -1254,4 +1360,8 @@ main() {
     esac
 }
 
-main "$@"
+# Execute main only when run directly; sourcing (tests/tools) defines the functions without ## FIX: C6-M-17
+# executing. Robust to reformatting, unlike an external grep/sed suppression in the harness. ## FIX: C6-M-17
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then ## FIX: C6-M-17
+    main "$@" ## FIX: C6-M-17
+fi ## FIX: C6-M-17
