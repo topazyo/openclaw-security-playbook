@@ -1,86 +1,13 @@
 {
   "version": "1.0.0",
-  "last_updated": "2026-02-14T12:00:00Z",
-  "description": "Skill security enforcement policy",
+  "last_updated": "2026-05-30T12:00:00Z",
+  "description": "Skill security enforcement policy. Only fields below are consumed by skill_integrity_monitor.sh; previously-theatrical, unconsumed fields were removed (see README.md changelog, C6-M-11).",
 
   "validation": {
-    "manifest": {
-      "required": true,
-      "schema_validation": true,
-      "fail_on_missing": true,
-      "fail_on_invalid": true
-    },
-
-    "integrity": {
-      "required": true,
-      "algorithm": "sha256",
-      "fail_on_mismatch": true,
-      "allow_unsigned": false
-    },
-
     "signature": {
       "required": true,
       "verify_pgp": true,
-      "trusted_keys": [],
-      "fail_on_invalid": true
+      "trusted_keys": []
     }
-  },
-
-  "source_validation": {
-    "check_allowlist": true,
-    "block_untrusted": true,
-    "warn_untrusted": false,
-    "require_https": true,
-    "check_certificate": true
-  },
-
-  "pattern_scanning": {
-    "enabled": true,
-    "scan_code": true,
-    "scan_config": true,
-    "scan_dependencies": false,
-
-    "ignore_patterns": ["# nosec", "# security: ignore"]
-  },
-
-  "quarantine": {
-    "auto_quarantine": true,
-    "quarantine_on": {
-      "integrity_failure": true,
-      "signature_invalid": true,
-      "dangerous_patterns": {
-        "critical": true,
-        "high": true
-      },
-      "blocked_source": true,
-      "blocked_author": true
-    },
-
-    "retention_days": 90,
-    "notify_on_quarantine": true
-  },
-
-  "logging": {
-    "log_level": "info",
-    "log_validation": true,
-    "log_scans": true,
-    "log_quarantine": true,
-    "audit_all_actions": true,
-
-    "rotation": {
-      "max_size_mb": 100,
-      "retention_days": 30
-    }
-  },
-
-  "exceptions": {
-    "skills": [
-      {
-        "id": "legacy-skill",
-        "reason": "Grandfather clause for existing deployment",
-        "expiry": "2026-12-31",
-        "skip_checks": ["pattern_scanning"]
-      }
-    ]
   }
 }

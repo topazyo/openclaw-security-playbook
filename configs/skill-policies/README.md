@@ -115,39 +115,55 @@ ajv validate -s enforcement-policy-schema.json -d enforcement-policy.json
 
 ### 4. enforcement-policy.json
 
-**Purpose:** Configure enforcement actions and monitoring
+**Purpose:** Configure the one enforcement lever that the monitoring script actually reads — PGP signature verification.
 
-**Settings (consumed by skill_integrity_monitor.sh):**
+> **Honesty note (C6-M-11):** Earlier revisions of this file declared a large
+> surface of enforcement levers (manifest/integrity validation, source
+> validation, pattern-scanning toggles, quarantine triggers, logging config,
+> per-skill exceptions). None of those were ever read by any code path —
+> editing them produced no behaviour change. They have been **removed** from
+> both `enforcement-policy.json` and `enforcement-policy-schema.json` rather
+> than left as config-theater. The table below states exactly what is and is
+> not enforced.
 
-- **Validation rules** - manifest, integrity, signatures (`validation.signature.*` read via jq)
-- **Source validation** - allowlist, HTTPS, certificate checks
-- **Pattern scanning** - enable/disable flags and ignore patterns (severity actions removed — not consumed)
-- **Quarantine rules** - auto-quarantine flag and quarantine triggers
-- **Logging** - log level, rotation settings
-- **Exceptions** - per-skill override list
+**Per-field status:**
 
-**Removed fields (were not consumed by any code):**
+| Top-level group | Status | Enforced by |
+|-----------------|--------|-------------|
+| `version`, `last_updated`, `description` | CONSUMED (metadata) | parsed by every jq read; required by schema |
+| `validation.signature.required` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:406` (`verify_signature`) |
+| `validation.signature.verify_pgp` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:407` (`verify_signature`) |
+| `validation.signature.trusted_keys` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:440` (`verify_signature` key allowlist) |
+| `validation.manifest.*` | REMOVED | never read; manifest validation is hardcoded in `validate_manifest` |
+| `validation.integrity.*` | REMOVED | never read; integrity check is hardcoded |
+| `validation.signature.fail_on_invalid` | REMOVED | never read; an invalid signature always fails `verify_signature` |
+| `source_validation.*` | REMOVED | never read |
+| `pattern_scanning.*` | REMOVED | never read; scanning is governed by presence of `dangerous-patterns.json` and the `$SKILL_SCAN_INTERVAL` / `$AUTO_QUARANTINE` env vars |
+| `quarantine.auto_quarantine` | REMOVED | the policy field was never read; auto-quarantine is driven by the `AUTO_QUARANTINE` env var (`skill_integrity_monitor.sh:787`) |
+| `quarantine.quarantine_on.*` | REMOVED | never read |
+| `quarantine.retention_days` | REMOVED | never read; quarantine pruning uses the `QUARANTINE_RETENTION_DAYS` env var (`skill_integrity_monitor.sh:976`) |
+| `quarantine.notify_on_quarantine` | REMOVED | never read; no notification dispatcher exists |
+| `logging.*` | REMOVED | never read; logging is hardcoded and rotation uses `LOG_RETENTION_DAYS` / `MAX_LOG_SIZE` env vars |
+| `exceptions.skills[]` | REMOVED | never read; no skip-check logic exists |
 
-- `enforcement_level` — no code reads this via jq
-- `pattern_scanning.severity_actions` — severity routing is hardcoded in script logic
-- `permissions` — dangerous_permissions and permission_combinations not read
-- `monitoring` — continuous_monitoring not read; scan interval comes from `$SKILL_SCAN_INTERVAL` env var
-- `notifications` — no notification dispatcher reads this block
-- `compliance` — sbom_required and license_compliance not read
+ADVISORY: there are currently **no** advisory-only fields — a field is either
+consumed by code or it has been removed. Quarantine/log retention, scan
+interval, and auto-quarantine behaviour are configured via **environment
+variables**, not this file (see Environment Variables below).
 
-**Example (consumed fields only):**
+**Example (this is the entire consumed surface):**
 
 ```json
 {
+  "version": "1.0.0",
+  "last_updated": "2026-05-30T12:00:00Z",
+  "description": "Skill security enforcement policy",
   "validation": {
     "signature": {
       "required": true,
       "verify_pgp": true,
       "trusted_keys": []
     }
-  },
-  "quarantine": {
-    "auto_quarantine": true
   }
 }
 ```
@@ -225,7 +241,11 @@ Edit `dangerous-patterns.json`:
 
 ### Adjusting Enforcement
 
-Edit `enforcement-policy.json` (only fields below are consumed by code):
+Edit `enforcement-policy.json`. The **only** fields consumed by code are the
+signature-verification settings below — there are no other enforcement levers in
+this file (see the per-field status table above). To adjust quarantine
+retention, auto-quarantine, or scan interval, use the environment variables
+listed under Environment Variables instead.
 
 ```json
 {
@@ -234,16 +254,6 @@ Edit `enforcement-policy.json` (only fields below are consumed by code):
       "required": true,
       "verify_pgp": true,
       "trusted_keys": []
-    }
-  },
-  "quarantine": {
-    "auto_quarantine": true,
-    "quarantine_on": {
-      "integrity_failure": true,
-      "dangerous_patterns": {
-        "critical": true,
-        "high": true
-      }
     }
   }
 }
@@ -291,52 +301,64 @@ Edit `enforcement-policy.json` (only fields below are consumed by code):
 
 ### Enforcement Semantics Contract (POLICY-SEM-001)
 
-The following semantics are treated as contract-level defaults for production:
+> **Updated for C6-M-11.** The previous version of this contract described
+> semantics (enforcement-level routing, source-validation blocking, integrity
+> gating, severity→action mapping, dangerous-permission mapping) that were
+> **never read from `enforcement-policy.json`** — they were config-theater.
+> This contract now lists only what the policy file actually controls; the
+> remaining behaviours below are hardcoded in `skill_integrity_monitor.sh` and
+> are not policy-configurable.
 
-- `production` enforcement level is `block`.
-- Untrusted sources are blocked (`source_validation.block_untrusted: true`).
-- Signature and integrity validation are mandatory (`validation.signature.required: true`, `validation.integrity.required: true`).
-- Unsigned skills are rejected (`validation.integrity.allow_unsigned: false`).
-- Invalid signatures fail validation (`validation.signature.fail_on_invalid: true`).
-- Pattern scanning actions are stable:
-  - `critical` → `block` + quarantine
-  - `high` → `block` + quarantine
-  - `medium` → `warn`
-  - `low` → `log`
-- Dangerous permissions are policy-mapped and deterministic:
-  - `process:exec` → `block`
-  - `network:unrestricted` → `block`
-  - `filesystem:write` → `warn`
-  - `secrets:write` → `block`
+Policy-file-controlled (read from `enforcement-policy.json`):
 
-Do not relax these defaults without a documented contract decision and cross-file audit update.
+- Signature verification is mandatory by default (`validation.signature.required: true`).
+- PGP signature verification is enabled by default (`validation.signature.verify_pgp: true`).
+- When `validation.signature.trusted_keys` is non-empty, only those keys are accepted (`skill_integrity_monitor.sh:440`).
+
+Hardcoded in the script (NOT policy-configurable — do not expect these to react to JSON edits):
+
+- An invalid or unverifiable signature always fails `verify_signature` (there is no `fail_on_invalid` toggle).
+- Manifest schema validation and SHA-256 integrity checking are always performed by their respective functions.
+- Pattern scanning runs whenever `dangerous-patterns.json` is present; there is no enable/disable toggle in this file.
+- Auto-quarantine on failure is driven by the `AUTO_QUARANTINE` environment variable, not by `quarantine.auto_quarantine`.
+
+Do not relax the policy-controlled defaults without a documented contract decision and cross-file audit update.
 
 ---
 
 ## Best Practices
 
-### 1. Keep Production Enforcement Immutable
+### 1. Keep Signature Verification Mandatory
 
-```json
-"enforcement_level": {
-  "production": "block"
-}
-```
-
-### 2. Use Exceptions Sparingly
+The only enforcement lever in `enforcement-policy.json` is signature
+verification. Keep it locked down:
 
 ```json
 {
-  "exceptions": {
-    "skills": [
-      {
-        "id": "legacy-skill",
-        "reason": "Legacy system integration",
-        "expiry": "2026-12-31", // Set expiration
-        "skip_checks": ["pattern_scanning"],
-        "approved_by": "security-team" // Track approval
-      }
-    ]
+  "validation": {
+    "signature": {
+      "required": true,
+      "verify_pgp": true
+    }
+  }
+}
+```
+
+> There is no `enforcement_level` field and no per-skill `exceptions` block —
+> those were removed in C6-M-11 because no code read them. Do not re-add them
+> expecting a behaviour change.
+
+### 2. Pin Trusted Signing Keys
+
+Populate `validation.signature.trusted_keys` to restrict accepted signers
+(empty = any otherwise-valid signature is accepted):
+
+```json
+{
+  "validation": {
+    "signature": {
+      "trusted_keys": ["<pgp-key-id-or-fingerprint>"]
+    }
   }
 }
 ```
@@ -452,16 +474,13 @@ eval(trusted_input)
 ### High Resource Usage
 
 ```bash
-# Reduce scan frequency
+# Reduce scan frequency (scan interval is an env var, not a policy field)
 export SKILL_SCAN_INTERVAL="600"  # 10 minutes
-
-# Disable expensive checks in dev
-{
-  "pattern_scanning": {
-    "scan_dependencies": false
-  }
-}
 ```
+
+> Note: there is no `pattern_scanning` block in `enforcement-policy.json` to
+> disable individual checks — those toggles were removed in C6-M-11 because no
+> code read them. Tune scan frequency with `SKILL_SCAN_INTERVAL` instead.
 
 ---
 
