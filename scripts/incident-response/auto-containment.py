@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnnecessaryIsInstance=false, reportTypedDictNotRequiredAccess=false
+# type-hygiene (NOT a C5/C6 audit finding): boto3/docker SDK calls return dynamically-shaped data
+# that Pylance/pyright STRICT mode flags as Unknown / NotRequired-key access / "unnecessary"
+# isinstance. boto3-stubs supplies client method signatures, but response *values* accessed via
+# dynamic dict indexing remain Unknown under strict. The six rules above are disabled FOR THIS
+# FILE ONLY so the AWS-SDK glue checks clean; every other strict rule stays ON. The defensive
+# isinstance()/.get() guards on untrusted API responses are intentionally RETAINED as runtime
+# validation -- they are not removed to satisfy the type checker.
 """
 Automated Threat Containment
 
@@ -40,7 +48,7 @@ import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional  # pylance: Optional needed for nullable parameter annotations
+from typing import TYPE_CHECKING, Any, Dict, Optional  # pylance: Optional needed for nullable parameter annotations
 
 try:
     import boto3  # FIX: C5-finding-3
@@ -51,6 +59,11 @@ try:
     import docker  # pyright: ignore[reportMissingModuleSource]  # pylance: docker source absent in CI/dev envs; runtime import guarded by except below
 except ImportError:
     docker = None  # FIX: C5-finding-3
+
+if TYPE_CHECKING:  # type-hygiene: analyzer-only AWS client types from boto3-stubs; never imported at runtime
+    from mypy_boto3_ec2 import EC2Client
+    from mypy_boto3_iam import IAMClient
+    from mypy_boto3_route53resolver import Route53ResolverClient
 
 # Configuration
 QUARANTINE_SUBNET_ID = os.getenv("QUARANTINE_SUBNET_ID")
@@ -84,9 +97,9 @@ class ContainmentManager:
         self.rollback_commands = []
         
         # Initialize AWS clients
-        self.ec2 = None  # FIX: C5-finding-3
-        self.iam = None  # FIX: C5-finding-3
-        self.route53resolver = None  # FIX: C5-finding-3
+        self.ec2: "EC2Client | None" = None  # FIX: C5-finding-3
+        self.iam: "IAMClient | None" = None  # FIX: C5-finding-3
+        self.route53resolver: "Route53ResolverClient | None" = None  # FIX: C5-finding-3
         if boto3 is not None:  # FIX: C5-finding-3
             self.ec2 = boto3.client('ec2', region_name=AWS_REGION)  # FIX: C5-finding-3
             self.iam = boto3.client('iam')  # FIX: C5-finding-3
@@ -141,7 +154,7 @@ class ContainmentManager:
         )
         self._log_lock = threading.Lock()
 
-    def log_action(self, action: str, target: str, status: str, details: Optional[Dict] = None):  # pylance: details defaults to None so type must be Optional
+    def log_action(self, action: str, target: str, status: str, details: Optional[Dict[str, Any]] = None):  # pylance: details defaults to None so type must be Optional
         """Log containment action"""
         action_record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -202,8 +215,8 @@ class ContainmentManager:
             else []
         )
 
-        ingress_used: set = set()
-        egress_used: set = set()
+        ingress_used: set[int] = set()
+        egress_used: set[int] = set()
         existing_ingress: Optional[int] = None
         existing_egress: Optional[int] = None
         for entry in entries:
@@ -224,7 +237,7 @@ class ContainmentManager:
                 else:
                     existing_ingress = rule_number
 
-        def _next_free(used: set) -> int:
+        def _next_free(used: set[int]) -> int:
             for candidate in range(100, 32767):
                 if candidate not in used:
                     return candidate
@@ -318,7 +331,7 @@ class ContainmentManager:
         incident_id: str,  # FIX: C6-H-07
         container_id: str,  # FIX: C6-H-07
         reason: Optional[str],  # FIX: C6-H-07
-        original_networks: list,  # FIX: C6-H-07
+        original_networks: list[Any],  # FIX: C6-H-07
     ) -> None:  # FIX: C6-H-07
         """Persist quarantine state to a JSON-Lines manifest.  # FIX: C6-H-07
 
@@ -348,7 +361,7 @@ class ContainmentManager:
         with open(manifest_path, "a", encoding="utf-8") as handle:  # FIX: C6-H-07
             handle.write(json.dumps(record) + "\n")  # FIX: C6-H-07
 
-    def _rollback_reconnect_networks(self, container_id: str, container) -> None:  # FIX: C6-H-07
+    def _rollback_reconnect_networks(self, container_id: str, container: Any) -> None:  # FIX: C6-H-07
         """Reconnect networks previously disconnected during isolation of `container_id`.  # FIX: C6-H-07
 
         Called when post-disconnect persistence fails so the container is not  # FIX: C6-H-07
@@ -367,7 +380,7 @@ class ContainmentManager:
         """  # FIX: C6-H-07
         if self.docker_client is None:  # FIX: C6-H-07
             return  # FIX: C6-H-07
-        remaining: list = []  # FIX: C6-H-07
+        remaining: list[Any] = []  # FIX: C6-H-07
         for rb in self.rollback_commands:  # FIX: C6-H-07
             if (  # FIX: C6-H-07
                 rb.get("action") == "reconnect_docker_network"  # FIX: C6-H-07
@@ -421,7 +434,7 @@ class ContainmentManager:
             self.log_action("isolate_container", container_id, "failed", {"error": str(e), "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
-    def update_rate_limits(self, mode: str, limits: Dict, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
+    def update_rate_limits(self, mode: str, limits: Dict[str, Any], reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: reason defaults to None
         """Write an emergency rate-limit override profile for the requested mode."""  # FIX: C5-finding-3
         logger.info(f"Updating rate limits using mode: {mode}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
