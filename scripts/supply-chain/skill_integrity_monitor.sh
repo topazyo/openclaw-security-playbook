@@ -758,8 +758,11 @@ restore_skill() {
         audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=not_absolute | path=$original_path" ## FIX: C6-M-14
         return 1 ## FIX: C6-M-14
     fi ## FIX: C6-M-14
-    if [[ "$original_path" == *..* ]]; then ## FIX: C6-M-14
-        error "Refusing restore: original_path must not contain '..' (got: $original_path)" ## FIX: C6-M-14
+    # Reject '..' only as a path component (/.., ../x, x/../y) — not as a substring of a ## FIX: C6-M-14
+    # legitimate filename like /tmp/a..b (Copilot review: precise segment match over breadth). ## FIX: C6-M-14
+    local _traversal_re='(^|/)\.\.(/|$)' ## FIX: C6-M-14
+    if [[ "$original_path" =~ $_traversal_re ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must not contain '..' path segments (got: $original_path)" ## FIX: C6-M-14
         audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=traversal | path=$original_path" ## FIX: C6-M-14
         return 1 ## FIX: C6-M-14
     fi ## FIX: C6-M-14
