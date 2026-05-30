@@ -1,0 +1,179 @@
+"""C6-M-17 regression tests — restore_skill origin-ledger hardening.
+
+Claim (issue #123):
+  restore_skill must restore a quarantined skill to the location captured at
+  quarantine time, recorded SEPARATELY from the (tamperable) QUARANTINE_INFO.txt.
+  A rewritten QUARANTINE_INFO.txt must NOT be able to redirect the restore, an
+  untracked quarantine must fail closed unless ALLOW_UNTRACKED_RESTORE=1, and a
+  symlink swapped into the target's parent between quarantine and restore must
+  be rejected.
+
+These drive the real bash functions (quarantine_skill / restore_skill) by sourcing
+scripts/supply-chain/skill_integrity_monitor.sh with its `main` dispatch suppressed,
+inside an isolated sandbox (QUARANTINE_DIR / QUARANTINE_ORIGINS_DIR / OPENCLAW_LOGS
+overridden). Mirrors the bash-mount-path handling used by test_cycle5_claim_regressions.
+"""
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_MONITOR_SCRIPT = _REPO_ROOT / "scripts" / "supply-chain" / "skill_integrity_monitor.sh"
+_BASH_PATH = shutil.which("bash")
+
+
+def _detect_bash_mount_root(bash_path: str | None) -> str:
+    """WSL mounts C: at /mnt/c; Git Bash / MSYS / Cygwin mount it at /c."""
+    if not bash_path:
+        return "/mnt/"
+    try:
+        proc = subprocess.run(
+            [bash_path, "--version"], capture_output=True, text=True, check=False, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "/mnt/"
+    banner = (proc.stdout + proc.stderr).lower()
+    if "cygwin" in banner or "msys" in banner or "mingw" in banner:
+        return "/"
+    return "/mnt/"
+
+
+def _to_bash_path(path: Path, bash_path: str | None = None) -> str:
+    """Convert an absolute path to the bash mount path for this flavor."""
+    if sys.platform != "win32":
+        return path.as_posix()
+    drive_letter = path.drive.rstrip(":").lower()
+    rest = path.as_posix()[len(path.drive):]
+    return f"{_detect_bash_mount_root(bash_path)}{drive_letter}{rest}"
+
+
+def _can_make_resolvable_symlink() -> bool:
+    """True iff this platform can create a symlink that realpath resolves
+    (Windows/MSYS without Developer Mode cannot — the symlink case is skipped there)."""
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "target"
+            link = Path(d) / "link"
+            target.mkdir()
+            os.symlink(target, link)
+            return Path(os.path.realpath(link)) == target.resolve()
+    except (OSError, NotImplementedError):
+        return False
+
+
+_CAN_SYMLINK = _can_make_resolvable_symlink()
+
+# Bash driver: sources the monitor script (main suppressed), isolates the quarantine
+# + origin-ledger dirs into the sandbox, then runs one named scenario and prints
+# RC= plus scenario markers and the audit log.
+_DRIVER = r'''
+SCRIPT="$1"; SB="$2"; SCEN="$3"
+export OPENCLAW_LOGS="$SB/logs"
+mkdir -p "$SB/logs" "$SB/q" "$SB/origins" "$SB/skills"
+sed 's/^main "\$@"$/: # main suppressed/' "$SCRIPT" > "$SB/mon.sh"
+# shellcheck disable=SC1090
+source "$SB/mon.sh"
+set +e +u +o pipefail
+QUARANTINE_DIR="$SB/q"
+QUARANTINE_ORIGINS_DIR="$SB/origins"
+_grep_qid() { ls -1 "$SB/q" | grep -F "$1" | head -n1; }
+
+case "$SCEN" in
+  tracked)
+    mkdir -p "$SB/skills/sk one"; echo d > "$SB/skills/sk one/f"
+    quarantine_skill "$SB/skills/sk one" t >/dev/null 2>&1
+    qid=$(_grep_qid "sk one")
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
+    [ -f "$SB/skills/sk one/f" ] && echo "RESTORED=yes" || echo "RESTORED=no" ;;
+  tamper)
+    mkdir -p "$SB/skills/tsk"; echo d > "$SB/skills/tsk/f"
+    quarantine_skill "$SB/skills/tsk" t >/dev/null 2>&1
+    qid=$(_grep_qid "tsk")
+    sed -i "s#^Original Path:.*#Original Path: $SB/evil#" "$SB/q/$qid/QUARANTINE_INFO.txt"
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
+    [ -e "$SB/evil" ] && echo "EVIL=created" || echo "EVIL=absent"
+    [ -d "$SB/q/$qid" ] && echo "QDIR=intact" || echo "QDIR=gone" ;;
+  untracked)
+    mkdir -p "$SB/skills/usk"; echo d > "$SB/skills/usk/f"
+    quarantine_skill "$SB/skills/usk" t >/dev/null 2>&1
+    qid=$(_grep_qid "usk"); rm -f "$SB/origins/$qid"
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?" ;;
+  untracked_flag)
+    mkdir -p "$SB/skills/ufsk"; echo d > "$SB/skills/ufsk/f"
+    quarantine_skill "$SB/skills/ufsk" t >/dev/null 2>&1
+    qid=$(_grep_qid "ufsk"); rm -f "$SB/origins/$qid"
+    ALLOW_UNTRACKED_RESTORE=1 restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
+    [ -f "$SB/skills/ufsk/f" ] && echo "RESTORED=yes" || echo "RESTORED=no" ;;
+  symlink)
+    mkdir -p "$SB/skills/realdir/ssk"; echo d > "$SB/skills/realdir/ssk/f"
+    quarantine_skill "$SB/skills/realdir/ssk" t >/dev/null 2>&1
+    qid=$(_grep_qid "ssk")
+    rm -rf "$SB/skills/realdir"; mkdir -p "$SB/evil2"; ln -s "$SB/evil2" "$SB/skills/realdir"
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
+    [ -e "$SB/evil2/ssk" ] && echo "EVIL=landed" || echo "EVIL=clean" ;;
+esac
+echo "AUDIT<<"; cat "$SB/logs/skill_audit.log" 2>/dev/null; echo ">>AUDIT"
+'''
+
+
+def _run(scenario: str, tmp_path: Path) -> str:
+    assert _BASH_PATH, "bash is required for these tests"
+    sandbox = tmp_path / "sb"
+    sandbox.mkdir()
+    out = subprocess.run(
+        [
+            _BASH_PATH, "-c", _DRIVER, "driver",
+            _to_bash_path(_MONITOR_SCRIPT, _BASH_PATH),
+            _to_bash_path(sandbox, _BASH_PATH),
+            scenario,
+        ],
+        capture_output=True, text=True, check=False, timeout=60,
+    )
+    return out.stdout + out.stderr
+
+
+pytestmark = pytest.mark.skipif(_BASH_PATH is None, reason="bash not available")
+
+
+def test_tracked_roundtrip_with_spaces_restores_to_origin(tmp_path):
+    """Happy path (incl. spaces / M-06 invariant): a tracked quarantine restores."""
+    out = _run("tracked", tmp_path)
+    assert "RC=0" in out, out
+    assert "RESTORED=yes" in out, out
+
+
+def test_tampered_quarantine_info_is_rejected(tmp_path):
+    """A rewritten Original Path that disagrees with the recorded origin -> reject, no mv."""
+    out = _run("tamper", tmp_path)
+    assert "RC=1" in out, out
+    assert "EVIL=absent" in out, out          # mv did not follow the tampered path
+    assert "QDIR=intact" in out, out          # quarantine not consumed
+    assert "reason=tamper" in out, out
+
+
+def test_untracked_quarantine_fails_closed_by_default(tmp_path):
+    """No origin record -> refuse by default."""
+    out = _run("untracked", tmp_path)
+    assert "RC=1" in out, out
+    assert "reason=untracked" in out, out
+
+
+def test_untracked_with_optout_flag_restores(tmp_path):
+    """ALLOW_UNTRACKED_RESTORE=1 falls back to QUARANTINE_INFO + shape checks."""
+    out = _run("untracked_flag", tmp_path)
+    assert "RC=0" in out, out
+    assert "RESTORED=yes" in out, out
+
+
+@pytest.mark.skipif(not _CAN_SYMLINK, reason="platform cannot create resolvable symlinks")
+def test_symlink_swapped_parent_is_rejected(tmp_path):
+    """A symlink swapped into the target's parent after quarantine -> reject, nothing escapes."""
+    out = _run("symlink", tmp_path)
+    assert "RC=1" in out, out
+    assert "EVIL=clean" in out, out
+    assert "reason=parent_symlink" in out, out
