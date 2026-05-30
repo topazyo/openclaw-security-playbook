@@ -131,17 +131,17 @@ ajv validate -s enforcement-policy-schema.json -d enforcement-policy.json
 | Top-level group | Status | Enforced by |
 |-----------------|--------|-------------|
 | `version`, `last_updated`, `description` | CONSUMED (metadata) | parsed by every jq read; required by schema |
-| `validation.signature.required` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:406` (`verify_signature`) |
-| `validation.signature.verify_pgp` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:407` (`verify_signature`) |
-| `validation.signature.trusted_keys` | **CONSUMED** | `scripts/supply-chain/skill_integrity_monitor.sh:440` (`verify_signature` key allowlist) |
+| `validation.signature.required` | **CONSUMED** | `verify_signature()` in `scripts/supply-chain/skill_integrity_monitor.sh` |
+| `validation.signature.verify_pgp` | **CONSUMED** | `verify_signature()` in `scripts/supply-chain/skill_integrity_monitor.sh` |
+| `validation.signature.trusted_keys` | **CONSUMED** | `verify_signature()` in `scripts/supply-chain/skill_integrity_monitor.sh` (trusted-keys allowlist) |
 | `validation.manifest.*` | REMOVED | never read; manifest validation is hardcoded in `validate_manifest` |
 | `validation.integrity.*` | REMOVED | never read; integrity check is hardcoded |
 | `validation.signature.fail_on_invalid` | REMOVED | never read; an invalid signature always fails `verify_signature` |
 | `source_validation.*` | REMOVED | never read |
 | `pattern_scanning.*` | REMOVED | never read; scanning is governed by presence of `dangerous-patterns.json` and the `$SKILL_SCAN_INTERVAL` / `$AUTO_QUARANTINE` env vars |
-| `quarantine.auto_quarantine` | REMOVED | the policy field was never read; auto-quarantine is driven by the `AUTO_QUARANTINE` env var (`skill_integrity_monitor.sh:787`) |
+| `quarantine.auto_quarantine` | REMOVED | the policy field was never read; auto-quarantine is driven by the `AUTO_QUARANTINE` env var (read in `scan_all_skills()`) |
 | `quarantine.quarantine_on.*` | REMOVED | never read |
-| `quarantine.retention_days` | REMOVED | never read; quarantine pruning uses the `QUARANTINE_RETENTION_DAYS` env var (`skill_integrity_monitor.sh:976`) |
+| `quarantine.retention_days` | REMOVED | never read; quarantine pruning uses the `QUARANTINE_RETENTION_DAYS` env var (read in `clean_quarantine()`) |
 | `quarantine.notify_on_quarantine` | REMOVED | never read; no notification dispatcher exists |
 | `logging.*` | REMOVED | never read; logging is hardcoded and rotation uses `LOG_RETENTION_DAYS` / `MAX_LOG_SIZE` env vars |
 | `exceptions.skills[]` | REMOVED | never read; no skip-check logic exists |
@@ -313,7 +313,7 @@ Policy-file-controlled (read from `enforcement-policy.json`):
 
 - Signature verification is mandatory by default (`validation.signature.required: true`).
 - PGP signature verification is enabled by default (`validation.signature.verify_pgp: true`).
-- When `validation.signature.trusted_keys` is non-empty, only those keys are accepted (`skill_integrity_monitor.sh:440`).
+- When `validation.signature.trusted_keys` is non-empty, only those keys are accepted (enforced in `verify_signature()`).
 
 Hardcoded in the script (NOT policy-configurable — do not expect these to react to JSON edits):
 
