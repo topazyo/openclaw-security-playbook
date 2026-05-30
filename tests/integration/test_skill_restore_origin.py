@@ -119,6 +119,16 @@ case "$SCEN" in
   invalid_id)
     restore_skill "../../escape" >/dev/null 2>&1; echo "RC_slash=$?"
     restore_skill ".." >/dev/null 2>&1; echo "RC_dotdot=$?" ;;
+  empty_record)
+    mkdir -p "$SB/skills/esk"; echo d > "$SB/skills/esk/f"
+    quarantine_skill "$SB/skills/esk" t >/dev/null 2>&1
+    qid=$(_grep_qid "esk"); : > "$SB/origins/$qid"   # truncate the ledger to empty
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?" ;;
+  parent_missing)
+    mkdir -p "$SB/skills/realp/psk"; echo d > "$SB/skills/realp/psk/f"
+    quarantine_skill "$SB/skills/realp/psk" t >/dev/null 2>&1
+    qid=$(_grep_qid "psk"); rm -rf "$SB/skills/realp"   # remove the recorded target's parent
+    restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?" ;;
 esac
 echo "AUDIT<<"; cat "$SB/logs/skill_audit.log" 2>/dev/null; echo ">>AUDIT"
 '''
@@ -188,3 +198,17 @@ def test_path_traversal_quarantine_id_is_rejected(tmp_path):
     assert "RC_slash=1" in out, out
     assert "RC_dotdot=1" in out, out
     assert "reason=invalid_id" in out, out
+
+
+def test_empty_origin_record_is_rejected(tmp_path):
+    """A present-but-empty origin ledger -> reject (cannot trust an empty authoritative path)."""
+    out = _run("empty_record", tmp_path)
+    assert "RC=1" in out, out
+    assert "reason=empty_origin_record" in out, out
+
+
+def test_missing_target_parent_is_rejected(tmp_path):
+    """Recorded target's parent removed before restore -> reject (no mv into a vanished tree)."""
+    out = _run("parent_missing", tmp_path)
+    assert "RC=1" in out, out
+    assert "reason=parent_missing" in out, out
