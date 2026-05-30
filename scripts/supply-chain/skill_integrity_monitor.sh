@@ -1360,4 +1360,8 @@ main() {
     esac
 }
 
-main "$@"
+# Execute main only when run directly; sourcing (tests/tools) defines the functions without ## FIX: C6-M-17
+# executing. Robust to reformatting, unlike an external grep/sed suppression in the harness. ## FIX: C6-M-17
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then ## FIX: C6-M-17
+    main "$@" ## FIX: C6-M-17
+fi ## FIX: C6-M-17

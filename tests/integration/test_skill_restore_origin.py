@@ -75,9 +75,10 @@ _DRIVER = r'''
 SCRIPT="$1"; SB="$2"; SCEN="$3"
 export OPENCLAW_LOGS="$SB/logs"
 mkdir -p "$SB/logs" "$SB/q" "$SB/origins" "$SB/skills"
-sed 's/^main "\$@"$/: # main suppressed/' "$SCRIPT" > "$SB/mon.sh"
+# Sourcing defines the functions without running main (BASH_SOURCE guard in the script),
+# so no sed-based suppression is needed.
 # shellcheck disable=SC1090
-source "$SB/mon.sh"
+source "$SCRIPT"
 set +e +u +o pipefail
 QUARANTINE_DIR="$SB/q"
 QUARANTINE_ORIGINS_DIR="$SB/origins"
@@ -94,7 +95,7 @@ case "$SCEN" in
     mkdir -p "$SB/skills/tsk"; echo d > "$SB/skills/tsk/f"
     quarantine_skill "$SB/skills/tsk" t >/dev/null 2>&1
     qid=$(_grep_qid "tsk")
-    sed -i "s#^Original Path:.*#Original Path: $SB/evil#" "$SB/q/$qid/QUARANTINE_INFO.txt"
+    printf 'Original Path: %s\n' "$SB/evil" > "$SB/q/$qid/QUARANTINE_INFO.txt"
     restore_skill "$qid" >/dev/null 2>&1; echo "RC=$?"
     [ -e "$SB/evil" ] && echo "EVIL=created" || echo "EVIL=absent"
     [ -d "$SB/q/$qid" ] && echo "QDIR=intact" || echo "QDIR=gone" ;;
