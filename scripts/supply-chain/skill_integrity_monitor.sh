@@ -749,6 +749,21 @@ restore_skill() {
         return 1
     fi
 
+    # Defense-in-depth: the metadata file lives on disk and could be tampered with ## FIX: C6-M-14
+    # after quarantine, so validate the restore target's shape before mv. Note we do ## FIX: C6-M-14
+    # NOT require it to live under SKILLS_DIR — legitimate quarantine sources (and the ## FIX: C6-M-14
+    # C6-M-06 fixture) live elsewhere (e.g. /tmp/...). ## FIX: C6-M-14
+    if [[ "$original_path" != /* ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must be absolute (got: $original_path)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=not_absolute | path=$original_path" ## FIX: C6-M-14
+        return 1 ## FIX: C6-M-14
+    fi ## FIX: C6-M-14
+    if [[ "$original_path" == *..* ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must not contain '..' (got: $original_path)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=traversal | path=$original_path" ## FIX: C6-M-14
+        return 1 ## FIX: C6-M-14
+    fi ## FIX: C6-M-14
+
     # Restore skill
     if mv "$quarantine_path" "$original_path"; then
         success "Skill restored: $original_path"
