@@ -166,6 +166,27 @@ is_valid_ere() {
     return 0
 }
 
+# Portable path canonicalization for the C6-M-17 restore-origin checks. GNU `realpath -m` ## FIX: C6-M-17
+# is coreutils-specific (absent/different on BSD/macOS, and busybox realpath has no -m), so ## FIX: C6-M-17
+# fall back to python3 — os.path.realpath resolves symlinks AND tolerates a non-existent ## FIX: C6-M-17
+# trailing component. Prints the canonical path (rc 0); if neither tool is usable it prints ## FIX: C6-M-17
+# nothing (rc 1) so callers fail safe (origin capture skipped -> restore falls closed). ## FIX: C6-M-17
+canonicalize_path() { ## FIX: C6-M-17
+    local p=$1 out ## FIX: C6-M-17
+    # Accept a backend's output only if it is a sane absolute POSIX path (starts with '/'). ## FIX: C6-M-17
+    # This rejects a busybox realpath that mishandles -m, and a Windows python3 that would ## FIX: C6-M-17
+    # emit a C:\ path — so a foreign/garbage value never feeds the restore security checks. ## FIX: C6-M-17
+    if out=$(realpath -m -- "$p" 2>/dev/null) && [ -n "$out" ] && [ "${out#/}" != "$out" ]; then ## FIX: C6-M-17
+        printf '%s\n' "$out"; return 0 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+    if command -v python3 >/dev/null 2>&1 \
+       && out=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null) \
+       && [ -n "$out" ] && [ "${out#/}" != "$out" ]; then ## FIX: C6-M-17
+        printf '%s\n' "$out"; return 0 ## FIX: C6-M-17
+    fi ## FIX: C6-M-17
+    return 1 ## FIX: C6-M-17
+} ## FIX: C6-M-17
+
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
@@ -179,7 +200,7 @@ initialize() {
 
     # Check for required commands
     local missing_cmds=()
-    for cmd in jq sha256sum curl realpath; do ## FIX: C6-M-17 (realpath needed for restore origin canonicalization)
+    for cmd in jq sha256sum curl; do
         if ! command -v "$cmd" &> /dev/null; then
             missing_cmds+=("$cmd")
         fi
@@ -728,7 +749,7 @@ quarantine_skill() {
     # treats the separately-recorded value as authoritative, so a tampered QUARANTINE_INFO.txt ## FIX: C6-M-17
     # cannot redirect the restore target. ## FIX: C6-M-17
     local canonical_origin ## FIX: C6-M-17
-    canonical_origin=$(realpath -- "$skill_path" 2>/dev/null || true) ## FIX: C6-M-17
+    canonical_origin=$(canonicalize_path "$skill_path" 2>/dev/null || true) ## FIX: C6-M-17
 
     # Move skill to quarantine
     if mv "$skill_path" "$quarantine_path"; then
@@ -800,7 +821,7 @@ restore_skill() {
         # canonically (-m: the original location no longer exists once the skill was moved). ## FIX: C6-M-17
         if [ -n "$info_path" ]; then ## FIX: C6-M-17
             local canon_info ## FIX: C6-M-17
-            canon_info=$(realpath -m -- "$info_path" 2>/dev/null || echo "$info_path") ## FIX: C6-M-17
+            canon_info=$(canonicalize_path "$info_path" 2>/dev/null || echo "$info_path") ## FIX: C6-M-17
             if [ "$canon_info" != "$authoritative" ]; then ## FIX: C6-M-17
                 error "Refusing restore: QUARANTINE_INFO.txt path ($info_path) disagrees with recorded origin ($authoritative) — possible tampering" ## FIX: C6-M-17
                 audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=tamper | info=$info_path | recorded=$authoritative" ## FIX: C6-M-17
@@ -842,15 +863,15 @@ restore_skill() {
     # swapped in between quarantine and restore to redirect the mv outside the recorded root. ## FIX: C6-M-17
     local target_parent real_parent ## FIX: C6-M-17
     target_parent=$(dirname -- "$target") ## FIX: C6-M-17
-    real_parent=$(realpath -- "$target_parent" 2>/dev/null || true) ## FIX: C6-M-17
-    if [ -z "$real_parent" ]; then ## FIX: C6-M-17
+    if [ ! -d "$target_parent" ]; then ## FIX: C6-M-17 (explicit: canonicalize_path uses -m and won't error on a missing dir)
         error "Refusing restore: target parent directory does not exist: $target_parent" ## FIX: C6-M-17
         audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=parent_missing | path=$target" ## FIX: C6-M-17
         return 1 ## FIX: C6-M-17
     fi ## FIX: C6-M-17
-    if [ "$real_parent" != "$target_parent" ]; then ## FIX: C6-M-17
-        error "Refusing restore: target parent resolves elsewhere (symlink?): $target_parent -> $real_parent" ## FIX: C6-M-17
-        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=parent_symlink | path=$target | resolved=$real_parent" ## FIX: C6-M-17
+    real_parent=$(canonicalize_path "$target_parent" 2>/dev/null || true) ## FIX: C6-M-17
+    if [ -z "$real_parent" ] || [ "$real_parent" != "$target_parent" ]; then ## FIX: C6-M-17
+        error "Refusing restore: target parent resolves elsewhere or is unresolvable (symlink?): $target_parent -> ${real_parent:-<none>}" ## FIX: C6-M-17
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=parent_symlink | path=$target | resolved=${real_parent:-none}" ## FIX: C6-M-17
         return 1 ## FIX: C6-M-17
     fi ## FIX: C6-M-17
 
