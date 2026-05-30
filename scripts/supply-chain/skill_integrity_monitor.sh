@@ -548,23 +548,39 @@ _warn_malformed_patterns() { ## FIX: C6-M-15
     fi ## FIX: C6-M-15
 } ## FIX: C6-M-15
 
+# A totally-unusable dangerous-patterns policy (absent, unreadable, or unparseable) ## FIX: C6-M-15
+# means the scan CANNOT run. Fail CLOSED by default (return 1 -> caller counts an issue, ## FIX: C6-M-15
+# CI sees the skill as non-clean) so a control that never ran is never mistaken for a ## FIX: C6-M-15
+# clean result. Operators who must scan without the policy can opt into fail-open ## FIX: C6-M-15
+# explicitly and auditably via ALLOW_MISSING_PATTERN_POLICY=1. ## FIX: C6-M-15
+# Args: $1 = audit tag, $2 = human-readable detail. Returns 0 (fail-open) or 1 (fail-closed). ## FIX: C6-M-15
+_pattern_policy_unavailable() { ## FIX: C6-M-15
+    local audit_tag=$1 ## FIX: C6-M-15
+    local detail=$2 ## FIX: C6-M-15
+    if [ "${ALLOW_MISSING_PATTERN_POLICY:-0}" = "1" ]; then ## FIX: C6-M-15
+        warning "${detail} (pattern scanning skipped; fail-open via ALLOW_MISSING_PATTERN_POLICY=1)" ## FIX: C6-M-15
+        audit "$audit_tag" "File: $PATTERNS_FILE | fail_open=1" ## FIX: C6-M-15
+        return 0 ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+    error "${detail} (pattern scanning FAILED; set ALLOW_MISSING_PATTERN_POLICY=1 to fail open)" ## FIX: C6-M-15
+    audit "$audit_tag" "File: $PATTERNS_FILE | fail_open=0" ## FIX: C6-M-15
+    return 1 ## FIX: C6-M-15
+} ## FIX: C6-M-15
+
 scan_dangerous_patterns() {
     local skill_dir=$1
 
+    # Distinguish a wholly-unusable policy (absent / unparseable — control cannot run) ## FIX: C6-M-15
+    # from a merely-malformed entry (partial degradation, handled per-section below). ## FIX: C6-M-15
+    # The unusable case fails closed by default; see _pattern_policy_unavailable. ## FIX: C6-M-15
     if [ ! -f "$PATTERNS_FILE" ]; then ## FIX: C6-M-15
-        # Distinguish "no policy" (error) from "malformed policy" (warn) so operators ## FIX: C6-M-15
-        # can tell whether detection coverage is silently absent vs. partially degraded. ## FIX: C6-M-15
-        error "Dangerous-patterns policy file not found: $PATTERNS_FILE (pattern scanning skipped)" ## FIX: C6-M-15
-        audit "PATTERN_POLICY_MISSING" "File: $PATTERNS_FILE" ## FIX: C6-M-15
-        return 0 ## FIX: C6-M-15
+        _pattern_policy_unavailable "PATTERN_POLICY_MISSING" "Dangerous-patterns policy file not found: $PATTERNS_FILE" ## FIX: C6-M-15
+        return $? ## FIX: C6-M-15
     fi
 
-    # An unreadable or syntactically-invalid policy file is a distinct error from ## FIX: C6-M-15
-    # a merely-malformed entry: nothing can be parsed, so emit error (not warn). ## FIX: C6-M-15
     if ! jq empty "$PATTERNS_FILE" >/dev/null 2>&1; then ## FIX: C6-M-15
-        error "Dangerous-patterns policy file is unreadable or not valid JSON: $PATTERNS_FILE (pattern scanning skipped)" ## FIX: C6-M-15
-        audit "PATTERN_POLICY_INVALID" "File: $PATTERNS_FILE" ## FIX: C6-M-15
-        return 0 ## FIX: C6-M-15
+        _pattern_policy_unavailable "PATTERN_POLICY_INVALID" "Dangerous-patterns policy file is unreadable or not valid JSON: $PATTERNS_FILE" ## FIX: C6-M-15
+        return $? ## FIX: C6-M-15
     fi
 
     info "Scanning for dangerous patterns..."
@@ -1097,6 +1113,9 @@ ENVIRONMENT VARIABLES:
     LOG_RETENTION_DAYS           Log retention period (default: 30)
     QUARANTINE_RETENTION_DAYS    Quarantine retention (default: 90)
     AUTO_QUARANTINE              Auto-quarantine on failure (true/false)
+    ALLOW_MISSING_PATTERN_POLICY Fail OPEN when the dangerous-patterns policy is absent or
+                                 unparseable (1 = log warning, skip scan, return success;
+                                 default 0 = fail closed: log error, count an issue)
 
 For more information, see: docs/guides/06-supply-chain-security.md
 
