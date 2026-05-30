@@ -543,7 +543,8 @@ _warn_malformed_patterns() { ## FIX: C6-M-15
         malformed=0 ## FIX: C6-M-15
     fi ## FIX: C6-M-15
     if [ "$malformed" -gt 0 ]; then ## FIX: C6-M-15
-        warning "Malformed dangerous-pattern entries skipped in ${section} (${PATTERNS_FILE}): ${malformed} entr(y/ies) missing a 'pattern' field or section is not an array" ## FIX: C6-M-15
+        local noun="entries"; [ "$malformed" -eq 1 ] && noun="entry" ## FIX: C6-M-15
+        warning "Skipped ${malformed} malformed ${noun} in ${section} of ${PATTERNS_FILE} (missing a 'pattern' field, or the section is not an array)" ## FIX: C6-M-15
         audit "PATTERN_MALFORMED" "File: $PATTERNS_FILE | Section: $section | Count: $malformed" ## FIX: C6-M-15
     fi ## FIX: C6-M-15
 } ## FIX: C6-M-15
