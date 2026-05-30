@@ -521,18 +521,75 @@ verify_signature() {
     return 0
 }
 
+# Emit an operator-visible warning when entries in a dangerous-patterns section ## FIX: C6-M-15
+# are malformed (missing the `pattern` field) or the section is present but is not ## FIX: C6-M-15
+# an array. Detection still proceeds with the valid entries (fail-open by design for ## FIX: C6-M-15
+# backward compatibility), but the operator is no longer left blind to the silent skip. ## FIX: C6-M-15
+# Args: $1 = jq section key (e.g. .patterns, .file_patterns, .network_patterns) ## FIX: C6-M-15
+_warn_malformed_patterns() { ## FIX: C6-M-15
+    local section=$1 ## FIX: C6-M-15
+    local malformed ## FIX: C6-M-15
+    # Count: a present-but-non-array section yields 1 (the whole section is unusable); ## FIX: C6-M-15
+    # an array yields the number of elements that lack a non-null string `pattern`. ## FIX: C6-M-15
+    # A wholly-absent section yields 0 (nothing declared is not a malformation). ## FIX: C6-M-15
+    malformed=$(jq -r --arg sec "${section#.}" ' ## FIX: C6-M-15
+        (.[$sec]) as $s ## FIX: C6-M-15
+        | if ($s == null) then 0 ## FIX: C6-M-15
+          elif (($s | type) != "array") then 1 ## FIX: C6-M-15
+          else ([ $s[] | select((.pattern | type) != "string") ] | length) ## FIX: C6-M-15
+          end ## FIX: C6-M-15
+    ' "$PATTERNS_FILE" 2>/dev/null || echo "0") ## FIX: C6-M-15
+    if ! [[ "$malformed" =~ ^[0-9]+$ ]]; then ## FIX: C6-M-15
+        malformed=0 ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+    if [ "$malformed" -gt 0 ]; then ## FIX: C6-M-15
+        local noun="entries"; [ "$malformed" -eq 1 ] && noun="entry" ## FIX: C6-M-15
+        warning "Skipped ${malformed} malformed ${noun} in ${section} of ${PATTERNS_FILE} (missing a 'pattern' field, or the section is not an array)" ## FIX: C6-M-15
+        audit "PATTERN_MALFORMED" "File: $PATTERNS_FILE | Section: $section | Count: $malformed" ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+} ## FIX: C6-M-15
+
+# A totally-unusable dangerous-patterns policy (absent, unreadable, or unparseable) ## FIX: C6-M-15
+# means the scan CANNOT run. Fail CLOSED by default (return 1 -> caller counts an issue, ## FIX: C6-M-15
+# CI sees the skill as non-clean) so a control that never ran is never mistaken for a ## FIX: C6-M-15
+# clean result. Operators who must scan without the policy can opt into fail-open ## FIX: C6-M-15
+# explicitly and auditably via ALLOW_MISSING_PATTERN_POLICY=1. ## FIX: C6-M-15
+# Args: $1 = audit tag, $2 = human-readable detail. Returns 0 (fail-open) or 1 (fail-closed). ## FIX: C6-M-15
+_pattern_policy_unavailable() { ## FIX: C6-M-15
+    local audit_tag=$1 ## FIX: C6-M-15
+    local detail=$2 ## FIX: C6-M-15
+    if [ "${ALLOW_MISSING_PATTERN_POLICY:-0}" = "1" ]; then ## FIX: C6-M-15
+        warning "${detail} (pattern scanning skipped; fail-open via ALLOW_MISSING_PATTERN_POLICY=1)" ## FIX: C6-M-15
+        audit "$audit_tag" "File: $PATTERNS_FILE | fail_open=1" ## FIX: C6-M-15
+        return 0 ## FIX: C6-M-15
+    fi ## FIX: C6-M-15
+    error "${detail} (pattern scanning FAILED; set ALLOW_MISSING_PATTERN_POLICY=1 to fail open)" ## FIX: C6-M-15
+    audit "$audit_tag" "File: $PATTERNS_FILE | fail_open=0" ## FIX: C6-M-15
+    return 1 ## FIX: C6-M-15
+} ## FIX: C6-M-15
+
 scan_dangerous_patterns() {
     local skill_dir=$1
 
-    if [ ! -f "$PATTERNS_FILE" ]; then
-        return 0
+    # Distinguish a wholly-unusable policy (absent / unparseable — control cannot run) ## FIX: C6-M-15
+    # from a merely-malformed entry (partial degradation, handled per-section below). ## FIX: C6-M-15
+    # The unusable case fails closed by default; see _pattern_policy_unavailable. ## FIX: C6-M-15
+    if [ ! -f "$PATTERNS_FILE" ]; then ## FIX: C6-M-15
+        _pattern_policy_unavailable "PATTERN_POLICY_MISSING" "Dangerous-patterns policy file not found: $PATTERNS_FILE" ## FIX: C6-M-15
+        return $? ## FIX: C6-M-15
+    fi
+
+    if ! jq empty "$PATTERNS_FILE" >/dev/null 2>&1; then ## FIX: C6-M-15
+        _pattern_policy_unavailable "PATTERN_POLICY_INVALID" "Dangerous-patterns policy file is unreadable or not valid JSON: $PATTERNS_FILE" ## FIX: C6-M-15
+        return $? ## FIX: C6-M-15
     fi
 
     info "Scanning for dangerous patterns..."
 
     local patterns
     local exceptions
-    patterns=$(jq -r '.patterns[].pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
+    _warn_malformed_patterns ".patterns" ## FIX: C6-M-15
+    patterns=$(jq -r '.patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C6-M-15
     exceptions=$(jq -r '.exceptions[]? // empty' "$PATTERNS_FILE" 2>/dev/null || echo "")
     local found_issues=0
 
@@ -568,6 +625,7 @@ scan_dangerous_patterns() {
 
     # Scan file_patterns against file basenames in the skill directory. ## FIX: C5-M-11
     local file_patterns ## FIX: C5-M-11
+    _warn_malformed_patterns ".file_patterns" ## FIX: C6-M-15
     file_patterns=$(jq -r '.file_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
     while IFS= read -r fpattern; do ## FIX: C5-M-11
         if [ -n "$fpattern" ]; then ## FIX: C5-M-11
@@ -589,6 +647,7 @@ scan_dangerous_patterns() {
 
     # Scan network_patterns against file content (URL/IP literals in skill payload). ## FIX: C5-M-11
     local network_patterns ## FIX: C5-M-11
+    _warn_malformed_patterns ".network_patterns" ## FIX: C6-M-15
     network_patterns=$(jq -r '.network_patterns[]?.pattern // empty' "$PATTERNS_FILE" 2>/dev/null || echo "") ## FIX: C5-M-11
     while IFS= read -r npattern; do ## FIX: C5-M-11
         if [ -n "$npattern" ]; then ## FIX: C5-M-11
@@ -706,6 +765,24 @@ restore_skill() {
         error "Could not determine original path"
         return 1
     fi
+
+    # Defense-in-depth: the metadata file lives on disk and could be tampered with ## FIX: C6-M-14
+    # after quarantine, so validate the restore target's shape before mv. Note we do ## FIX: C6-M-14
+    # NOT require it to live under SKILLS_DIR — legitimate quarantine sources (and the ## FIX: C6-M-14
+    # C6-M-06 fixture) live elsewhere (e.g. /tmp/...). ## FIX: C6-M-14
+    if [[ "$original_path" != /* ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must be absolute (got: $original_path)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=not_absolute | path=$original_path" ## FIX: C6-M-14
+        return 1 ## FIX: C6-M-14
+    fi ## FIX: C6-M-14
+    # Reject '..' only as a path component (/.., ../x, x/../y) — not as a substring of a ## FIX: C6-M-14
+    # legitimate filename like /tmp/a..b (Copilot review: precise segment match over breadth). ## FIX: C6-M-14
+    local _traversal_re='(^|/)\.\.(/|$)' ## FIX: C6-M-14
+    if [[ "$original_path" =~ $_traversal_re ]]; then ## FIX: C6-M-14
+        error "Refusing restore: original_path must not contain '..' path segments (got: $original_path)" ## FIX: C6-M-14
+        audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=traversal | path=$original_path" ## FIX: C6-M-14
+        return 1 ## FIX: C6-M-14
+    fi ## FIX: C6-M-14
 
     # Restore skill
     if mv "$quarantine_path" "$original_path"; then
@@ -1037,6 +1114,9 @@ ENVIRONMENT VARIABLES:
     LOG_RETENTION_DAYS           Log retention period (default: 30)
     QUARANTINE_RETENTION_DAYS    Quarantine retention (default: 90)
     AUTO_QUARANTINE              Auto-quarantine on failure (true/false)
+    ALLOW_MISSING_PATTERN_POLICY Fail OPEN when the dangerous-patterns policy is absent or
+                                 unparseable (1 = log warning, skip scan, return success;
+                                 default 0 = fail closed: log error, count an issue)
 
 For more information, see: docs/guides/06-supply-chain-security.md
 

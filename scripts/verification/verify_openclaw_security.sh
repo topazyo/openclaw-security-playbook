@@ -74,7 +74,26 @@ Exit codes:
     0  All checks passed
     1  One or more critical issues found
     2  Warnings found (no critical issues) or invalid arguments
+
+Environment variables:
+    OPENCLAW_VERIFIER_TLS_HOST            (default: 127.0.0.1)
+        Host used for the TLS certificate/version check (Check 3).
+        Override when the MCP server is reachable at a different address.
+
+    OPENCLAW_VERIFIER_TLS_PORT            (default: 8443)
+        Port used for the TLS certificate/version check (Check 3).
+        Override when the MCP server listens on a non-default port.
+
+    OPENCLAW_VERIFIER_SKIP_ENFORCER_PROCESS  (default: 0; set to 1 to bypass)
+        SECURITY NOTE: When set to 1, Check 4 (runtime-enforcer process
+        detection) is bypassed entirely. Check 4 will report SUCCESS
+        (CONFIGURED_PROCESS_CHECK_SKIPPED) without verifying that the
+        openclaw-shield enforcer is actually running. Use ONLY in CI/test
+        environments where the enforcer is confirmed running by other means.
+        Setting this variable in production masks a real security control gap.
+        Used by hosted-CI workflows.
 EOF
+## FIX: C6-M-16
 }
 
 if [ "$#" -gt 0 ]; then
