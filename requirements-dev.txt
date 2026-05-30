@@ -1,0 +1,9 @@
+# Development / static type-checking dependencies (NOT required at runtime).
+# Provides type stubs for the AWS SDK (boto3) used by
+# scripts/incident-response/auto-containment.py, so Pylance/pyright can resolve
+# EC2/IAM/Route53Resolver client types under strict mode.
+# The floor mirrors `boto3>=1.35` (pyproject.toml / requirements.txt): boto3-stubs
+# is released in lockstep with boto3, so a matching floor (not an exact pin) keeps
+# the stubs aligned with the runtime SDK and avoids manual bumps on minor updates.
+# Install with:  python -m pip install -r requirements-dev.txt
+boto3-stubs[ec2,iam,route53resolver]>=1.35
