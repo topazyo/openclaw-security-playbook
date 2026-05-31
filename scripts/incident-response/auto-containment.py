@@ -191,7 +191,7 @@ class ContainmentManager:
         response = self.ec2.describe_network_acls(Filters=[{"Name": "default", "Values": ["true"]}])  # FIX: C5-finding-3
         network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
         if network_acls and isinstance(network_acls[0], dict) and network_acls[0].get("NetworkAclId"):  # FIX: C5-finding-3
-            return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3
+            return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS describe_network_acls success-response key
         raise RuntimeError(  # FIX: C6-H-01
             "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
         )  # FIX: C6-H-01
@@ -511,12 +511,12 @@ class ContainmentManager:
         try:
             # Get instance details
             response = self.ec2.describe_instances(InstanceIds=[instance_id])
-            instance = response['Reservations'][0]['Instances'][0]
+            instance = response['Reservations'][0]['Instances'][0]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS describe_instances success-response keys
             
-            original_sg_ids = [sg['GroupId'] for sg in instance['SecurityGroups']]
-            original_subnet = instance['SubnetId']
+            original_sg_ids = [sg['GroupId'] for sg in instance['SecurityGroups']]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response keys
+            original_subnet = instance['SubnetId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response key
             
-            logger.info(f"Instance state: {instance['State']['Name']}")
+            logger.info(f"Instance state: {instance['State']['Name']}")  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response keys
             logger.info(f"Original security groups: {original_sg_ids}")
             logger.info(f"Original subnet: {original_subnet}")
             
@@ -529,7 +529,7 @@ class ContainmentManager:
                 return True
             
             # Create snapshot for forensics
-            volumes = [device['Ebs']['VolumeId'] for device in instance.get('BlockDeviceMappings', [])]
+            volumes = [device['Ebs']['VolumeId'] for device in instance.get('BlockDeviceMappings', [])]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS EBS device-mapping keys
             snapshot_ids = []
             
             for volume_id in volumes:
@@ -559,7 +559,7 @@ class ContainmentManager:
                 # Create restrictive security group on-the-fly
                 logger.warning("QUARANTINE_SG_ID not set, creating temporary SG")
                 
-                vpc_id = instance['VpcId']
+                vpc_id = instance['VpcId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response key
                 sg_response = self.ec2.create_security_group(
                     GroupName=f"quarantine-{self.incident_id}",
                     Description=f"Quarantine SG for incident {self.incident_id}",
@@ -637,7 +637,7 @@ class ContainmentManager:
 
             deactivated_keys = []  # FIX: C5-Batch-G — renamed from revoked_keys; keys are deactivated, not deleted
             for key_info in access_keys:
-                access_key_id = key_info['AccessKeyId']
+                access_key_id = key_info['AccessKeyId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS list_access_keys success-response key
 
                 # Deactivate key (Status='Inactive'); key is NOT deleted
                 self.iam.update_access_key(
