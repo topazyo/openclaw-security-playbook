@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnnecessaryIsInstance=false, reportTypedDictNotRequiredAccess=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnnecessaryIsInstance=false
 # type-hygiene (NOT a C5/C6 audit finding): boto3/docker SDK calls return dynamically-shaped data
-# that Pylance/pyright STRICT mode flags as Unknown / NotRequired-key access / "unnecessary"
-# isinstance. boto3-stubs supplies client method signatures, but response *values* accessed via
-# dynamic dict indexing remain Unknown under strict. The six rules above are disabled FOR THIS
-# FILE ONLY so the AWS-SDK glue checks clean; every other strict rule stays ON. The defensive
-# isinstance()/.get() guards on untrusted API responses are intentionally RETAINED as runtime
-# validation -- they are not removed to satisfy the type checker.
+# that Pylance/pyright STRICT mode flags as Unknown types or "unnecessary" isinstance. boto3-stubs
+# supplies client method signatures, but response *values* accessed via dynamic dict indexing remain
+# Unknown under strict. The five rules above are disabled FOR THIS FILE ONLY so the AWS-SDK glue
+# checks clean; every other strict rule stays ON. NOTE: reportTypedDictNotRequiredAccess is kept
+# ENABLED (it has real shape-safety signal on untrusted AWS responses) and is suppressed only
+# per-line at the specific response-access sites below, so new unguarded accesses still get flagged.
+# The defensive isinstance()/.get() guards on untrusted API responses are intentionally RETAINED as
+# runtime validation -- they are not removed to satisfy the type checker.
 """
 Automated Threat Containment
 
