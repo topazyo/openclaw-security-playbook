@@ -24,11 +24,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _load(module_path: Path, module_name: str):
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    # Load a source file as a throwaway module WITHOUT leaving it in the global module
+    # cache. The entry is registered only for the duration of exec_module (so a module that
+    # imports itself by name still resolves) under a name namespaced to THIS test module,
+    # then removed in finally. Registering under the source file's canonical name instead
+    # would (a) leak module state — globals, monkeypatches — across tests and (b) collide
+    # with other tests that load the same file under that name (e.g.
+    # test_malicious_skill_chain_exercise also registers "exercise_malicious_skill_chain").
+    qualified_name = f"{__name__}.{module_name}"
+    spec = importlib.util.spec_from_file_location(qualified_name, module_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    sys.modules[qualified_name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(qualified_name, None)
     return module
 
 
