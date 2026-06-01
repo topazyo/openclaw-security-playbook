@@ -20,6 +20,10 @@ dependencies = [
   "psutil>=6.0", # FIX: C5-finding-3
 ]
 
+[project.optional-dependencies]  # FIX: C6-RT-07
+# PDF rendering for `openclaw-cli report weekly --pdf` (lazy-imported in src/clawdbot/report_weekly.py)
+reporting = ["reportlab>=4.0"]  # FIX: C6-RT-07
+
 [project.scripts]
 openclaw-cli = "clawdbot.openclaw_cli:main"
 
