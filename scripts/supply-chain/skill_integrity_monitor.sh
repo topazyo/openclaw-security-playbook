@@ -1157,6 +1157,20 @@ clean_quarantine() {
     fi
 }
 
+find_skill() {  ## FIX: C6-RT-06 - fail-closed stub; refuses to fabricate the affected-agents inventory
+    local skill_name="$1"  ## FIX: C6-RT-06
+    local output_file="${2:-}"  ## FIX: C6-RT-06
+    ## FIX: C6-RT-06 - Listing the agents that have a skill installed requires an external
+    ## FIX: C6-RT-06 - agent->skill inventory (the orchestration platform's installed-skills
+    ## FIX: C6-RT-06 - export). It is NOT available to this repo-local monitor, so we fail
+    ## FIX: C6-RT-06 - closed: write nothing and return non-zero rather than fabricate data.
+    error "--find-skill is not wired for '$skill_name': listing the agents that have a skill installed requires an external agent->skill inventory (the orchestration platform's installed-skills export, e.g. exported to \$OPENCLAW_AGENT_INVENTORY as JSON {\"agents\":[{\"agent_id\":...,\"skills\":[{\"name\":...,\"installation_date\":...}]}]}). No such inventory is available here; refusing to fabricate affected_agents. Obtain the affected-agent list from your orchestration platform/telemetry, then resume the playbook."  ## FIX: C6-RT-06
+    if [ -n "$output_file" ]; then  ## FIX: C6-RT-06
+        error "Refusing to write '$output_file' (it would contain fabricated affected-agent data)."  ## FIX: C6-RT-06
+    fi  ## FIX: C6-RT-06
+    return 1  ## FIX: C6-RT-06 - fail closed
+}  ## FIX: C6-RT-06
+
 # ============================================================================
 # MAIN FUNCTION
 # ============================================================================
@@ -1179,6 +1193,8 @@ OPTIONS:
     --cleanup            Clean up old logs and quarantine
     --status             Show monitoring status
     --report             Generate security report
+    --find-skill SKILL   Find agents with SKILL installed (requires external agent inventory; currently fails closed)
+    --output FILE        Output path for --find-skill results (only used with --find-skill)
     --help               Show this help message
 
 EXAMPLES:
@@ -1270,6 +1286,7 @@ main() {
 
     local action=""
     local arg=""
+    local output_file=""  ## FIX: C6-RT-06
 
     case "$1" in
         --start)
@@ -1302,6 +1319,13 @@ main() {
         --report)
             action="report"
             ;;
+        --find-skill)  ## FIX: C6-RT-06
+            action="find_skill"  ## FIX: C6-RT-06
+            arg="${2:-}"  ## FIX: C6-RT-06 - skill name
+            if [ "${3:-}" = "--output" ]; then  ## FIX: C6-RT-06 - optional "--output <file>" follows the skill name
+                output_file="${4:-}"  ## FIX: C6-RT-06
+            fi  ## FIX: C6-RT-06
+            ;;  ## FIX: C6-RT-06
         --help)
             show_help
             exit 0
@@ -1348,6 +1372,14 @@ main() {
             fi
             restore_skill "$arg"
             ;;
+        find_skill)  ## FIX: C6-RT-06
+            if [ -z "$arg" ]; then  ## FIX: C6-RT-06
+                error "--find-skill requires a skill name"  ## FIX: C6-RT-06
+                exit 1  ## FIX: C6-RT-06
+            fi  ## FIX: C6-RT-06
+            find_skill "$arg" "$output_file"  ## FIX: C6-RT-06
+            exit $?  ## FIX: C6-RT-06 - propagate the fail-closed status
+            ;;  ## FIX: C6-RT-06
         cleanup)
             cleanup
             ;;
