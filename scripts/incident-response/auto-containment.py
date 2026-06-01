@@ -326,6 +326,41 @@ class ContainmentManager:
             self.log_action("block_domain", domain, "failed", {"error": str(e), "duration": duration, "reason": reason})  # FIX: C5-finding-3
             return False  # FIX: C5-finding-3
 
+    def _identity_action_stub(self, action: str, user_id: str, **details: Any) -> bool:  # FIX: C6-RT-05
+        """Fail-closed stub for identity-containment actions (disable/enable/ban/revoke-sessions).
+
+        Acting on a user identity (e.g. eve@external.com) is a policy/enforcement action with no
+        AWS or local equivalent in this repo; it depends on an external identity integration that
+        is NOT wired here. Per the unwired-integration rule it raises NotImplementedError so callers
+        FAIL CLOSED rather than report a false containment, and never silently no-ops. To wire it:
+          - clawguard (policy):        POST {policy, subject: {user_id}} -> {allowed: bool, reason: str}  [CLAWGUARD_URL, CLAWGUARD_TOKEN]
+          - openclaw-shield (enforce): POST {action, target: {user_id}} -> {applied: bool}               [OPENCLAW_SHIELD_URL, OPENCLAW_SHIELD_TOKEN]
+        """  # FIX: C6-RT-05
+        logger.info(f"{action} requested for identity {user_id} (details={details})")  # FIX: C6-RT-05
+        raise NotImplementedError(  # FIX: C6-RT-05
+            f"{action} is not wired: acting on a user identity requires the clawguard policy authority "
+            f"(CLAWGUARD_URL/CLAWGUARD_TOKEN; POST {{policy, subject}} -> {{allowed, reason}}) and/or the "
+            f"openclaw-shield enforcement integration (OPENCLAW_SHIELD_URL/OPENCLAW_SHIELD_TOKEN; "
+            f"POST {{action, target}} -> {{applied}}). No automated identity action exists in this repo "
+            f"yet; refusing to report a false containment for {user_id}."  # FIX: C6-RT-05
+        )  # FIX: C6-RT-05
+
+    def disable_account(self, user_id: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
+        """Disable a user identity (fail-closed stub until the identity integration is wired)."""  # FIX: C6-RT-05
+        return self._identity_action_stub("disable_account", user_id, duration=duration, reason=reason)  # FIX: C6-RT-05
+
+    def revoke_all_sessions(self, user_id: str, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
+        """Revoke all active sessions for a user identity (fail-closed stub until wired)."""  # FIX: C6-RT-05
+        return self._identity_action_stub("revoke_all_sessions", user_id, reason=reason)  # FIX: C6-RT-05
+
+    def enable_account(self, user_id: str, send_warning_email: bool = False, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
+        """Re-enable a previously disabled user identity (fail-closed stub until wired)."""  # FIX: C6-RT-05
+        return self._identity_action_stub("enable_account", user_id, send_warning_email=send_warning_email, reason=reason)  # FIX: C6-RT-05
+
+    def permanent_ban(self, user_id: str, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
+        """Permanently ban a user identity (fail-closed stub until wired)."""  # FIX: C6-RT-05
+        return self._identity_action_stub("permanent_ban", user_id, reason=reason)  # FIX: C6-RT-05
+
     def _write_quarantine_manifest(  # FIX: C6-H-07
         self,  # FIX: C6-H-07
         incident_id: str,  # FIX: C6-H-07
@@ -858,7 +893,7 @@ Actions (all implemented):
     parser.add_argument(
         "--action",
         required=True,
-        choices=["isolate-ec2", "revoke-credentials", "isolate-docker", "block_ip", "block_domain", "isolate_container", "update_rate_limits"],  # FIX: C5-finding-3
+        choices=["isolate-ec2", "revoke-credentials", "isolate-docker", "block_ip", "block_domain", "isolate_container", "update_rate_limits", "disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"],  # FIX: C5-finding-3  # FIX: C6-RT-05 - identity-containment actions (fail-closed stubs)
         help="Containment action to perform"
     )
     parser.add_argument("--ip-address", help="IP address to block with the block_ip action")  # FIX: C5-finding-3
@@ -866,6 +901,8 @@ Actions (all implemented):
     parser.add_argument("--container-id", help="Container ID to isolate with the isolate_container action")  # FIX: C5-finding-3
     parser.add_argument("--duration", help="Duration for temporary containment actions")  # FIX: C5-finding-3
     parser.add_argument("--reason", help="Reason recorded in the containment log")  # FIX: C5-finding-3
+    parser.add_argument("--user-id", help="User identity (e.g. user@example.com) for identity-containment actions: disable_account/revoke_all_sessions/enable_account/permanent_ban")  # FIX: C6-RT-05
+    parser.add_argument("--send-warning-email", action="store_true", help="With enable_account, request a warning email on restoration (applied by the identity integration when wired)")  # FIX: C6-RT-05
     parser.add_argument("--mode", choices=["normal", "aggressive", "emergency"], help="Rate-limit mode to apply with update_rate_limits")  # FIX: C5-finding-3
     parser.add_argument("--limits", help="JSON object describing rate-limit overrides for update_rate_limits")  # FIX: C5-finding-3
     parser.add_argument(
@@ -936,7 +973,24 @@ Actions (all implemented):
         if parsed_limits is None:  # FIX: C5-finding-3
             parser.error("--limits is required for update_rate_limits")  # FIX: C5-finding-3
         success = manager.update_rate_limits(args.mode, parsed_limits, reason=args.reason)  # FIX: C5-finding-3
-    
+
+    elif args.action in ("disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"):  # FIX: C6-RT-05 - identity-containment actions
+        if not args.user_id:  # FIX: C6-RT-05
+            parser.error(f"--user-id is required for {args.action}")  # FIX: C6-RT-05
+        try:  # FIX: C6-RT-05 - the identity integration is unwired and raises NotImplementedError; handle it explicitly
+            if args.action == "disable_account":  # FIX: C6-RT-05
+                success = manager.disable_account(args.user_id, duration=args.duration, reason=args.reason)  # FIX: C6-RT-05
+            elif args.action == "revoke_all_sessions":  # FIX: C6-RT-05
+                success = manager.revoke_all_sessions(args.user_id, reason=args.reason)  # FIX: C6-RT-05
+            elif args.action == "enable_account":  # FIX: C6-RT-05
+                success = manager.enable_account(args.user_id, send_warning_email=args.send_warning_email, reason=args.reason)  # FIX: C6-RT-05
+            else:  # permanent_ban  # FIX: C6-RT-05
+                success = manager.permanent_ban(args.user_id, reason=args.reason)  # FIX: C6-RT-05
+        except NotImplementedError as e:  # FIX: C6-RT-05 - fail closed: log as failed, never fake success or crash with a traceback
+            logger.error(f"✗ {args.action} unavailable: {e}")  # FIX: C6-RT-05
+            manager.log_action(args.action, args.user_id, "failed", {"error": str(e), "reason": args.reason})  # FIX: C6-RT-05
+            success = False  # FIX: C6-RT-05
+
     # Save report
     manager.save_containment_report()
     

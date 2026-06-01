@@ -333,6 +333,10 @@ class TestAutoContainmentCliParity:
         assert "block_domain" in help_output  # FIX: C5-finding-3
         assert "isolate_container" in help_output  # FIX: C5-finding-3
         assert "update_rate_limits" in help_output  # FIX: C5-finding-3
+        assert "disable_account" in help_output  # FIX: C6-RT-05
+        assert "revoke_all_sessions" in help_output  # FIX: C6-RT-05
+        assert "enable_account" in help_output  # FIX: C6-RT-05
+        assert "permanent_ban" in help_output  # FIX: C6-RT-05
 
     @pytest.mark.parametrize(  # FIX: C5-finding-3
         ("args", "expected_action", "expected_target", "expected_reason", "expected_mode"),  # FIX: C5-finding-3
@@ -385,6 +389,27 @@ class TestAutoContainmentCliParity:
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
             fake_container.update.assert_called_once()  # FIX: C5-finding-3
+
+    @pytest.mark.parametrize(  # FIX: C6-RT-05
+        ("action", "extra_args"),  # FIX: C6-RT-05
+        [  # FIX: C6-RT-05
+            ("disable_account", ["--user-id", "eve@external.com", "--duration", "24h"]),  # FIX: C6-RT-05
+            ("revoke_all_sessions", ["--user-id", "eve@external.com"]),  # FIX: C6-RT-05
+            ("enable_account", ["--user-id", "user@openclaw.ai", "--send-warning-email"]),  # FIX: C6-RT-05
+            ("permanent_ban", ["--user-id", "eve@external.com"]),  # FIX: C6-RT-05
+        ],  # FIX: C6-RT-05
+        ids=["disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"],  # FIX: C6-RT-05
+    )  # FIX: C6-RT-05
+    def test_identity_actions_are_accepted_but_fail_closed(self, tmp_path, action, extra_args):  # FIX: C6-RT-05
+        """The documented identity actions parse (no argparse 'invalid choice') and FAIL CLOSED - the unwired clawguard/shield integration must never report a false containment."""  # FIX: C6-RT-05
+        module, log_dir, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-05
+        rc = _run_auto_containment(module, ["--action", action, *extra_args, "--reason", "Prompt injection - IRP-002"])  # FIX: C6-RT-05
+        assert rc == 1  # FIX: C6-RT-05 - fail closed: nonzero exit, never success
+        report = _read_single_report(log_dir)  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["action"] == action  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["status"] == "failed"  # FIX: C6-RT-05
+        error_text = report["actions_taken"][0]["details"]["error"].lower()  # FIX: C6-RT-05
+        assert "not wired" in error_text and "clawguard" in error_text  # FIX: C6-RT-05 - documented integration contract is surfaced
 
 
 class TestForensicsCollectorRuntimeParity:
