@@ -18,6 +18,12 @@ azure-ad
     Credentials are read from explicit keyword args or from environment
     variables: AZURE_AD_TENANT_ID, AZURE_AD_CLIENT_ID, AZURE_AD_CLIENT_SECRET.
 
+    NOT every rule above runs for this source.  The basic Graph user query
+    cannot supply the columns named in ``AZURE_AD_UNAVAILABLE_FIELDS``, so the
+    prod-access privilege-creep sub-rule and the orphaned-approver check are
+    reported as ``status="incomplete_data"`` rather than as a clean result.
+    See that constant for the authoritative list.
+
 SECURITY NOTE
 -------------
 Functions in this module that perform external I/O (``_graph_token``, ``_graph_get``,
@@ -132,6 +138,13 @@ def _graph_get(endpoint: str, token: str) -> dict[str, Any]:
     return resp.json()
 
 
+# FIX: C6-RT-08: the basic Microsoft Graph user query cannot supply these fields
+# (see load_azure_ad below — Systems/GrantedBy are hardcoded ""). Checks that depend
+# on them therefore did NOT run for the azure-ad source; they must be reported as
+# incomplete_data, never as a clean/zero result (which was false-clean evidence).
+AZURE_AD_UNAVAILABLE_FIELDS = frozenset({"Systems", "GrantedBy"})  # FIX: C6-RT-08
+
+
 @read_only_io
 def load_azure_ad(
     tenant_id: str | None = None,
@@ -200,6 +213,7 @@ def analyze_access(
     rows: list[dict[str, str]],
     *,
     days_threshold: int = 90,
+    unavailable_fields: frozenset[str] | None = None,  # FIX: C6-RT-08
 ) -> dict[str, list[dict[str, Any]]]:
     """Apply the access-review rules and return a findings dict.
 
@@ -207,7 +221,13 @@ def analyze_access(
       - inactive_users
       - privilege_creep
       - orphaned_approvers
+
+    ``unavailable_fields`` names columns the data source could not supply (e.g.
+    the azure-ad provider cannot populate Systems/GrantedBy). Checks that depend
+    on such a field are reported with an explicit ``status="incomplete_data"``
+    marker instead of silently returning no findings — see C6-RT-08.
     """
+    unavailable_fields = unavailable_fields or frozenset()  # FIX: C6-RT-08
     now = datetime.now(UTC)
     all_user_ids = {r.get("UserID", "").strip() for r in rows if r.get("UserID")}
 
@@ -280,6 +300,30 @@ def analyze_access(
                 "granted_by": granted_by,
                 "issue": "access approver (GrantedBy) not found in current user list",
             })
+
+    # FIX: C6-RT-08: when a required field was unavailable from the data source, the
+    # dependent check could not run. Emit an explicit incomplete_data marker so an
+    # empty finding list is never mistaken for "no risk found" (false-clean evidence).
+    if "Systems" in unavailable_fields:  # FIX: C6-RT-08
+        privilege_creep.append({  # FIX: C6-RT-08
+            "status": "incomplete_data",  # FIX: C6-RT-08
+            "check": "production_access_in_non_prod_role",  # FIX: C6-RT-08
+            "missing_fields": ["Systems"],  # FIX: C6-RT-08
+            "issue": (  # FIX: C6-RT-08
+                "production-access privilege-creep check could not run: "  # FIX: C6-RT-08
+                "'Systems' field unavailable from this data source"  # FIX: C6-RT-08
+            ),  # FIX: C6-RT-08
+        })  # FIX: C6-RT-08
+    if "GrantedBy" in unavailable_fields:  # FIX: C6-RT-08
+        orphaned_approvers.append({  # FIX: C6-RT-08
+            "status": "incomplete_data",  # FIX: C6-RT-08
+            "check": "orphaned_approver",  # FIX: C6-RT-08
+            "missing_fields": ["GrantedBy"],  # FIX: C6-RT-08
+            "issue": (  # FIX: C6-RT-08
+                "orphaned-approver check could not run: "  # FIX: C6-RT-08
+                "'GrantedBy' field unavailable from this data source"  # FIX: C6-RT-08
+            ),  # FIX: C6-RT-08
+        })  # FIX: C6-RT-08
 
     return {
         "inactive_users": inactive_users,
@@ -356,19 +400,45 @@ def run_access_review(
             client_secret=client_secret,
         )
 
-    findings = analyze_access(rows, days_threshold=days_threshold)
+    # FIX: C6-RT-08: declare which required fields the source cannot supply, so
+    # analyze_access reports dependent checks as incomplete rather than clean.
+    unavailable_fields = (  # FIX: C6-RT-08
+        AZURE_AD_UNAVAILABLE_FIELDS if input_source == "azure-ad" else frozenset()  # FIX: C6-RT-08
+    )  # FIX: C6-RT-08
+
+    findings = analyze_access(  # FIX: C6-RT-08
+        rows,
+        days_threshold=days_threshold,
+        unavailable_fields=unavailable_fields,  # FIX: C6-RT-08
+    )
+
+    # FIX: C6-RT-08: count real findings separately from incomplete_data markers so a
+    # check that could not run never inflates a real-finding count nor reads as zero.
+    real_inactive = [f for f in findings["inactive_users"] if f.get("status") != "incomplete_data"]  # FIX: C6-RT-08
+    real_creep = [f for f in findings["privilege_creep"] if f.get("status") != "incomplete_data"]  # FIX: C6-RT-08
+    real_orphaned = [f for f in findings["orphaned_approvers"] if f.get("status") != "incomplete_data"]  # FIX: C6-RT-08
+    incomplete_data_count = sum(  # FIX: C6-RT-08
+        1 for cat in findings.values() for f in cat if f.get("status") == "incomplete_data"  # FIX: C6-RT-08
+    )  # FIX: C6-RT-08
 
     summary = {
         "total_users": len(rows),
-        "inactive_count": len(findings["inactive_users"]),
-        "privilege_creep_count": len(findings["privilege_creep"]),
-        "orphaned_approver_count": len(findings["orphaned_approvers"]),
+        "inactive_count": len(real_inactive),  # FIX: C6-RT-08
+        "privilege_creep_count": len(real_creep),  # FIX: C6-RT-08
+        "orphaned_approver_count": len(real_orphaned),  # FIX: C6-RT-08
+        "incomplete_data_count": incomplete_data_count,  # FIX: C6-RT-08
     }
 
     # Derive simple compliance signals (warn if any findings)
+    # FIX: C6-RT-08: when a required field was unavailable, the access-rights review
+    # (ISO 27001 A.9.2.5) could not fully run -> report "incomplete", never "pass".
     compliance = {
         "soc2_cc6_1": "warn" if summary["inactive_count"] > 0 else "pass",
-        "iso27001_a9_2_5": "warn" if summary["privilege_creep_count"] > 0 else "pass",
+        "iso27001_a9_2_5": (  # FIX: C6-RT-08
+            "incomplete" if unavailable_fields & {"Systems", "GrantedBy"}  # FIX: C6-RT-08
+            else "warn" if summary["privilege_creep_count"] > 0  # FIX: C6-RT-08
+            else "pass"  # FIX: C6-RT-08
+        ),
     }
 
     result: dict[str, Any] = {
@@ -393,10 +463,10 @@ def run_access_review(
             ["user_id", "email", "role", "last_login", "days_inactive", "recommendation"],
         )
 
-    if output_privilege_creep_csv and findings["privilege_creep"]:
+    if output_privilege_creep_csv and real_creep:  # FIX: C6-RT-08: export real findings only — never the incomplete_data marker (no identity fields)
         _write_findings_csv(
             output_privilege_creep_csv,
-            findings["privilege_creep"],
+            real_creep,  # FIX: C6-RT-08: markers excluded so the CSV artifact can't read as an empty-identity finding
             ["user_id", "email", "issue"],
         )
 
