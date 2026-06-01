@@ -43,6 +43,7 @@ IMPACT_ANALYZER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incide
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
     log_dir = tmp_path / "containment"  # FIX: C5-finding-3
     fake_ec2 = MagicMock()  # FIX: C5-finding-3
+    fake_ec2.describe_network_acls.return_value = {"NetworkAcls": [{"NetworkAclId": "acl-test-default", "Entries": []}]}  # FIX: C6-RT-03 - return a valid default NACL so the documented block_ip real-path command succeeds against the mock
     fake_iam = MagicMock()  # FIX: C5-finding-3
     fake_route53resolver = MagicMock()  # FIX: C5-finding-3
     fake_network = MagicMock()  # FIX: C5-finding-3
@@ -385,6 +386,22 @@ class TestAutoContainmentCliParity:
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
             fake_container.update.assert_called_once()  # FIX: C5-finding-3
+
+    def test_block_ip_dry_run_does_not_touch_aws(self, tmp_path):  # FIX: C6-RT-03
+        """block_ip --dry-run must simulate WITHOUT any AWS/NACL discovery (no credentials required)."""  # FIX: C6-RT-03
+        module, log_dir, fake_ec2, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-03
+        # Even if every EC2 call would fail (e.g. missing credentials), the dry-run must still succeed.  # FIX: C6-RT-03
+        fake_ec2.describe_network_acls.side_effect = Exception("Unable to locate credentials")  # FIX: C6-RT-03
+        rc = _run_auto_containment(  # FIX: C6-RT-03
+            module,  # FIX: C6-RT-03
+            ["--action", "block_ip", "--ip-address", "198.51.100.42", "--reason", "Rehearsal - IRP-002", "--dry-run"],  # FIX: C6-RT-03
+        )  # FIX: C6-RT-03
+        assert rc == 0  # FIX: C6-RT-03 - dry-run rehearsal succeeds with no AWS credentials
+        fake_ec2.describe_network_acls.assert_not_called()  # FIX: C6-RT-03 - proves no NACL discovery happened in dry-run
+        report = _read_single_report(log_dir)  # FIX: C6-RT-03
+        assert report["actions_taken"][0]["action"] == "block_ip"  # FIX: C6-RT-03
+        assert report["actions_taken"][0]["status"] == "dry_run"  # FIX: C6-RT-03
+        assert report["actions_taken"][0]["dry_run"] is True  # FIX: C6-RT-03
 
 
 class TestForensicsCollectorRuntimeParity:
