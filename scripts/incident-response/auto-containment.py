@@ -310,12 +310,12 @@ class ContainmentManager:
             normalized_domain = domain.strip().lower()  # FIX: C5-finding-3
             if not normalized_domain:  # FIX: C5-finding-3
                 raise ValueError("Domain cannot be empty")  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C6-RT-04 - simulate BEFORE resolving the firewall list id so dry-run needs no DNS_FIREWALL_DOMAIN_LIST_ID/AWS
+                logger.info("[DRY-RUN] Would add the domain to the emergency DNS firewall list")  # FIX: C6-RT-04
+                self.log_action("block_domain", normalized_domain, "dry_run", {"duration": duration, "reason": reason})  # FIX: C6-RT-04 - log only locally-known fields; firewall_domain_list_id requires AWS/env and is intentionally not resolved in dry-run
+                return True  # FIX: C6-RT-04
             firewall_domain_list_id = self._resolve_firewall_domain_list_id()  # FIX: C5-finding-3
             assert self.route53resolver is not None  # pylance: _resolve_firewall_domain_list_id raises if self.route53resolver is None
-            if self.dry_run:  # FIX: C5-finding-3
-                logger.info("[DRY-RUN] Would add the domain to the emergency DNS firewall list")  # FIX: C5-finding-3
-                self.log_action("block_domain", normalized_domain, "dry_run", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3
-                return True  # FIX: C5-finding-3
             self.route53resolver.update_firewall_domains(FirewallDomainListId=firewall_domain_list_id, Operation="ADD", Domains=[normalized_domain])  # FIX: C5-finding-3
             self.rollback_commands.append({"action": "remove_firewall_domain", "firewall_domain_list_id": firewall_domain_list_id, "domain": normalized_domain})  # FIX: C5-finding-3
             self.log_action("block_domain", normalized_domain, "success", {"duration": duration, "reason": reason, "firewall_domain_list_id": firewall_domain_list_id})  # FIX: C5-finding-3

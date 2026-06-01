@@ -70,6 +70,7 @@ def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
         sys.modules[spec.name] = module  # FIX: C5-finding-3
         spec.loader.exec_module(module)  # FIX: C5-finding-3
     module.CONTAINMENT_LOG_DIR = log_dir  # type: ignore[attr-defined]  # FIX: C5-finding-3
+    module.DNS_FIREWALL_DOMAIN_LIST_ID = "rslvr-fdl-test0000000000"  # type: ignore[attr-defined]  # FIX: C6-RT-04 - fake firewall list id so the documented block_domain real-path command resolves against the mocked route53resolver
     return module, log_dir, fake_ec2, fake_route53resolver, fake_docker_client, fake_network, fake_container  # FIX: C5-finding-3
 
 
@@ -385,6 +386,23 @@ class TestAutoContainmentCliParity:
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
             fake_container.update.assert_called_once()  # FIX: C5-finding-3
+
+    def test_block_domain_dry_run_does_not_touch_aws(self, tmp_path):  # FIX: C6-RT-04
+        """block_domain --dry-run must simulate WITHOUT resolving the firewall list id (no DNS_FIREWALL_DOMAIN_LIST_ID / AWS)."""  # FIX: C6-RT-04
+        module, log_dir, _fake_ec2, fake_route53resolver, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-04
+        module.DNS_FIREWALL_DOMAIN_LIST_ID = ""  # FIX: C6-RT-04 - simulate an UNSET firewall env: dry-run must still succeed (real path would raise)
+        # Even if the Route53 firewall call would fail, the dry-run must still succeed.  # FIX: C6-RT-04
+        fake_route53resolver.update_firewall_domains.side_effect = Exception("DNS_FIREWALL_DOMAIN_LIST_ID is not set")  # FIX: C6-RT-04
+        rc = _run_auto_containment(  # FIX: C6-RT-04
+            module,  # FIX: C6-RT-04
+            ["--action", "block_domain", "--domain", "attacker.com", "--reason", "C2 domain - IRP-004", "--dry-run"],  # FIX: C6-RT-04
+        )  # FIX: C6-RT-04
+        assert rc == 0  # FIX: C6-RT-04 - dry-run rehearsal succeeds with no firewall env/credentials
+        fake_route53resolver.update_firewall_domains.assert_not_called()  # FIX: C6-RT-04 - proves no Route53 firewall mutation happened in dry-run
+        report = _read_single_report(log_dir)  # FIX: C6-RT-04
+        assert report["actions_taken"][0]["action"] == "block_domain"  # FIX: C6-RT-04
+        assert report["actions_taken"][0]["status"] == "dry_run"  # FIX: C6-RT-04
+        assert report["actions_taken"][0]["dry_run"] is True  # FIX: C6-RT-04
 
 
 class TestForensicsCollectorRuntimeParity:
