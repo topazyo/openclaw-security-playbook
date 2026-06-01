@@ -32,3 +32,10 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]  # FIX: C6-RT-09
+testpaths = ["tests"]  # FIX: C6-RT-09 - collect only the maintained suite, not gitignored tmp/claude-home* reference checkouts
+# Setting this ini key REPLACES pytest's built-in default list rather than extending it, so the
+# defaults are restated verbatim here and only "tmp" is added. Dropping them would silently
+# re-enable recursion into node_modules/venv/dot-dirs.  # FIX: C6-RT-09
+norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "tmp"]  # FIX: C6-RT-09 - pytest defaults + the local temp/reference checkout tree
