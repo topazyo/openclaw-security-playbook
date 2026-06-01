@@ -12,7 +12,6 @@ the stored ``prev_hash`` pointer, so content edits that preserved the pointer pa
 from __future__ import annotations
 
 import copy
-import hashlib
 import importlib.util
 import json
 import sys
@@ -66,10 +65,12 @@ def _write_jsonl(tmp_path: Path, events: list[dict[str, Any]]) -> str:
     return str(path)
 
 
-def _rehash(event: dict[str, Any]) -> str:
-    """Recompute an event's chain_hash the way the canonical writer does."""
-    body = {k: v for k, v in event.items() if k != "chain_hash"}
-    return hashlib.sha256(json.dumps(body, sort_keys=True).encode("utf-8")).hexdigest()
+# Re-hash via the verifier's own canonical routine (the single source of truth) rather than a
+# duplicated copy here, so a fixture built to pass the content check can never drift from what
+# the verifier actually computes. These re-hashes only exist to make the content check pass so
+# the linkage/genesis checks can be isolated; writer-vs-verifier agreement is pinned separately
+# by test_accepts_intact_chain_from_canonical_writer below.
+_rehash = verifier.compute_event_chain_hash
 
 
 def test_accepts_intact_chain_from_canonical_writer(tmp_path: Path) -> None:
@@ -113,6 +114,25 @@ def test_fails_closed_on_missing_chain_hash(tmp_path: Path) -> None:
 
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
     assert any(b["position"] == 1 and b["reason"] == "missing_or_invalid_chain_hash" for b in report["breaks"])
+
+
+def test_unverifiable_previous_event_is_not_mislabeled_as_link_mismatch(tmp_path: Path) -> None:
+    # When a prior event is unverifiable (missing chain_hash), the NEXT event's linkage cannot be
+    # meaningfully checked: its prev_hash points at the prior event's real hash, but the verifier
+    # has no verified hash to compare against. It must be reported as previous_event_unverifiable,
+    # NOT as a genuine prev_hash_link_mismatch. (Event 3's own content is left intact so it does
+    # not trip content_hash_mismatch first, isolating the linkage path.)
+    events = copy.deepcopy(_build_chain())
+    del events[2]["chain_hash"]  # event 2 becomes unverifiable; events 0,1,3,4 untouched
+    report_path = str(tmp_path / "report.json")
+    assert verifier.verify_hash_chain(_write_jsonl(tmp_path, events), report_path) is False
+
+    report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    by_position = {b["position"]: b["reason"] for b in report["breaks"]}
+    assert by_position.get(2) == "missing_or_invalid_chain_hash"
+    assert by_position.get(3) == "previous_event_unverifiable"
+    # The bug this guards against: event 3 must NOT be blamed for a link mismatch it didn't cause.
+    assert not any(b["position"] == 3 and b["reason"] == "prev_hash_link_mismatch" for b in report["breaks"])
 
 
 def test_rejects_prev_hash_link_tamper_even_when_content_hash_valid(tmp_path: Path) -> None:

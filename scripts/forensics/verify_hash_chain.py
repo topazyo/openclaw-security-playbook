@@ -22,6 +22,42 @@ from typing import Any
 JsonObject = dict[str, Any]
 
 
+def compute_event_chain_hash(event: JsonObject) -> str:  # FIX: C6-RT-01 - single source of truth for the content hash
+    """Canonical chain_hash for one telemetry event.
+
+    SHA-256 over the event object EXCLUDING its own ``chain_hash`` (``prev_hash`` is retained
+    in the hashed body), canonicalized via ``json.dumps(sort_keys=True)``. This mirrors the
+    canonical writer ``exercise_malicious_skill_chain.apply_hash_chain``. It is the sole place
+    the verifier recomputes the hash and is imported by the tests, so the verifier and its
+    fixtures cannot drift apart; writer-vs-verifier agreement is pinned separately by the
+    intact-chain test that builds fixtures with the real writer.
+    """
+    hashed_body = {k: v for k, v in event.items() if k != "chain_hash"}  # FIX: C6-RT-01
+    return hashlib.sha256(json.dumps(hashed_body, sort_keys=True).encode("utf-8")).hexdigest()  # FIX: C6-RT-01
+
+
+def _short_hash(value: object, prefix: int = 12) -> str:  # FIX: C6-RT-01 - keep the human-facing stderr line scannable
+    """Render a hash/pointer for the stderr break message.
+
+    Truncates 64-char hex digests to a leading prefix so a multi-break run stays readable;
+    ``None`` is shown as ``null``. The untruncated values are always preserved in full in the
+    JSON report's ``breaks`` entries, so field debugging loses nothing when ``--output`` is set.
+    """
+    if value is None:  # FIX: C6-RT-01
+        return "null"  # FIX: C6-RT-01
+    text = str(value)  # FIX: C6-RT-01
+    return f"{text[:prefix]}..." if len(text) > prefix else text  # FIX: C6-RT-01
+
+
+def _is_valid_chain_hash(value: object) -> bool:  # FIX: C6-RT-01 - a present, non-empty string is the only verifiable chain_hash
+    """Whether a stored chain_hash is verifiable at all (present, a string, non-empty).
+
+    An event whose own chain_hash fails this cannot be content-verified, and the NEXT event
+    cannot have its linkage meaningfully checked against it — see the linkage gate below.
+    """
+    return isinstance(value, str) and bool(value)  # FIX: C6-RT-01
+
+
 def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
     events: list[JsonObject] = []
     path = Path(input_path)
@@ -68,18 +104,17 @@ def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
         # content mismatch, missing/invalid chain_hash, or broken linkage is recorded as a break.
         recomputed_chain_hash: str | None = None  # FIX: C6-RT-01
         break_reason: str | None = None  # FIX: C6-RT-01
-        if not isinstance(stored_chain_hash, str) or not stored_chain_hash:  # FIX: C6-RT-01
+        if not _is_valid_chain_hash(stored_chain_hash):  # FIX: C6-RT-01 - this event is unverifiable
             break_reason = "missing_or_invalid_chain_hash"  # FIX: C6-RT-01
         else:  # FIX: C6-RT-01
-            hashed_body = {k: v for k, v in event.items() if k != "chain_hash"}  # FIX: C6-RT-01
-            recomputed_chain_hash = hashlib.sha256(  # FIX: C6-RT-01
-                json.dumps(hashed_body, sort_keys=True).encode("utf-8")  # FIX: C6-RT-01
-            ).hexdigest()  # FIX: C6-RT-01
+            recomputed_chain_hash = compute_event_chain_hash(event)  # FIX: C6-RT-01 - canonical content hash
             if recomputed_chain_hash != stored_chain_hash:  # FIX: C6-RT-01 - content tampering
                 break_reason = "content_hash_mismatch"  # FIX: C6-RT-01
             elif i == 0:  # FIX: C6-RT-01 - genesis event must declare prev_hash=null
                 if event_prev_hash is not None:  # FIX: C6-RT-01
                     break_reason = "genesis_prev_hash_not_null"  # FIX: C6-RT-01
+            elif not _is_valid_chain_hash(prev_chain_hash):  # FIX: C6-RT-01 - prior event unverifiable, so linkage can't be checked
+                break_reason = "previous_event_unverifiable"  # FIX: C6-RT-01 - distinct from a genuine link mismatch
             elif event_prev_hash != prev_chain_hash:  # FIX: C6-RT-01 - linkage to prior event
                 break_reason = "prev_hash_link_mismatch"  # FIX: C6-RT-01
 
@@ -97,8 +132,12 @@ def verify_hash_chain(input_path: str, output_path: str | None = None) -> bool:
             results["breaks"].append(break_info)
             results["chain_intact"] = False
             print(
-                f"BREAK at position {i} ({event.get('timestamp')}): {break_reason} "  # FIX: C6-RT-01
-                f"(stored={stored_chain_hash}, recomputed={recomputed_chain_hash})",  # FIX: C6-RT-01
+                f"BREAK at position {i} ({event.get('timestamp')}, "  # FIX: C6-RT-01
+                f"event_type={event.get('event_type')}): {break_reason} "  # FIX: C6-RT-01 - include event_type
+                f"[expected_prev_hash={_short_hash(prev_chain_hash if i > 0 else None)}, "  # FIX: C6-RT-01 - restore linkage detail
+                f"actual_prev_hash={_short_hash(event_prev_hash)}, "  # FIX: C6-RT-01 - restore linkage detail
+                f"stored_chain_hash={_short_hash(stored_chain_hash)}, "  # FIX: C6-RT-01
+                f"recomputed_chain_hash={_short_hash(recomputed_chain_hash)}]",  # FIX: C6-RT-01
                 file=sys.stderr,
             )
 
