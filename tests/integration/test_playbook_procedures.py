@@ -401,7 +401,7 @@ class TestAutoContainmentCliParity:
     def test_block_domain_dry_run_does_not_touch_aws(self, tmp_path):  # FIX: C6-RT-04
         """block_domain --dry-run must simulate WITHOUT resolving the firewall list id (no DNS_FIREWALL_DOMAIN_LIST_ID / AWS)."""  # FIX: C6-RT-04
         module, log_dir, _fake_ec2, fake_route53resolver, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-04
-        module.DNS_FIREWALL_DOMAIN_LIST_ID = ""  # FIX: C6-RT-04 - simulate an UNSET firewall env: dry-run must still succeed (real path would raise)
+        module.DNS_FIREWALL_DOMAIN_LIST_ID = None  # type: ignore[attr-defined]  # FIX: C6-RT-04 - simulate a truly-unset firewall env (os.getenv returns None when the var is absent); set explicitly so the test owns its precondition. dry-run must still succeed (the real path would raise)
         # Even if the Route53 firewall call would fail, the dry-run must still succeed.  # FIX: C6-RT-04
         fake_route53resolver.update_firewall_domains.side_effect = Exception("DNS_FIREWALL_DOMAIN_LIST_ID is not set")  # FIX: C6-RT-04
         rc = _run_auto_containment(  # FIX: C6-RT-04
