@@ -23,7 +23,7 @@ import importlib.util  # FIX: C5-finding-3
 import sys
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timezone
 import json
 from pathlib import Path  # FIX: C5-finding-3
@@ -43,6 +43,7 @@ IMPACT_ANALYZER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incide
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
     log_dir = tmp_path / "containment"  # FIX: C5-finding-3
     fake_ec2 = MagicMock()  # FIX: C5-finding-3
+    fake_ec2.describe_network_acls.return_value = {"NetworkAcls": [{"NetworkAclId": "acl-default"}]}  # FIX: C6-RT-04 - default NACL discovery response (matches sibling helper) so the block_ip real-path resolves an ACL; shared mock infra, not a masking default — no test here asserts the unset-NACL behavior
     fake_iam = MagicMock()  # FIX: C5-finding-3
     fake_route53resolver = MagicMock()  # FIX: C5-finding-3
     fake_network = MagicMock()  # FIX: C5-finding-3
@@ -70,7 +71,8 @@ def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
         sys.modules[spec.name] = module  # FIX: C5-finding-3
         spec.loader.exec_module(module)  # FIX: C5-finding-3
     module.CONTAINMENT_LOG_DIR = log_dir  # type: ignore[attr-defined]  # FIX: C5-finding-3
-    module.DNS_FIREWALL_DOMAIN_LIST_ID = "rslvr-fdl-test0000000000"  # type: ignore[attr-defined]  # FIX: C6-RT-04 - fake firewall list id so the documented block_domain real-path command resolves against the mocked route53resolver
+    module.DNS_FIREWALL_DOMAIN_LIST_ID = None  # type: ignore[attr-defined]  # FIX: C6-RT-04 - keep the helper neutral (unset firewall list id); tests exercising the block_domain real-path set a list id themselves to avoid cross-test coupling and masking unset-id behavior
+    module.BLOCK_NETWORK_ACL_ID = None  # type: ignore[attr-defined]  # FIX: C6-RT-04 - neutral default (matches sibling helper); block_ip resolves its ACL via the mocked describe_network_acls discovery path, not an env-pinned id
     return module, log_dir, fake_ec2, fake_route53resolver, fake_docker_client, fake_network, fake_container  # FIX: C5-finding-3
 
 
@@ -372,7 +374,9 @@ class TestAutoContainmentCliParity:
     def test_auto_containment_accepts_documented_playbook_commands(  # FIX: C5-finding-3
         self, tmp_path, args, expected_action, expected_target, expected_reason, expected_mode  # FIX: C5-finding-3
     ):  # FIX: C5-finding-3
-        module, log_dir, _fake_ec2, _fake_route53resolver, fake_docker_client, fake_network, fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        module, log_dir, _fake_ec2, _fake_route53resolver, fake_docker_client, fake_network, _fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        if expected_action == "block_domain":  # FIX: C6-RT-04 - only the block_domain real-path resolves the firewall list id; set it here, not in the shared helper
+            module.DNS_FIREWALL_DOMAIN_LIST_ID = "rslvr-fdl-test0000000000"  # type: ignore[attr-defined]  # FIX: C6-RT-04 - fake firewall list id so the documented block_domain command resolves against the mocked route53resolver
         assert _run_auto_containment(module, args) == 0  # FIX: C5-finding-3
         report = _read_single_report(log_dir)  # FIX: C5-finding-3
         assert report["actions_taken"][0]["action"] == expected_action  # FIX: C5-finding-3
@@ -382,10 +386,17 @@ class TestAutoContainmentCliParity:
         if expected_mode is not None:  # FIX: C5-finding-3
             assert report["actions_taken"][0]["details"]["mode"] == expected_mode  # FIX: C5-finding-3
             assert report["actions_taken"][0]["details"]["limits"]["global_per_second"] == 500  # FIX: C5-finding-3
+        if expected_action == "block_domain":  # FIX: C6-RT-04 - schema parity: success path carries the resolved firewall_domain_list_id (dry-run carries sentinel None)
+            assert report["actions_taken"][0]["details"]["firewall_domain_list_id"] == "rslvr-fdl-test0000000000"  # FIX: C6-RT-04
         if expected_action == "isolate_container":  # FIX: C5-finding-3
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
-            fake_container.update.assert_called_once()  # FIX: C5-finding-3
+            # FIX: C6-RT-04 - C6-H-07 replaced container.update(labels=...) (immutable Docker labels raise TypeError) with a quarantine manifest. Assert that durable behavior — the persisted quarantine record — instead of the removed update() call, which is both obsolete and brittle.
+            manifest_files = sorted(log_dir.glob("*-quarantined-containers.jsonl"))  # FIX: C6-RT-04
+            assert len(manifest_files) == 1  # FIX: C6-RT-04 - exactly one quarantine manifest written for this incident
+            manifest_record = json.loads(manifest_files[0].read_text(encoding="utf-8").splitlines()[0])  # FIX: C6-RT-04 - JSONL: first (only) record
+            assert manifest_record["container_id"] == "agent-prod-42"  # FIX: C6-RT-04 - quarantine record names the isolated container
+            assert manifest_record["original_networks"] == ["openclaw-network", "bridge"]  # FIX: C6-RT-04 - records the networks it was disconnected from (for rollback)
 
     def test_block_domain_dry_run_does_not_touch_aws(self, tmp_path):  # FIX: C6-RT-04
         """block_domain --dry-run must simulate WITHOUT resolving the firewall list id (no DNS_FIREWALL_DOMAIN_LIST_ID / AWS)."""  # FIX: C6-RT-04
@@ -403,6 +414,9 @@ class TestAutoContainmentCliParity:
         assert report["actions_taken"][0]["action"] == "block_domain"  # FIX: C6-RT-04
         assert report["actions_taken"][0]["status"] == "dry_run"  # FIX: C6-RT-04
         assert report["actions_taken"][0]["dry_run"] is True  # FIX: C6-RT-04
+        # Schema parity: firewall_domain_list_id is present on both dry-run and success; in dry-run it is a sentinel None (never resolved against AWS/env).  # FIX: C6-RT-04
+        assert "firewall_domain_list_id" in report["actions_taken"][0]["details"]  # FIX: C6-RT-04
+        assert report["actions_taken"][0]["details"]["firewall_domain_list_id"] is None  # FIX: C6-RT-04
 
 
 class TestForensicsCollectorRuntimeParity:
