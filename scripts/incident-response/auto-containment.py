@@ -271,7 +271,19 @@ class ContainmentManager:
         return DNS_FIREWALL_DOMAIN_LIST_ID
 
     def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
-        """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
+        """Block an attacker IP by adding deny entries to the emergency network ACL.
+
+        Report contract: every action record carries the same top-level keys
+        (timestamp, incident_id, action, target, status, details, dry_run). The
+        ``details`` bag is status-dependent, so consumers MUST branch on ``status``:
+          - ``dry_run``: {cidr_block, duration, reason}. The AWS-derived fields
+            (network_acl_id, ingress_rule_number, egress_rule_number,
+            ingress_already_present, egress_already_present) are intentionally
+            ABSENT — dry-run performs no NACL discovery and requires no AWS
+            credentials (C6-RT-03), so those values are never resolved.
+          - ``success``: the dry_run fields plus the five AWS-derived fields above.
+          - ``failed``: {error, duration, reason}.
+        """  # FIX: C6-RT-03 - document status-dependent report schema; dry-run omits AWS-derived fields by design
         logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3

@@ -43,7 +43,7 @@ IMPACT_ANALYZER_PATH = Path(__file__).resolve().parents[2] / "scripts" / "incide
 def _load_auto_containment_module(tmp_path):  # FIX: C5-finding-3
     log_dir = tmp_path / "containment"  # FIX: C5-finding-3
     fake_ec2 = MagicMock()  # FIX: C5-finding-3
-    fake_ec2.describe_network_acls.return_value = {"NetworkAcls": [{"NetworkAclId": "acl-test-default", "Entries": []}]}  # FIX: C6-RT-03 - return a valid default NACL so the documented block_ip real-path command succeeds against the mock
+    fake_ec2.describe_network_acls.return_value = {"NetworkAcls": [{"NetworkAclId": "acl-test-default", "IsDefault": True, "VpcId": "vpc-test-0000", "OwnerId": "123456789012", "Associations": [{"NetworkAclAssociationId": "aclassoc-test-0000", "NetworkAclId": "acl-test-default", "SubnetId": "subnet-test-0000"}], "Entries": [], "Tags": []}]}  # FIX: C6-RT-03 - mirror the real boto3 default-NACL response shape (IsDefault/VpcId/Associations/OwnerId) so the mock matches what describe_network_acls actually returns; Entries kept empty so _allocate_acl_rule_numbers still picks deterministic rule numbers in the real-path block_ip test
     fake_iam = MagicMock()  # FIX: C5-finding-3
     fake_route53resolver = MagicMock()  # FIX: C5-finding-3
     fake_network = MagicMock()  # FIX: C5-finding-3
@@ -398,10 +398,14 @@ class TestAutoContainmentCliParity:
         )  # FIX: C6-RT-03
         assert rc == 0  # FIX: C6-RT-03 - dry-run rehearsal succeeds with no AWS credentials
         fake_ec2.describe_network_acls.assert_not_called()  # FIX: C6-RT-03 - proves no NACL discovery happened in dry-run
+        fake_ec2.create_network_acl_entry.assert_not_called()  # FIX: C6-RT-03 - the only other EC2 method block_ip's real path invokes; never reached in dry-run
+        assert fake_ec2.method_calls == []  # FIX: C6-RT-03 - comprehensive backstop: NO EC2 method of any kind runs in dry-run (subsumes replace_network_acl_entry and any future real-path call)
         report = _read_single_report(log_dir)  # FIX: C6-RT-03
-        assert report["actions_taken"][0]["action"] == "block_ip"  # FIX: C6-RT-03
-        assert report["actions_taken"][0]["status"] == "dry_run"  # FIX: C6-RT-03
-        assert report["actions_taken"][0]["dry_run"] is True  # FIX: C6-RT-03
+        actions = report["actions_taken"]  # FIX: C6-RT-03
+        assert len(actions) == 1  # FIX: C6-RT-03 - dry-run records exactly one action, so [0] is unambiguous (and proves no extra real-path action leaked in)
+        block_ip_action = next(a for a in actions if a["action"] == "block_ip")  # FIX: C6-RT-03 - select by action name, not position, so the assertions stay correct if recording order ever changes
+        assert block_ip_action["status"] == "dry_run"  # FIX: C6-RT-03
+        assert block_ip_action["dry_run"] is True  # FIX: C6-RT-03
 
 
 class TestForensicsCollectorRuntimeParity:
