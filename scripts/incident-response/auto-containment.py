@@ -39,6 +39,7 @@ Related: playbook-prompt-injection.md, IRP-001.md
 """
 
 import argparse
+import hashlib  # FIX: C6-RT-05 - redact identity PII from operational logs
 import ipaddress  # FIX: C5-finding-3
 import json
 import logging
@@ -85,6 +86,54 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# --action accepts a single canonical kebab-case spelling per action. snake_case  # FIX: C6-RT-05
+# spellings (e.g. block_ip, disable_account) are accepted as backward-compatible  # FIX: C6-RT-05
+# aliases so existing runbooks/automation keep working; every value is normalized  # FIX: C6-RT-05
+# to its canonical kebab-case form before dispatch. NOTE: CLI surface only -- the  # FIX: C6-RT-05
+# internal log_action() names stay snake_case (the audit-log schema is unchanged).  # FIX: C6-RT-05
+CANONICAL_ACTIONS = [  # FIX: C6-RT-05
+    "isolate-ec2",  # FIX: C6-RT-05
+    "revoke-credentials",  # FIX: C6-RT-05
+    "isolate-docker",  # FIX: C6-RT-05
+    "block-ip",  # FIX: C6-RT-05
+    "block-domain",  # FIX: C6-RT-05
+    "isolate-container",  # FIX: C6-RT-05
+    "update-rate-limits",  # FIX: C6-RT-05
+    "disable-account",  # FIX: C6-RT-05
+    "revoke-all-sessions",  # FIX: C6-RT-05
+    "enable-account",  # FIX: C6-RT-05
+    "permanent-ban",  # FIX: C6-RT-05
+    "kill-skill",  # FIX: C6-RT-05 - skill-enforcement action (fail-closed stub)
+]  # FIX: C6-RT-05
+
+
+def _normalize_action(value: str) -> str:  # FIX: C6-RT-05
+    """Normalize an --action value to its canonical kebab-case form.
+
+    Lowercases and maps '_' -> '-' so snake_case aliases (block_ip,
+    disable_account, ...) resolve to the canonical kebab-case action. Validation
+    against CANONICAL_ACTIONS is left to argparse `choices`, which produces the
+    standard "invalid choice" error listing the canonical names.
+    """  # FIX: C6-RT-05
+    return value.strip().lower().replace("_", "-")  # FIX: C6-RT-05
+
+
+def _redact_identity(user_id: str) -> str:  # FIX: C6-RT-05
+    """Return a stable, non-PII token for a user identity, safe for operational logs.
+
+    Identity-containment targets are typically emails/usernames (PII). Operational
+    logs (INFO/ERROR) can be shipped to CI output or centralized log aggregators
+    whose access is broader than the deliberate containment audit trail, so the raw
+    identity is never emitted there -- only a stable SHA-256-derived token that lets
+    an operator correlate log lines for the same identity. The full identity is still
+    recorded in the access-controlled containment audit log (log_action target) for
+    incident-response forensics. This is log-hygiene redaction, not cryptographic
+    anonymization (the unsalted digest is kept stable so log lines stay correlatable).
+    """  # FIX: C6-RT-05
+    digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:12]  # FIX: C6-RT-05
+    return f"identity:{digest}"  # FIX: C6-RT-05
 
 
 class ContainmentManager:
@@ -336,13 +385,16 @@ class ContainmentManager:
           - clawguard (policy):        POST {policy, subject: {user_id}} -> {allowed: bool, reason: str}  [CLAWGUARD_URL, CLAWGUARD_TOKEN]
           - openclaw-shield (enforce): POST {action, target: {user_id}} -> {applied: bool}               [OPENCLAW_SHIELD_URL, OPENCLAW_SHIELD_TOKEN]
         """  # FIX: C6-RT-05
-        logger.info(f"{action} requested for identity {user_id} (details={details})")  # FIX: C6-RT-05
+        # PII hygiene: log only a redacted identity token and never the arbitrary  # FIX: C6-RT-05
+        # `details` kwargs on this operational INFO line -- it can reach CI/centralized  # FIX: C6-RT-05
+        # logs. The full identity + reason are retained in the audit trail (log_action).  # FIX: C6-RT-05
+        logger.info(f"{action} requested for {_redact_identity(user_id)}")  # FIX: C6-RT-05
         raise NotImplementedError(  # FIX: C6-RT-05
             f"{action} is not wired: acting on a user identity requires the clawguard policy authority "
             f"(CLAWGUARD_URL/CLAWGUARD_TOKEN; POST {{policy, subject}} -> {{allowed, reason}}) and/or the "
             f"openclaw-shield enforcement integration (OPENCLAW_SHIELD_URL/OPENCLAW_SHIELD_TOKEN; "
             f"POST {{action, target}} -> {{applied}}). No automated identity action exists in this repo "
-            f"yet; refusing to report a false containment for {user_id}."  # FIX: C6-RT-05
+            f"yet; refusing to report a false containment for {_redact_identity(user_id)}."  # FIX: C6-RT-05 - redact PII; this message propagates to the operational error log
         )  # FIX: C6-RT-05
 
     def disable_account(self, user_id: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
@@ -360,6 +412,27 @@ class ContainmentManager:
     def permanent_ban(self, user_id: str, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
         """Permanently ban a user identity (fail-closed stub until wired)."""  # FIX: C6-RT-05
         return self._identity_action_stub("permanent_ban", user_id, reason=reason)  # FIX: C6-RT-05
+
+    def kill_skill(self, agent_id: str, skill_name: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C6-RT-05
+        """Terminate a malicious skill on a specific agent (fail-closed stub until wired).
+
+        Killing a skill process on a remote agent is an enforcement action with no AWS or
+        local-Docker equivalent in this script (the skill-compromise playbook documents a
+        manual `docker exec <agent> pkill` fallback for that). It depends on the openclaw-shield
+        enforcement integration / agent control-plane, which is NOT wired here. Per the
+        unwired-integration rule it raises NotImplementedError so callers FAIL CLOSED rather
+        than report a false containment, and never silently no-ops. To wire it:
+          - openclaw-shield (enforce): POST {action: 'kill_skill', target: {agent_id, skill_name}} -> {applied: bool}  [OPENCLAW_SHIELD_URL, OPENCLAW_SHIELD_TOKEN]
+        agent_id/skill_name are operational identifiers (not PII), so they are logged as-is.
+        """  # FIX: C6-RT-05
+        logger.info(f"kill_skill requested for skill {skill_name!r} on agent {agent_id}")  # FIX: C6-RT-05
+        raise NotImplementedError(  # FIX: C6-RT-05
+            f"kill_skill is not wired: terminating skill {skill_name!r} on agent {agent_id} requires the "
+            f"openclaw-shield enforcement integration (OPENCLAW_SHIELD_URL/OPENCLAW_SHIELD_TOKEN; "
+            f"POST {{action, target}} -> {{applied}}). No automated skill-kill action exists in this repo "
+            f"yet; refusing to report a false containment. Use the documented 'docker exec <agent> pkill' "
+            f"fallback for manual termination."  # FIX: C6-RT-05
+        )  # FIX: C6-RT-05
 
     def _write_quarantine_manifest(  # FIX: C6-H-07
         self,  # FIX: C6-H-07
@@ -850,13 +923,21 @@ Examples:
     python3 auto-containment.py --incident INC-2024-001 \\
         --domain attacker.example.com --reason "C2 domain" --action block_domain
 
-    # Isolate a named container (network disconnect + quarantine label)
+    # Isolate a named container (network disconnect + quarantine manifest)
     python3 auto-containment.py --incident INC-2024-001 \\
-        --container-id agent-prod-42 --action isolate_container
+        --container-id agent-prod-42 --action isolate-container
 
     # Apply aggressive rate-limit override profile
     python3 auto-containment.py --incident INC-2024-001 \\
-        --mode aggressive --limits '{\"per_ip_per_minute\":10}' --action update_rate_limits
+        --mode aggressive --limits '{\"per_ip_per_minute\":10}' --action update-rate-limits
+
+    # Disable a compromised user identity (fail-closed stub until the identity integration is wired)
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --user-id eve@external.com --reason "Prompt injection" --action disable-account
+
+    # Kill a malicious skill on an agent (fail-closed stub until the skill-enforcement integration is wired)
+    python3 auto-containment.py --incident INC-2024-001 \\
+        --agent-id agent-prod-12 --skill-name "@attacker/credential-stealer" --action kill-skill
 
     # Dry-run any action
     python3 auto-containment.py --incident INC-2024-001 \\
@@ -869,14 +950,24 @@ Environment Variables:
     DNS_FIREWALL_DOMAIN_LIST_ID Route53 Resolver domain list for domain blocking; created if absent
     RATE_LIMIT_CONFIG_PATH      File path for rate-limit override profile
 
-Actions (all implemented):
+Actions (kebab-case canonical; snake_case spellings accepted as aliases):
     isolate-ec2           Snapshot volumes + apply quarantine SG  # FIX: C5-Batch-G
     revoke-credentials    Deactivate IAM access keys + attach deny-all policy  # FIX: C5-Batch-G
     isolate-docker        Disconnect Docker container from all networks  # FIX: C5-Batch-G
-    block_ip              Add deny entries to emergency network ACL  # FIX: C5-Batch-G
-    block_domain          Add domain to Route53 Resolver DNS firewall list  # FIX: C5-Batch-G
-    isolate_container     Network disconnect + quarantine label (Docker)  # FIX: C5-Batch-G
-    update_rate_limits    Write emergency rate-limit override profile  # FIX: C5-Batch-G
+    block-ip              Add deny entries to emergency network ACL  # FIX: C6-RT-05
+    block-domain          Add domain to Route53 Resolver DNS firewall list  # FIX: C6-RT-05
+    isolate-container     Network disconnect + quarantine manifest (Docker)  # FIX: C6-RT-05
+    update-rate-limits    Write emergency rate-limit override profile  # FIX: C6-RT-05
+    disable-account       Disable a user identity (fail-closed stub until wired)  # FIX: C6-RT-05
+    revoke-all-sessions   Revoke all active sessions for a user (fail-closed stub)  # FIX: C6-RT-05
+    enable-account        Re-enable a user identity (fail-closed stub until wired)  # FIX: C6-RT-05
+    permanent-ban         Permanently ban a user identity (fail-closed stub)  # FIX: C6-RT-05
+    kill-skill            Terminate a malicious skill on an agent (fail-closed stub)  # FIX: C6-RT-05
+
+Accepted aliases (snake_case, normalized to the kebab-case names above):  # FIX: C6-RT-05
+    block_ip, block_domain, isolate_container, update_rate_limits,  # FIX: C6-RT-05
+    disable_account, revoke_all_sessions, enable_account, permanent_ban,  # FIX: C6-RT-05
+    isolate_ec2, revoke_credentials, isolate_docker, kill_skill  # FIX: C6-RT-05
         """  # FIX: C5-Batch-G
     )
     
@@ -893,16 +984,19 @@ Actions (all implemented):
     parser.add_argument(
         "--action",
         required=True,
-        choices=["isolate-ec2", "revoke-credentials", "isolate-docker", "block_ip", "block_domain", "isolate_container", "update_rate_limits", "disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"],  # FIX: C5-finding-3  # FIX: C6-RT-05 - identity-containment actions (fail-closed stubs)
-        help="Containment action to perform"
+        type=_normalize_action,  # FIX: C6-RT-05 - normalize snake_case aliases (block_ip, disable_account, ...) to canonical kebab-case before validation
+        choices=CANONICAL_ACTIONS,  # FIX: C5-finding-3  # FIX: C6-RT-05 - canonical kebab-case names; snake_case spellings accepted via type= normalization
+        help="Containment action to perform (kebab-case canonical; snake_case spellings accepted as aliases)"  # FIX: C6-RT-05
     )
     parser.add_argument("--ip-address", help="IP address to block with the block_ip action")  # FIX: C5-finding-3
     parser.add_argument("--domain", help="Domain to block with the block_domain action")  # FIX: C5-finding-3
     parser.add_argument("--container-id", help="Container ID to isolate with the isolate_container action")  # FIX: C5-finding-3
     parser.add_argument("--duration", help="Duration for temporary containment actions")  # FIX: C5-finding-3
     parser.add_argument("--reason", help="Reason recorded in the containment log")  # FIX: C5-finding-3
-    parser.add_argument("--user-id", help="User identity (e.g. user@example.com) for identity-containment actions: disable_account/revoke_all_sessions/enable_account/permanent_ban")  # FIX: C6-RT-05
-    parser.add_argument("--send-warning-email", action="store_true", help="With enable_account, request a warning email on restoration (applied by the identity integration when wired)")  # FIX: C6-RT-05
+    parser.add_argument("--user-id", help="User identity (e.g. user@example.com) for identity-containment actions: disable-account/revoke-all-sessions/enable-account/permanent-ban")  # FIX: C6-RT-05
+    parser.add_argument("--send-warning-email", action="store_true", help="With enable-account, request a warning email on restoration (applied by the identity integration when wired)")  # FIX: C6-RT-05
+    parser.add_argument("--agent-id", help="Agent identifier (e.g. agent-prod-12) for the kill-skill action")  # FIX: C6-RT-05
+    parser.add_argument("--skill-name", help="Skill name to terminate with the kill-skill action (e.g. @vendor/skill)")  # FIX: C6-RT-05
     parser.add_argument("--mode", choices=["normal", "aggressive", "emergency"], help="Rate-limit mode to apply with update_rate_limits")  # FIX: C5-finding-3
     parser.add_argument("--limits", help="JSON object describing rate-limit overrides for update_rate_limits")  # FIX: C5-finding-3
     parser.add_argument(
@@ -948,47 +1042,68 @@ Actions (all implemented):
         container_id = raw_container_target.split(":", 1)[1] if raw_container_target and ":" in raw_container_target else raw_container_target  # FIX: C5-finding-3
         success = manager.isolate_docker_container(container_id)
 
-    elif args.action == "block_ip":  # FIX: C5-finding-3
+    elif args.action == "block-ip":  # FIX: C5-finding-3  # FIX: C6-RT-05 - canonical kebab (block_ip alias normalized here)
         ip_address = args.ip_address or args.target  # FIX: C5-finding-3
         if not ip_address:  # FIX: C5-finding-3
-            parser.error("--ip-address or --target is required for block_ip")  # FIX: C5-finding-3
+            parser.error("--ip-address or --target is required for block-ip")  # FIX: C5-finding-3  # FIX: C6-RT-05
         success = manager.block_ip_address(ip_address, duration=args.duration, reason=args.reason)  # FIX: C5-finding-3
 
-    elif args.action == "block_domain":  # FIX: C5-finding-3
+    elif args.action == "block-domain":  # FIX: C5-finding-3  # FIX: C6-RT-05 - canonical kebab (block_domain alias normalized here)
         domain = args.domain or args.target  # FIX: C5-finding-3
         if not domain:  # FIX: C5-finding-3
-            parser.error("--domain or --target is required for block_domain")  # FIX: C5-finding-3
+            parser.error("--domain or --target is required for block-domain")  # FIX: C5-finding-3  # FIX: C6-RT-05
         success = manager.block_domain_name(domain, duration=args.duration, reason=args.reason)  # FIX: C5-finding-3
 
-    elif args.action == "isolate_container":  # FIX: C5-finding-3
+    elif args.action == "isolate-container":  # FIX: C5-finding-3  # FIX: C6-RT-05 - canonical kebab (isolate_container alias normalized here)
         raw_container_target = args.container_id or args.target  # FIX: C5-finding-3
         if not raw_container_target:  # FIX: C5-finding-3
-            parser.error("--container-id or --target is required for isolate_container")  # FIX: C5-finding-3
+            parser.error("--container-id or --target is required for isolate-container")  # FIX: C5-finding-3  # FIX: C6-RT-05
         container_id = raw_container_target.split(":", 1)[1] if ":" in raw_container_target else raw_container_target  # FIX: C5-finding-3
         success = manager.isolate_container(container_id, reason=args.reason)  # FIX: C5-finding-3
 
-    elif args.action == "update_rate_limits":  # FIX: C5-finding-3
+    elif args.action == "update-rate-limits":  # FIX: C5-finding-3  # FIX: C6-RT-05 - canonical kebab (update_rate_limits alias normalized here)
         if not args.mode:  # FIX: C5-finding-3
-            parser.error("--mode is required for update_rate_limits")  # FIX: C5-finding-3
+            parser.error("--mode is required for update-rate-limits")  # FIX: C5-finding-3  # FIX: C6-RT-05
         if parsed_limits is None:  # FIX: C5-finding-3
-            parser.error("--limits is required for update_rate_limits")  # FIX: C5-finding-3
+            parser.error("--limits is required for update-rate-limits")  # FIX: C5-finding-3  # FIX: C6-RT-05
         success = manager.update_rate_limits(args.mode, parsed_limits, reason=args.reason)  # FIX: C5-finding-3
 
-    elif args.action in ("disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"):  # FIX: C6-RT-05 - identity-containment actions
+    elif args.action in ("disable-account", "revoke-all-sessions", "enable-account", "permanent-ban"):  # FIX: C6-RT-05 - identity-containment actions (canonical kebab; snake_case aliases normalized here)
         if not args.user_id:  # FIX: C6-RT-05
             parser.error(f"--user-id is required for {args.action}")  # FIX: C6-RT-05
+        # Audit-log under the snake_case action name so identity events match the  # FIX: C6-RT-05
+        # log_action() schema every other action uses (block_ip, isolate_ec2, ...).  # FIX: C6-RT-05
+        identity_log_action = args.action.replace("-", "_")  # FIX: C6-RT-05
+        # Capture the action-specific inputs that were attempted so the audit report records  # FIX: C6-RT-05
+        # WHAT was requested even when the integration is unwired (fail-closed). These are  # FIX: C6-RT-05
+        # operator-supplied, non-PII request params; the identity itself stays in `target`.  # FIX: C6-RT-05
+        requested_params: Dict[str, Any] = {"reason": args.reason}  # FIX: C6-RT-05
+        if args.action == "disable-account":  # FIX: C6-RT-05
+            requested_params["duration"] = args.duration  # FIX: C6-RT-05
+        elif args.action == "enable-account":  # FIX: C6-RT-05
+            requested_params["send_warning_email"] = args.send_warning_email  # FIX: C6-RT-05
         try:  # FIX: C6-RT-05 - the identity integration is unwired and raises NotImplementedError; handle it explicitly
-            if args.action == "disable_account":  # FIX: C6-RT-05
+            if args.action == "disable-account":  # FIX: C6-RT-05
                 success = manager.disable_account(args.user_id, duration=args.duration, reason=args.reason)  # FIX: C6-RT-05
-            elif args.action == "revoke_all_sessions":  # FIX: C6-RT-05
+            elif args.action == "revoke-all-sessions":  # FIX: C6-RT-05
                 success = manager.revoke_all_sessions(args.user_id, reason=args.reason)  # FIX: C6-RT-05
-            elif args.action == "enable_account":  # FIX: C6-RT-05
+            elif args.action == "enable-account":  # FIX: C6-RT-05
                 success = manager.enable_account(args.user_id, send_warning_email=args.send_warning_email, reason=args.reason)  # FIX: C6-RT-05
-            else:  # permanent_ban  # FIX: C6-RT-05
+            else:  # permanent-ban  # FIX: C6-RT-05
                 success = manager.permanent_ban(args.user_id, reason=args.reason)  # FIX: C6-RT-05
         except NotImplementedError as e:  # FIX: C6-RT-05 - fail closed: log as failed, never fake success or crash with a traceback
             logger.error(f"✗ {args.action} unavailable: {e}")  # FIX: C6-RT-05
-            manager.log_action(args.action, args.user_id, "failed", {"error": str(e), "reason": args.reason})  # FIX: C6-RT-05
+            manager.log_action(identity_log_action, args.user_id, "failed", {"error": str(e), **requested_params})  # FIX: C6-RT-05 - include attempted params (duration/send_warning_email) for forensics
+            success = False  # FIX: C6-RT-05
+
+    elif args.action == "kill-skill":  # FIX: C6-RT-05 - skill-enforcement action (canonical kebab; kill_skill alias normalized here)
+        if not args.agent_id:  # FIX: C6-RT-05
+            parser.error("--agent-id is required for kill-skill")  # FIX: C6-RT-05
+        try:  # FIX: C6-RT-05 - the skill-enforcement integration is unwired and raises NotImplementedError; handle it explicitly
+            success = manager.kill_skill(args.agent_id, skill_name=args.skill_name, reason=args.reason)  # FIX: C6-RT-05
+        except NotImplementedError as e:  # FIX: C6-RT-05 - fail closed: log as failed, never fake success or crash with a traceback
+            logger.error(f"✗ kill-skill unavailable: {e}")  # FIX: C6-RT-05
+            manager.log_action("kill_skill", args.agent_id, "failed", {"error": str(e), "skill_name": args.skill_name, "reason": args.reason})  # FIX: C6-RT-05
             success = False  # FIX: C6-RT-05
 
     # Save report
