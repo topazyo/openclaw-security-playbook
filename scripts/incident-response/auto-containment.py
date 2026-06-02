@@ -273,10 +273,26 @@ class ContainmentManager:
         return DNS_FIREWALL_DOMAIN_LIST_ID
 
     def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
-        """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
+        """Block an attacker IP by adding deny entries to the emergency network ACL.
+
+        Report contract: every action record carries the same top-level keys
+        (timestamp, incident_id, action, target, status, details, dry_run). The
+        ``details`` bag is status-dependent, so consumers MUST branch on ``status``:
+          - ``dry_run``: {cidr_block, duration, reason}. The AWS-derived fields
+            (network_acl_id, ingress_rule_number, egress_rule_number,
+            ingress_already_present, egress_already_present) are intentionally
+            ABSENT — dry-run performs no NACL discovery and requires no AWS
+            credentials (C6-RT-03), so those values are never resolved.
+          - ``success``: the dry_run fields plus the five AWS-derived fields above.
+          - ``failed``: {error, duration, reason}.
+        """  # FIX: C6-RT-03 - document status-dependent report schema; dry-run omits AWS-derived fields by design
         logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C6-RT-03 - simulate BEFORE any AWS/NACL discovery so dry-run needs no credentials
+                logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C6-RT-03
+                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason})  # FIX: C6-RT-03 - log only locally-known fields; NACL id/rule numbers require AWS and are intentionally not resolved in dry-run
+                return True  # FIX: C6-RT-03
             network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
             assert self.ec2 is not None  # pylance: _resolve_network_acl_id raises if self.ec2 is None
             allocation = self._allocate_acl_rule_numbers(network_acl_id, cidr_block)
@@ -284,10 +300,6 @@ class ContainmentManager:
             egress_rule_number = allocation["egress_rule_number"]
             ingress_already_present = allocation["ingress_already_present"]
             egress_already_present = allocation["egress_already_present"]
-            if self.dry_run:  # FIX: C5-finding-3
-                logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C5-finding-3
-                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
-                return True  # FIX: C5-finding-3
             created_rule_numbers = []
             if not ingress_already_present:
                 self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)
