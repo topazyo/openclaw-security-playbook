@@ -711,7 +711,7 @@ class TestRecoveryPhase:
         backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
         manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
 
-        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10, "sessions": 5}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:  # FIX: C5-finding-3
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "verify_database_records", return_value={"users": 10, "sessions": 5}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:  # FIX: C5-finding-3
             metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
 
         assert metrics.meets_rto is True  # FIX: C5-finding-3
