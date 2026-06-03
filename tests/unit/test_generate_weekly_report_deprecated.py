@@ -38,7 +38,7 @@ def test_help_exits_zero_and_points_to_canonical_cli():
     proc = _run("--help")
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
-    assert "DEPRECATED" in combined, combined
+    assert "DEPRECATED" in proc.stderr, combined  # pointer must go to stderr, not stdout
     assert "openclaw-cli report weekly" in combined, combined
     # The guard short-circuits BEFORE the matplotlib/pandas/reportlab/elasticsearch
     # import block, so the old missing-deps abort path must never be reached.
@@ -53,6 +53,6 @@ def test_real_invocation_fails_closed_and_writes_nothing(tmp_path):
     # Exit 2 (deprecated/usage), distinct from the OLD exit-1 missing-deps path — asserting
     # the exact code catches any future drift back toward that fail-open behavior.
     assert proc.returncode == 2, combined            # does not masquerade as success
-    assert "DEPRECATED" in combined, combined         # surfaces the canonical pointer
+    assert "DEPRECATED" in proc.stderr, combined      # surfaces the canonical pointer on stderr
     assert "Missing dependencies" not in combined, combined
     assert not out.exists(), "deprecated shim must not write an output file"
