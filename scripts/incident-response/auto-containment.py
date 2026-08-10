@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnnecessaryIsInstance=false, reportTypedDictNotRequiredAccess=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnnecessaryIsInstance=false
 # type-hygiene (NOT a C5/C6 audit finding): boto3/docker SDK calls return dynamically-shaped data
-# that Pylance/pyright STRICT mode flags as Unknown / NotRequired-key access / "unnecessary"
-# isinstance. boto3-stubs supplies client method signatures, but response *values* accessed via
-# dynamic dict indexing remain Unknown under strict. The six rules above are disabled FOR THIS
-# FILE ONLY so the AWS-SDK glue checks clean; every other strict rule stays ON. The defensive
-# isinstance()/.get() guards on untrusted API responses are intentionally RETAINED as runtime
-# validation -- they are not removed to satisfy the type checker.
+# that Pylance/pyright STRICT mode flags as Unknown types or "unnecessary" isinstance. boto3-stubs
+# supplies client method signatures, but response *values* accessed via dynamic dict indexing remain
+# Unknown under strict. The five rules above are disabled FOR THIS FILE ONLY so the AWS-SDK glue
+# checks clean; every other strict rule stays ON. NOTE: reportTypedDictNotRequiredAccess is kept
+# ENABLED (it has real shape-safety signal on untrusted AWS responses) and is suppressed only
+# per-line at the specific response-access sites below, so new unguarded accesses still get flagged.
+# The defensive isinstance()/.get() guards on untrusted API responses are intentionally RETAINED as
+# runtime validation -- they are not removed to satisfy the type checker.
 """
 Automated Threat Containment
 
@@ -238,7 +240,7 @@ class ContainmentManager:
         response = self.ec2.describe_network_acls(Filters=[{"Name": "default", "Values": ["true"]}])  # FIX: C5-finding-3
         network_acls = response.get("NetworkAcls", []) if isinstance(response, dict) else []  # FIX: C5-finding-3
         if network_acls and isinstance(network_acls[0], dict) and network_acls[0].get("NetworkAclId"):  # FIX: C5-finding-3
-            return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3
+            return network_acls[0]["NetworkAclId"]  # FIX: C5-finding-3  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS describe_network_acls success-response key
         raise RuntimeError(  # FIX: C6-H-01
             "No NACL configured: set BLOCK_NETWORK_ACL_ID or ensure AWS returns a valid NetworkAclId"  # FIX: C6-H-01
         )  # FIX: C6-H-01
@@ -320,10 +322,26 @@ class ContainmentManager:
         return DNS_FIREWALL_DOMAIN_LIST_ID
 
     def block_ip_address(self, ip_address: str, duration: Optional[str] = None, reason: Optional[str] = None) -> bool:  # FIX: C5-finding-3  # pylance: duration/reason default to None
-        """Block an attacker IP by adding deny entries to the emergency network ACL."""  # FIX: C5-finding-3
+        """Block an attacker IP by adding deny entries to the emergency network ACL.
+
+        Report contract: every action record carries the same top-level keys
+        (timestamp, incident_id, action, target, status, details, dry_run). The
+        ``details`` bag is status-dependent, so consumers MUST branch on ``status``:
+          - ``dry_run``: {cidr_block, duration, reason}. The AWS-derived fields
+            (network_acl_id, ingress_rule_number, egress_rule_number,
+            ingress_already_present, egress_already_present) are intentionally
+            ABSENT — dry-run performs no NACL discovery and requires no AWS
+            credentials (C6-RT-03), so those values are never resolved.
+          - ``success``: the dry_run fields plus the five AWS-derived fields above.
+          - ``failed``: {error, duration, reason}.
+        """  # FIX: C6-RT-03 - document status-dependent report schema; dry-run omits AWS-derived fields by design
         logger.info(f"Blocking IP address: {ip_address}")  # FIX: C5-finding-3
         try:  # FIX: C5-finding-3
             cidr_block = str(ipaddress.ip_network(ip_address, strict=False))  # FIX: C5-finding-3
+            if self.dry_run:  # FIX: C6-RT-03 - simulate BEFORE any AWS/NACL discovery so dry-run needs no credentials
+                logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C6-RT-03
+                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason})  # FIX: C6-RT-03 - log only locally-known fields; NACL id/rule numbers require AWS and are intentionally not resolved in dry-run
+                return True  # FIX: C6-RT-03
             network_acl_id = self._resolve_network_acl_id()  # FIX: C5-finding-3
             assert self.ec2 is not None  # pylance: _resolve_network_acl_id raises if self.ec2 is None
             allocation = self._allocate_acl_rule_numbers(network_acl_id, cidr_block)
@@ -331,10 +349,6 @@ class ContainmentManager:
             egress_rule_number = allocation["egress_rule_number"]
             ingress_already_present = allocation["ingress_already_present"]
             egress_already_present = allocation["egress_already_present"]
-            if self.dry_run:  # FIX: C5-finding-3
-                logger.info("[DRY-RUN] Would add deny entries to the emergency network ACL")  # FIX: C5-finding-3
-                self.log_action("block_ip", ip_address, "dry_run", {"cidr_block": cidr_block, "duration": duration, "reason": reason, "network_acl_id": network_acl_id, "ingress_rule_number": ingress_rule_number, "egress_rule_number": egress_rule_number, "ingress_already_present": ingress_already_present, "egress_already_present": egress_already_present})
-                return True  # FIX: C5-finding-3
             created_rule_numbers = []
             if not ingress_already_present:
                 self.ec2.create_network_acl_entry(NetworkAclId=network_acl_id, RuleNumber=ingress_rule_number, Protocol='-1', RuleAction='deny', Egress=False, CidrBlock=cidr_block)
@@ -617,12 +631,12 @@ class ContainmentManager:
         try:
             # Get instance details
             response = self.ec2.describe_instances(InstanceIds=[instance_id])
-            instance = response['Reservations'][0]['Instances'][0]
+            instance = response['Reservations'][0]['Instances'][0]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS describe_instances success-response keys
             
-            original_sg_ids = [sg['GroupId'] for sg in instance['SecurityGroups']]
-            original_subnet = instance['SubnetId']
+            original_sg_ids = [sg['GroupId'] for sg in instance['SecurityGroups']]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response keys
+            original_subnet = instance['SubnetId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response key
             
-            logger.info(f"Instance state: {instance['State']['Name']}")
+            logger.info(f"Instance state: {instance['State']['Name']}")  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response keys
             logger.info(f"Original security groups: {original_sg_ids}")
             logger.info(f"Original subnet: {original_subnet}")
             
@@ -635,7 +649,7 @@ class ContainmentManager:
                 return True
             
             # Create snapshot for forensics
-            volumes = [device['Ebs']['VolumeId'] for device in instance.get('BlockDeviceMappings', [])]
+            volumes = [device['Ebs']['VolumeId'] for device in instance.get('BlockDeviceMappings', [])]  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS EBS device-mapping keys
             snapshot_ids = []
             
             for volume_id in volumes:
@@ -665,7 +679,7 @@ class ContainmentManager:
                 # Create restrictive security group on-the-fly
                 logger.warning("QUARANTINE_SG_ID not set, creating temporary SG")
                 
-                vpc_id = instance['VpcId']
+                vpc_id = instance['VpcId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS instance success-response key
                 sg_response = self.ec2.create_security_group(
                     GroupName=f"quarantine-{self.incident_id}",
                     Description=f"Quarantine SG for incident {self.incident_id}",
@@ -743,7 +757,7 @@ class ContainmentManager:
 
             deactivated_keys = []  # FIX: C5-Batch-G — renamed from revoked_keys; keys are deactivated, not deleted
             for key_info in access_keys:
-                access_key_id = key_info['AccessKeyId']
+                access_key_id = key_info['AccessKeyId']  # pyright: ignore[reportTypedDictNotRequiredAccess]  # AWS list_access_keys success-response key
 
                 # Deactivate key (Status='Inactive'); key is NOT deleted
                 self.iam.update_access_key(
