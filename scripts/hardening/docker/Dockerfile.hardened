@@ -91,12 +91,23 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip and install build tools; floors clear CVE-2026-24049 (wheel) and CVE-2024-6345/CVE-2025-47273 (setuptools)
 RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" "wheel>=0.46.2"
 
-# Install production dependencies with hash verification
+# Install production dependencies with hash verification.
+#
+# This previously ended in `|| pip install -r requirements-prod.txt`, which defeated the
+# entire control: requirements-prod.txt carried `PyYAML>=6.0` with no `==` pin and no
+# digests, so --require-hashes failed on every single build and the unverified install ran
+# instead. The build log for run 31353439888 shows exactly that sequence. The image was
+# therefore never built from hash-verified dependencies, while the header of this file
+# claimed "Hash verification for packages (--require-hashes)".
+#
+# requirements-prod.txt is now pinned with `==` and carries every published sha256 digest
+# for that release, so verification succeeds on its own merits. The unverified path is gone:
+# if a digest ever fails to match, the build fails, which is the only behaviour that makes
+# the claim above true. # FIX: C6-CI-05
 RUN pip install --no-cache-dir \
     --require-hashes \
     --no-deps \
-    -r requirements-prod.txt || \
-    pip install --no-cache-dir -r requirements-prod.txt
+    -r requirements-prod.txt
 
 # Verify installed packages
 RUN pip check && \
