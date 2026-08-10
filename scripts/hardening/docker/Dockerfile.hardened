@@ -91,12 +91,23 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip and install build tools; floors clear CVE-2026-24049 (wheel) and CVE-2024-6345/CVE-2025-47273 (setuptools)
 RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" "wheel>=0.46.2"
 
-# Install production dependencies with hash verification
+# Install production dependencies with hash verification.
+#
+# This previously ended in `|| pip install -r requirements-prod.txt`, which defeated the
+# entire control: requirements-prod.txt carried `PyYAML>=6.0` with no `==` pin and no
+# digests, so --require-hashes failed on every single build and the unverified install ran
+# instead. The build log for run 31353439888 shows exactly that sequence. The image was
+# therefore never built from hash-verified dependencies, while the header of this file
+# claimed "Hash verification for packages (--require-hashes)".
+#
+# requirements-prod.txt is now pinned with `==` and carries every published sha256 digest
+# for that release, so verification succeeds on its own merits. The unverified path is gone:
+# if a digest ever fails to match, the build fails, which is the only behaviour that makes
+# the claim above true. # FIX: C6-CI-05
 RUN pip install --no-cache-dir \
     --require-hashes \
     --no-deps \
-    -r requirements-prod.txt || \
-    pip install --no-cache-dir -r requirements-prod.txt
+    -r requirements-prod.txt
 
 # Verify installed packages
 RUN pip check && \
@@ -154,8 +165,13 @@ RUN trivy filesystem --format cyclonedx --output /scan/sbom.json /scan
 
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS runtime-base
 
-# Install runtime dependencies only
-RUN apk add --no-cache \
+# Install runtime dependencies only.
+# `apk upgrade` applies patch-level updates within the pinned ALPINE_VERSION branch. The
+# python:alpine base image lags the Alpine security database, so it shipped
+# libcrypto3/libssl3 3.5.6-r0 while 3.5.7-r0 (CVE-2026-45447, OpenSSL heap
+# use-after-free in PKCS7_verify) was already published. # FIX: C6-CI-02
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     libffi \
     openssl \
     ca-certificates \
@@ -165,13 +181,6 @@ RUN apk add --no-cache \
     curl \
     && update-ca-certificates
 
-# Upgrade system Python pip/setuptools/wheel; the python:alpine base ships outdated versions
-# carrying CVE-2026-24049 (wheel<0.46.2), CVE-2024-6345 + CVE-2025-47273 (setuptools<78.1.1).
-# Trivy scans /usr/local/lib/python3.11/site-packages directly, so upgrading the venv alone
-# is not enough.
-RUN pip install --no-cache-dir --upgrade \
-        "pip" "setuptools>=78.1.1" "wheel>=0.46.2"
-
 # Create non-root user
 RUN addgroup -g 1000 -S clawdbot && \
     adduser -u 1000 -S clawdbot -G clawdbot -h /app
@@ -179,6 +188,14 @@ RUN addgroup -g 1000 -S clawdbot && \
 # Create necessary directories
 RUN mkdir -p /app/config /app/logs /app/tmp /app/data && \
     chown -R clawdbot:clawdbot /app
+
+# Upgrade system Python pip/setuptools/wheel; the python:alpine base ships outdated versions
+# carrying CVE-2026-24049 (wheel<0.46.2), CVE-2024-6345 + CVE-2025-47273 (setuptools<78.1.1)
+# and PYSEC-2026-3447 (setuptools<83.0.0). This stage keeps pip because the `development`
+# target below builds from it and needs pip to install its tooling; the production targets
+# build from `runtime-hardened`, which removes pip entirely. # FIX: C6-CI-03
+RUN pip install --no-cache-dir --upgrade \
+        "pip" "setuptools>=83.0.0" "wheel>=0.46.2"
 
 # Copy virtual environment from builder
 COPY --from=app-builder --chown=clawdbot:clawdbot /opt/venv /opt/venv
@@ -198,10 +215,57 @@ WORKDIR /app
 USER clawdbot
 
 # ============================================================================
+# STAGE 5b: Hardened Runtime (no package manager)
+# ============================================================================
+# Production images build from here rather than from `runtime-base`. The only difference is
+# that the Python package manager is removed. `development` deliberately keeps it.
+# FIX: C6-CI-03
+
+FROM runtime-base AS runtime-hardened
+
+# Removing pip/setuptools/wheel requires root; the stage drops back to clawdbot at the end.
+USER root
+
+# Remove the Python package manager from the production runtime images.
+#
+# Two reasons, in order of importance:
+#   1. Hardening. A production runtime image has no legitimate need to install packages.
+#      Shipping pip/setuptools/wheel hands an attacker who achieves code execution a
+#      ready-made package installer and an arbitrary-code-execution path via
+#      `setup.py`/`pkg_resources`.
+#   2. It eliminates a class of otherwise unfixable Trivy findings. Trivy's python-pkg
+#      analyzer parses `pip/_vendor/vendor.txt`, which pins `msgpack==1.1.2` and
+#      `setuptools==70.3.0` regardless of what is actually installed. Those pins are
+#      reported as HIGH (GHSA-6v7p-g79w-8964, CVE-2025-47273) and CANNOT be cleared by
+#      upgrading pip — current pip still vendors those versions. Deleting pip removes the
+#      vendored manifest, so the finding goes away because the code is gone, not because it
+#      was suppressed with an ignore rule.
+#
+# Both site-packages trees are purged: the interpreter's own and the venv's. `ensurepip` is
+# removed too, since it bundles the same wheels. Nothing at runtime imports pip, setuptools,
+# or pkg_resources — the entrypoints are shell scripts and the application is installed as a
+# built wheel. The two assertions below fail the build if that ever stops being true.
+RUN for sp in /usr/local/lib/python3.*/site-packages /opt/venv/lib/python3.*/site-packages; do \
+        rm -rf "$sp"/pip "$sp"/pip-*.dist-info \
+               "$sp"/setuptools "$sp"/setuptools-*.dist-info \
+               "$sp"/pkg_resources \
+               "$sp"/wheel "$sp"/wheel-*.dist-info \
+               "$sp"/_distutils_hack "$sp"/distutils-precedence.pth; \
+    done && \
+    rm -rf /usr/local/lib/python3.*/ensurepip && \
+    /opt/venv/bin/python -c "import yaml; print('runtime deps import OK')" && \
+    if /opt/venv/bin/python -c "import pip" 2>/dev/null; then \
+        echo "ERROR: pip still importable after purge" >&2; exit 1; \
+    fi && \
+    echo "pip successfully removed from runtime image"
+
+USER clawdbot
+
+# ============================================================================
 # STAGE 6: Gateway Production Image
 # ============================================================================
 
-FROM runtime-base AS gateway
+FROM runtime-hardened AS gateway
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -247,7 +311,8 @@ CMD ["/app/entrypoint.sh"]
 # STAGE 7: Agent Production Image
 # ============================================================================
 
-FROM runtime-base AS agent
+# Builds from runtime-hardened (no package manager). # FIX: C6-CI-03
+FROM runtime-hardened AS agent
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -294,15 +359,31 @@ CMD ["/app/entrypoint.sh"]
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS playbook
 
 # Install only what the playbook tooling needs at runtime.
-RUN apk add --no-cache \
+# `apk upgrade` picks up patched libcrypto3/libssl3 3.5.7-r0 (CVE-2026-45447) that the
+# python:alpine base still ships at 3.5.6-r0. # FIX: C6-CI-02
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     ca-certificates \
     tini \
     && update-ca-certificates
 
-# Upgrade system Python pip/setuptools/wheel; the python:alpine base ships outdated versions
-# carrying CVE-2026-24049 (wheel<0.46.2), CVE-2024-6345 + CVE-2025-47273 (setuptools<78.1.1).
-RUN pip install --no-cache-dir --upgrade \
-        "pip" "setuptools>=78.1.1" "wheel>=0.46.2"
+# Remove the Python package manager — see the equivalent block in `runtime-base` for the
+# full rationale. In short: this CI image only runs stdlib-based verification tooling, so
+# pip is pure attack surface, and its `_vendor/vendor.txt` pins (msgpack 1.1.2,
+# setuptools 70.3.0) are reported HIGH by Trivy and cannot be fixed by upgrading pip.
+# FIX: C6-CI-03
+RUN for sp in /usr/local/lib/python3.*/site-packages; do \
+        rm -rf "$sp"/pip "$sp"/pip-*.dist-info \
+               "$sp"/setuptools "$sp"/setuptools-*.dist-info \
+               "$sp"/pkg_resources \
+               "$sp"/wheel "$sp"/wheel-*.dist-info \
+               "$sp"/_distutils_hack "$sp"/distutils-precedence.pth; \
+    done && \
+    rm -rf /usr/local/lib/python3.*/ensurepip && \
+    if python -c "import pip" 2>/dev/null; then \
+        echo "ERROR: pip still importable after purge" >&2; exit 1; \
+    fi && \
+    echo "pip successfully removed from playbook image"
 
 # Create non-root user and workspace
 RUN addgroup -g 1000 -S clawdbot && \
