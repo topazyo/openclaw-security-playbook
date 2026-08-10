@@ -315,9 +315,20 @@
 
 1. **Block the User/Agent**
    
+   > **⚠ Identity actions require an external integration and currently fail closed.**
+   > The `disable_account`, `revoke_all_sessions`, `enable_account`, and `permanent_ban`
+   > actions act on a user *identity* (e.g. `eve@external.com`), which has no AWS or local
+   > equivalent in this repo. They are valid `auto-containment.py` actions, but they
+   > **fail closed** — exiting non-zero with a `NotImplementedError` that documents the
+   > contract — until the `clawguard` policy authority (`CLAWGUARD_URL`/`CLAWGUARD_TOKEN`)
+   > and/or the `openclaw-shield` enforcement integration
+   > (`OPENCLAW_SHIELD_URL`/`OPENCLAW_SHIELD_TOKEN`) is wired. The network/agent actions
+   > (`block_ip`, `isolate_container`) below work as shown. Until the integration is
+   > configured, suspend/restore the identity out-of-band via your identity provider.
+
    **For Direct Injection** (malicious user):
    ```bash
-   # Suspend user account immediately
+   # Suspend user account immediately (identity action — fails closed until the integration is wired; see note above)
    ./scripts/incident-response/auto-containment.py \
      --action disable_account \
      --user-id eve@external.com \
@@ -708,7 +719,12 @@
    ```
 
 3. **Restore User Access** (if legitimate user was blocked)
-   
+
+   > **⚠** `enable_account` and `permanent_ban` are identity actions that **fail closed**
+   > (exit non-zero with a documented `NotImplementedError`) until the clawguard/openclaw-shield
+   > identity integration is wired — see the Phase 1 note. Until then, restore or ban the
+   > identity out-of-band via your identity provider.
+
    ```bash
    # Review block decision
    if [[ "$USER_WAS_MALICIOUS" == "false" ]]; then

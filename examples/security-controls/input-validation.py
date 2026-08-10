@@ -48,31 +48,47 @@ class PromptSanitizer:
     # phrases: 'reveal secrets' (14 bytes) encodes to 19 base64 chars).          # FIX: C5-7
     _B64_RE = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,3}")  # FIX: C5-7
 
+    # Each entry is (human_readable_label, compiled_pattern). validate() surfaces the  # FIX: C6-RT-05
+    # LABEL in ValidationResult.reason, never the raw regex: a sanitizer that echoes its  # FIX: C6-RT-05
+    # exact detection pattern back to the (possibly hostile) submitter hands them the  # FIX: C6-RT-05
+    # evasion map. The regexes themselves are unchanged (no detection/evasion regression).  # FIX: C6-RT-05
     HIGH_RISK_PATTERNS = (  # FIX: C5-7
         # Char-insertion-aware + synonym-aware "ignore all previous instructions"
-        re.compile(  # FIX: C5-7
-            r"(?:i[^a-zA-Z0-9]{0,3}g[^a-zA-Z0-9]{0,3}n[^a-zA-Z0-9]{0,3}o[^a-zA-Z0-9]{0,3}"
-            r"r[^a-zA-Z0-9]{0,3}e"
-            r"|disregard|forget|overlook|bypass)"
-            r"\s+(?:all\s+)?(?:previous|prior|earlier|past|above|original)\s+"
-            r"(?:instructions?|directives?|commands?|rules?|prompts?|context|training)",
-            re.IGNORECASE,
-        ),  # FIX: C5-7
+        (
+            "instruction override (e.g. 'ignore all previous instructions')",  # FIX: C6-RT-05
+            re.compile(  # FIX: C5-7
+                r"(?:i[^a-zA-Z0-9]{0,3}g[^a-zA-Z0-9]{0,3}n[^a-zA-Z0-9]{0,3}o[^a-zA-Z0-9]{0,3}"
+                r"r[^a-zA-Z0-9]{0,3}e"
+                r"|disregard|forget|overlook|bypass)"
+                r"\s+(?:all\s+)?(?:previous|prior|earlier|past|above|original)\s+"
+                r"(?:instructions?|directives?|commands?|rules?|prompts?|context|training)",
+                re.IGNORECASE,
+            ),
+        ),  # FIX: C6-RT-05
         # "system prompt" flagged only in suspicious access/override context  # FIX: C5-7
-        re.compile(  # FIX: C5-7
-            r"(?:(?:reveal|expose|leak|bypass|override|modify|ignore|extract|show|print)"
-            r"\s+(?:(?:me\s+)?(?:the|your|my|all)\s+)?system\s+prompt"
-            r"|system\s+prompt\s*[:=]\s*)",
-            re.IGNORECASE,
-        ),  # FIX: C5-7
+        (
+            "system prompt access/override",  # FIX: C6-RT-05
+            re.compile(  # FIX: C5-7
+                r"(?:(?:reveal|expose|leak|bypass|override|modify|ignore|extract|show|print)"
+                r"\s+(?:(?:me\s+)?(?:the|your|my|all)\s+)?system\s+prompt"
+                r"|system\s+prompt\s*[:=]\s*)",
+                re.IGNORECASE,
+            ),
+        ),  # FIX: C6-RT-05
         # "developer message" flagged only when accessed/exposed in attack context  # FIX: C5-7
-        re.compile(  # FIX: C5-7
-            r"(?:(?:reveal|expose|leak|bypass|override|modify|ignore|extract|show|print)"
-            r"\s+(?:(?:me\s+)?(?:the|your|my|all)\s+)?developer\s+message"
-            r"|developer\s+message\s*[:=]\s*)",
-            re.IGNORECASE,
-        ),  # FIX: C5-7
-        re.compile(r"reveal\s+secrets?", re.IGNORECASE),
+        (
+            "developer message access/override",  # FIX: C6-RT-05
+            re.compile(  # FIX: C5-7
+                r"(?:(?:reveal|expose|leak|bypass|override|modify|ignore|extract|show|print)"
+                r"\s+(?:(?:me\s+)?(?:the|your|my|all)\s+)?developer\s+message"
+                r"|developer\s+message\s*[:=]\s*)",
+                re.IGNORECASE,
+            ),
+        ),  # FIX: C6-RT-05
+        (
+            "reveal secrets",  # FIX: C6-RT-05
+            re.compile(r"reveal\s+secrets?", re.IGNORECASE),
+        ),  # FIX: C6-RT-05
     )  # FIX: C5-7
 
     @classmethod
@@ -94,9 +110,9 @@ class PromptSanitizer:
         normalized = self._normalize(prompt)  # FIX: C5-7
 
         # Direct match on normalised text (handles homoglyphs + char-insertion)
-        for pattern in self.HIGH_RISK_PATTERNS:  # FIX: C5-7
+        for label, pattern in self.HIGH_RISK_PATTERNS:  # FIX: C5-7  # FIX: C6-RT-05 - unpack (label, pattern)
             if pattern.search(normalized):  # FIX: C5-7
-                return ValidationResult(False, 0.95, f"Matched risky pattern: {pattern.pattern}")
+                return ValidationResult(False, 0.95, f"Matched risky pattern: {label}")  # FIX: C6-RT-05 - surface the label, not the raw regex (no detection-internals leak)
 
         # Base64 blob detection: decode each candidate and re-check           # FIX: C5-7
         for match in self._B64_RE.finditer(normalized):  # FIX: C5-7
@@ -107,10 +123,10 @@ class PromptSanitizer:
                     "utf-8", errors="replace"
                 )  # FIX: C5-7
                 decoded_norm = self._normalize(decoded)  # FIX: C5-7
-                for pattern in self.HIGH_RISK_PATTERNS:  # FIX: C5-7
+                for label, pattern in self.HIGH_RISK_PATTERNS:  # FIX: C5-7  # FIX: C6-RT-05 - unpack (label, pattern)
                     if pattern.search(decoded_norm):  # FIX: C5-7
                         return ValidationResult(  # FIX: C5-7
-                            False, 0.95, "Matched risky pattern in base64 decoded content"  # FIX: C5-7
+                            False, 0.95, f"Matched risky pattern in base64 decoded content: {label}"  # FIX: C5-7  # FIX: C6-RT-05 - include label, not the raw regex
                         )  # FIX: C5-7
             except (ValueError, UnicodeDecodeError):  # FIX: C5-7 — narrow: programming errors propagate
                 pass  # malformed base64 or non-UTF-8 payload — skip this blob  # FIX: C5-7

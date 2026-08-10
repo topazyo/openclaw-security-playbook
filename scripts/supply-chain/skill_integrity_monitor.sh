@@ -1157,6 +1157,31 @@ clean_quarantine() {
     fi
 }
 
+find_skill() {  ## FIX: C6-RT-06 - fail-closed stub; refuses to fabricate the affected-agents inventory
+    local skill_name="$1"  ## FIX: C6-RT-06
+    local output_file="${2:-}"  ## FIX: C6-RT-06
+    ## FIX: C6-RT-06 - Listing the agents that have a skill installed requires an external
+    ## FIX: C6-RT-06 - agent->skill inventory (the orchestration platform's installed-skills
+    ## FIX: C6-RT-06 - export). It is NOT available to this repo-local monitor, so we fail
+    ## FIX: C6-RT-06 - closed: write nothing and return non-zero rather than fabricate data.
+    ## FIX: C6-RT-06 - Keep the logged line short and scannable (error() duplicates it into the
+    ## FIX: C6-RT-06 - log); print the full integration contract + JSON schema example as a
+    ## FIX: C6-RT-06 - separate indented block to stdout only, which is NOT logged.
+    error "--find-skill is not wired for '$skill_name': refusing to fabricate affected_agents (no agent->skill inventory available)."  ## FIX: C6-RT-06
+    if [ -n "$output_file" ]; then  ## FIX: C6-RT-06
+        error "Refusing to write '$output_file' (it would contain fabricated affected-agent data)."  ## FIX: C6-RT-06
+    fi  ## FIX: C6-RT-06
+    cat <<'EOF'  ## FIX: C6-RT-06 - operator guidance + contract; stdout only, deliberately not logged
+  Why: mapping a skill to the agents that have it installed needs the orchestration
+       platform's installed-skills export; this repo-local monitor has no such inventory.
+  Resolve: export it to $OPENCLAW_AGENT_INVENTORY as JSON, e.g.
+       {"agents":[{"agent_id":"...","skills":[{"name":"...","installation_date":"..."}]}]}
+       then take the affected-agent list from that export / your telemetry and resume.
+  Docs: examples/incident-response/playbook-skill-compromise.md
+EOF
+    return 1  ## FIX: C6-RT-06 - fail closed
+}  ## FIX: C6-RT-06
+
 # ============================================================================
 # MAIN FUNCTION
 # ============================================================================
@@ -1179,6 +1204,8 @@ OPTIONS:
     --cleanup            Clean up old logs and quarantine
     --status             Show monitoring status
     --report             Generate security report
+    --find-skill SKILL   Find agents with SKILL installed (requires external agent inventory; currently fails closed)
+    --output FILE        Output path for --find-skill results (only used with --find-skill)
     --help               Show this help message
 
 EXAMPLES:
@@ -1270,6 +1297,7 @@ main() {
 
     local action=""
     local arg=""
+    local output_file=""  ## FIX: C6-RT-06
 
     case "$1" in
         --start)
@@ -1302,6 +1330,37 @@ main() {
         --report)
             action="report"
             ;;
+        --find-skill)  ## FIX: C6-RT-06
+            action="find_skill"  ## FIX: C6-RT-06
+            arg="${2:-}"  ## FIX: C6-RT-06 - skill name
+            ## FIX: C6-RT-06 - Validate at parse time. A missing skill name, or one that looks like
+            ## FIX: C6-RT-06 - a flag (e.g. "--find-skill --output foo"), must be rejected rather than
+            ## FIX: C6-RT-06 - silently consumed as the skill name. Reject any leading-dash value:
+            ## FIX: C6-RT-06 - skill names are never option-like, so this is safe and option-injection-proof.
+            case "$arg" in  ## FIX: C6-RT-06
+                ""|-*)  ## FIX: C6-RT-06
+                    error "--find-skill requires a skill name; usage: --find-skill SKILL [--output FILE]"  ## FIX: C6-RT-06
+                    exit 1  ## FIX: C6-RT-06
+                    ;;  ## FIX: C6-RT-06
+            esac  ## FIX: C6-RT-06
+            if [ -n "${3:-}" ]; then  ## FIX: C6-RT-06 - the only token allowed after SKILL is "--output FILE"
+                if [ "${3:-}" != "--output" ]; then  ## FIX: C6-RT-06
+                    error "Unexpected argument '$3' after --find-skill SKILL; expected '--output FILE'"  ## FIX: C6-RT-06
+                    exit 1  ## FIX: C6-RT-06
+                fi  ## FIX: C6-RT-06
+                output_file="${4:-}"  ## FIX: C6-RT-06 - require a real path, not a missing/flag-like value
+                case "$output_file" in  ## FIX: C6-RT-06
+                    ""|-*)  ## FIX: C6-RT-06
+                        error "--output requires a file path argument (got '${output_file:-<none>}')"  ## FIX: C6-RT-06
+                        exit 1  ## FIX: C6-RT-06
+                        ;;  ## FIX: C6-RT-06
+                esac  ## FIX: C6-RT-06
+                if [ -n "${5:-}" ]; then  ## FIX: C6-RT-06 - reject trailing junk after "--output FILE"
+                    error "Unexpected argument '$5' after --find-skill SKILL --output FILE"  ## FIX: C6-RT-06
+                    exit 1  ## FIX: C6-RT-06
+                fi  ## FIX: C6-RT-06
+            fi  ## FIX: C6-RT-06
+            ;;  ## FIX: C6-RT-06
         --help)
             show_help
             exit 0
@@ -1348,6 +1407,14 @@ main() {
             fi
             restore_skill "$arg"
             ;;
+        find_skill)  ## FIX: C6-RT-06
+            if [ -z "$arg" ]; then  ## FIX: C6-RT-06
+                error "--find-skill requires a skill name"  ## FIX: C6-RT-06
+                exit 1  ## FIX: C6-RT-06
+            fi  ## FIX: C6-RT-06
+            find_skill "$arg" "$output_file"  ## FIX: C6-RT-06
+            exit $?  ## FIX: C6-RT-06 - propagate the fail-closed status
+            ;;  ## FIX: C6-RT-06
         cleanup)
             cleanup
             ;;
