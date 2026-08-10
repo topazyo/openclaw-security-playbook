@@ -23,7 +23,7 @@ import importlib.util  # FIX: C5-finding-3
 import sys
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timezone
 import json
 from pathlib import Path  # FIX: C5-finding-3
@@ -327,13 +327,19 @@ class TestAutoContainmentCliParity:
                 module.main()  # FIX: C5-finding-3
         assert exc_info.value.code == 0  # FIX: C5-finding-3
         help_output = capsys.readouterr().out  # FIX: C5-finding-3
-        assert "isolate-ec2" in help_output  # FIX: C5-finding-3
-        assert "revoke-credentials" in help_output  # FIX: C5-finding-3
-        assert "isolate-docker" in help_output  # FIX: C5-finding-3
-        assert "block_ip" in help_output  # FIX: C5-finding-3
-        assert "block_domain" in help_output  # FIX: C5-finding-3
-        assert "isolate_container" in help_output  # FIX: C5-finding-3
-        assert "update_rate_limits" in help_output  # FIX: C5-finding-3
+        # Canonical kebab-case action names are the documented/preferred spelling.  # FIX: C6-RT-05
+        for action in [  # FIX: C6-RT-05
+            "isolate-ec2", "revoke-credentials", "isolate-docker", "block-ip",  # FIX: C6-RT-05
+            "block-domain", "isolate-container", "update-rate-limits",  # FIX: C6-RT-05
+            "disable-account", "revoke-all-sessions", "enable-account", "permanent-ban",  # FIX: C6-RT-05
+            "kill-skill",  # FIX: C6-RT-05
+        ]:  # FIX: C6-RT-05
+            assert action in help_output, f"canonical action {action!r} missing from --help"  # FIX: C6-RT-05
+        # Backward-compatible snake_case aliases must be documented as accepted so  # FIX: C6-RT-05
+        # operators with existing runbooks know the old spellings still work.  # FIX: C6-RT-05
+        assert "alias" in help_output.lower()  # FIX: C6-RT-05
+        for alias in ["block_ip", "block_domain", "isolate_container", "update_rate_limits", "disable_account", "revoke_all_sessions", "enable_account", "permanent_ban", "kill_skill"]:  # FIX: C6-RT-05
+            assert alias in help_output, f"snake_case alias {alias!r} should be documented in --help"  # FIX: C6-RT-05
 
     @pytest.mark.parametrize(  # FIX: C5-finding-3
         ("args", "expected_action", "expected_target", "expected_reason", "expected_mode"),  # FIX: C5-finding-3
@@ -372,7 +378,12 @@ class TestAutoContainmentCliParity:
     def test_auto_containment_accepts_documented_playbook_commands(  # FIX: C5-finding-3
         self, tmp_path, args, expected_action, expected_target, expected_reason, expected_mode  # FIX: C5-finding-3
     ):  # FIX: C5-finding-3
-        module, log_dir, _fake_ec2, _fake_route53resolver, fake_docker_client, fake_network, fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3
+        module, log_dir, fake_ec2, _fake_route53resolver, fake_docker_client, fake_network, fake_container = _load_auto_containment_module(tmp_path)  # FIX: C5-finding-3  # FIX: C6-RT-05 - bind fake_ec2 to configure the NACL below
+        # C6-H-01 hardened _resolve_network_acl_id to FAIL CLOSED instead of fabricating  # FIX: C6-RT-05
+        # a NACL, so block_ip's claim is only provable against a configured NACL: model one.  # FIX: C6-RT-05
+        fake_ec2.describe_network_acls.return_value = {"NetworkAcls": [{"NetworkAclId": "acl-default"}]}  # FIX: C6-RT-05
+        # block_domain refuses to create an unenforced DNS firewall list, so model a configured id.  # FIX: C6-RT-05
+        module.DNS_FIREWALL_DOMAIN_LIST_ID = "fdl-test"  # type: ignore[attr-defined]  # FIX: C6-RT-05
         assert _run_auto_containment(module, args) == 0  # FIX: C5-finding-3
         report = _read_single_report(log_dir)  # FIX: C5-finding-3
         assert report["actions_taken"][0]["action"] == expected_action  # FIX: C5-finding-3
@@ -385,7 +396,71 @@ class TestAutoContainmentCliParity:
         if expected_action == "isolate_container":  # FIX: C5-finding-3
             fake_docker_client.containers.get.assert_called_once_with("agent-prod-42")  # FIX: C5-finding-3
             fake_network.disconnect.assert_called()  # FIX: C5-finding-3
-            fake_container.update.assert_called_once()  # FIX: C5-finding-3
+            # C6-H-07: Docker container labels are immutable post-creation, so quarantine  # FIX: C6-RT-05
+            # state is persisted to a JSONL manifest instead of container.update(labels=...),  # FIX: C6-RT-05
+            # which would raise TypeError at runtime. Assert the manifest, not the mutation.  # FIX: C6-RT-05
+            fake_container.update.assert_not_called()  # FIX: C6-RT-05
+            manifest_files = list(log_dir.glob("*-quarantined-containers.jsonl"))  # FIX: C6-RT-05
+            assert len(manifest_files) == 1, f"expected one quarantine manifest, got {manifest_files!r}"  # FIX: C6-RT-05
+            manifest_record = json.loads(manifest_files[0].read_text(encoding="utf-8").splitlines()[0])  # FIX: C6-RT-05
+            assert manifest_record["container_id"] == "agent-prod-42"  # FIX: C6-RT-05
+            assert set(manifest_record["original_networks"]) == {"openclaw-network", "bridge"}  # FIX: C6-RT-05
+
+    @pytest.mark.parametrize(  # FIX: C6-RT-05
+        ("action", "extra_args"),  # FIX: C6-RT-05
+        [  # FIX: C6-RT-05
+            ("disable_account", ["--user-id", "eve@external.com", "--duration", "24h"]),  # FIX: C6-RT-05
+            ("revoke_all_sessions", ["--user-id", "eve@external.com"]),  # FIX: C6-RT-05
+            ("enable_account", ["--user-id", "user@openclaw.ai", "--send-warning-email"]),  # FIX: C6-RT-05
+            ("permanent_ban", ["--user-id", "eve@external.com"]),  # FIX: C6-RT-05
+        ],  # FIX: C6-RT-05
+        ids=["disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"],  # FIX: C6-RT-05
+    )  # FIX: C6-RT-05
+    def test_identity_actions_are_accepted_but_fail_closed(self, tmp_path, action, extra_args):  # FIX: C6-RT-05
+        """The documented identity actions parse (no argparse 'invalid choice') and FAIL CLOSED - the unwired clawguard/shield integration must never report a false containment."""  # FIX: C6-RT-05
+        module, log_dir, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-05
+        rc = _run_auto_containment(module, ["--action", action, *extra_args, "--reason", "Prompt injection - IRP-002"])  # FIX: C6-RT-05
+        assert rc == 1  # FIX: C6-RT-05 - fail closed: nonzero exit, never success
+        report = _read_single_report(log_dir)  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["action"] == action  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["status"] == "failed"  # FIX: C6-RT-05
+        error_text = report["actions_taken"][0]["details"]["error"].lower()  # FIX: C6-RT-05
+        assert "not wired" in error_text and "clawguard" in error_text  # FIX: C6-RT-05 - documented integration contract is surfaced
+        # Failure path must still capture the action-specific inputs that were attempted,  # FIX: C6-RT-05
+        # so the report records WHAT was requested even though the integration is unwired.  # FIX: C6-RT-05
+        details = report["actions_taken"][0]["details"]  # FIX: C6-RT-05
+        assert details.get("reason") == "Prompt injection - IRP-002"  # FIX: C6-RT-05
+        if action == "disable_account":  # FIX: C6-RT-05
+            assert details.get("duration") == "24h"  # FIX: C6-RT-05 - attempted duration captured
+        if action == "enable_account":  # FIX: C6-RT-05
+            assert details.get("send_warning_email") is True  # FIX: C6-RT-05 - attempted flag captured
+
+    def test_kill_skill_is_accepted_but_fails_closed(self, tmp_path):  # FIX: C6-RT-05
+        """kill_skill parses (no argparse 'invalid choice') and FAILS CLOSED - the unwired openclaw-shield skill-enforcement integration must never report a false containment."""  # FIX: C6-RT-05
+        module, log_dir, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-05
+        rc = _run_auto_containment(module, ["--action", "kill_skill", "--agent-id", "agent-prod-12", "--skill-name", "@attacker/credential-stealer", "--reason", "Malicious skill - IRP-003"])  # FIX: C6-RT-05
+        assert rc == 1  # FIX: C6-RT-05 - fail closed: nonzero exit, never success
+        report = _read_single_report(log_dir)  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["action"] == "kill_skill"  # FIX: C6-RT-05 - snake_case audit-log name (consistent with other actions)
+        assert report["actions_taken"][0]["target"] == "agent-prod-12"  # FIX: C6-RT-05
+        assert report["actions_taken"][0]["status"] == "failed"  # FIX: C6-RT-05
+        error_text = report["actions_taken"][0]["details"]["error"].lower()  # FIX: C6-RT-05
+        assert "not wired" in error_text and "openclaw-shield" in error_text  # FIX: C6-RT-05 - documented integration contract is surfaced
+
+    @pytest.mark.parametrize(  # FIX: C6-RT-05
+        "action",  # FIX: C6-RT-05
+        ["disable_account", "revoke_all_sessions", "enable_account", "permanent_ban"],  # FIX: C6-RT-05
+    )  # FIX: C6-RT-05
+    def test_identity_actions_require_user_id_via_argparse_error(self, tmp_path, action):  # FIX: C6-RT-05
+        """Omitting --user-id for an identity action must exit via an argparse usage error
+        (SystemExit code 2), NOT the fail-closed exit(1) path, and must write NO containment
+        report -- so a missing-argument invocation can never look like a successful containment.
+        """  # FIX: C6-RT-05
+        module, log_dir, *_rest = _load_auto_containment_module(tmp_path)  # FIX: C6-RT-05
+        with pytest.raises(SystemExit) as exc_info:  # FIX: C6-RT-05
+            _run_auto_containment(module, ["--action", action, "--reason", "missing user id"])  # FIX: C6-RT-05
+        assert exc_info.value.code == 2  # FIX: C6-RT-05 - argparse usage error (parser.error), distinct from fail-closed exit(1)
+        assert list(log_dir.glob("*-report.json")) == []  # FIX: C6-RT-05 - parser.error fires before save_containment_report(); no misleading success report
 
     def test_block_ip_dry_run_does_not_touch_aws(self, tmp_path):  # FIX: C6-RT-03
         """block_ip --dry-run must simulate WITHOUT any AWS/NACL discovery (no credentials required)."""  # FIX: C6-RT-03
@@ -700,7 +775,7 @@ class TestRecoveryPhase:
         backup_path.write_bytes(b"compressed-backup")  # FIX: C5-finding-3
         manager = module.DisasterRecoveryManager(module.BackupStrategy())  # FIX: C5-finding-3
 
-        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "_verify_database_records", return_value={"users": 10, "sessions": 5}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:  # FIX: C5-finding-3
+        with patch.object(module.BackupVerifier, "verify_backup_integrity", return_value=(True, [])), patch.object(module.BackupVerifier, "verify_database_records", return_value={"users": 10, "sessions": 5}), patch.object(module.DisasterRecoveryManager, "_run_smoke_tests", return_value=None), patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:  # FIX: C5-finding-3  # FIX: C6-RT-05 - patch the public verify_database_records (BackupVerifier has no _verify_database_records; execute_recovery calls the public method)
             metrics = manager.execute_recovery(str(backup_path), "postgresql://restore-target")  # FIX: C5-finding-3
 
         assert metrics.meets_rto is True  # FIX: C5-finding-3
