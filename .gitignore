@@ -75,3 +75,10 @@ CLAUDE.md
 .mcp.json
 setup-claude-config.sh
 .github/audit
+
+# ClaudeMemoryVault — added to the VS Code multi-root workspace; never commit it into this repo.
+# Scoped to the exact folder name so the tracked configs/agent-config/secrets-template.vault is unaffected.
+ClaudeMemoryVault/
+ClaudeMemoryVault
+# VS Code multi-root workspace files (they list machine-specific absolute paths, e.g. the vault)
+*.code-workspace
