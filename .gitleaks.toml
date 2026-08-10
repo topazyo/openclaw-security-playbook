@@ -1,23 +1,56 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Threat scenario documentation intentionally demonstrates credential patterns"
-paths = [
-  '''examples/scenarios/''',
-]
+# FIX: C6-CI-01 — Collapsed the three `[[allowlists]]` array-of-tables blocks into a
+# single singular `[allowlist]` table.
+#
+# Why: gitleaks-action@v2 resolves and runs gitleaks 8.24.3, which reads only the
+# singular `allowlist` key from the config. The plural global `[[allowlists]]` form is
+# a newer addition, so 8.24.3 parsed the config successfully (the run log confirms
+# "using gitleaks config from GITLEAKS_CONFIG env var: .gitleaks.toml") and then
+# silently ignored every allowlist, reporting 22 findings in threat-scenario
+# documentation. The singular form is honoured by every gitleaks 8.x, so this stays
+# correct whether or not the action's pinned version moves forward.
+#
+# Scope note: this allowlist suppresses only synthetic placeholder credentials in
+# documentation and templates. Every entry below was inspected line-by-line and
+# contains a redaction marker, never a real secret. Source code paths
+# (scripts/, tools/, src/, detections/, configs/ other than the vault template) are
+# deliberately NOT allowlisted, so a real leak there still fails the scan.
+[allowlist]
+description = "Synthetic placeholder credentials in threat-scenario docs and templates"
 
-[[allowlists]]
-description = "Secrets vault template uses masked placeholder examples"
+# Criteria below are OR'd: a finding is allowlisted if its path OR its secret matches.
 paths = [
+  # Threat scenario documentation intentionally demonstrates credential patterns.
+  '''examples/scenarios/''',
+  # Secrets vault template uses masked placeholder examples.
   '''secrets-template\.vault''',
 ]
 
-[[allowlists]]
-description = "Placeholder-style redaction markers used in place of real secrets"
+# gitleaks runs `detect`, which scans the full commit history (363 commits), so findings
+# persist even after the working tree is cleaned up. This matches one specific synthetic
+# value committed in the initial commit (5343fe47) at
+# docs/compliance/audit-configuration.md:390, where an illustrative Stripe key was written
+# out before it was replaced with FULL_API_KEY_REDACTED_FOR_DOCS in the current tree.
+# `abc123def456` is a documentation placeholder, not a live credential — a real Stripe
+# secret key is 24+ random characters. Matching the literal value rather than allowlisting
+# the file by path keeps the file itself scanned, so a genuine future leak there still fails.
+#
+# The pattern deliberately omits the `sk_live_` prefix: gitleaks reports a startColumn one
+# past the true start of the match, so anchoring on the prefix would be sensitive to that
+# off-by-one. `abc123def456` is the placeholder body used consistently across this repo's
+# example credentials (gw_live_abc123def456, sk-prod-abc123def456ghi789, ...).
+regexes = [
+  '''abc123def456''',
+]
+
+# Placeholder-style redaction markers used in place of real secrets.
 stopwords = [
   "_EXAMPLE_NOT_REAL",
   "_PLACEHOLDER",
   "REDACTED",
   "NOT_REAL",
+  "REPLACE_WITH",
+  "redacted example token",
 ]

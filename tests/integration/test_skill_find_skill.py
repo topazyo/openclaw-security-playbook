@@ -11,6 +11,7 @@ These drive the real bash `find_skill` function by sourcing the monitor script w
 `main` dispatch suppressed (BASH_SOURCE guard), inside an isolated sandbox. Mirrors the
 bash-mount-path handling used by test_skill_restore_origin.py.
 """
+import os
 import re
 import shutil
 import subprocess
@@ -95,6 +96,26 @@ def test_find_skill_fails_closed_and_writes_nothing(tmp_path):
     assert "refusing to fabricate" in low, out
 
 
+def test_find_skill_logs_concise_message_not_full_schema(tmp_path):
+    """The dense JSON-schema contract reaches the operator (stdout) but must NOT bloat the log.
+
+    Copilot review: keep the logged line short and scannable; print the schema example as a
+    separate block instead of duplicating it into skill_monitor.log on every fail-closed call.
+    """
+    out = _run_find_skill(tmp_path)
+    # Operator-facing stdout still carries the full guidance: schema example + docs pointer.
+    assert "agent_id" in out, out
+    assert "installation_date" in out, out
+    assert "playbook-skill-compromise.md" in out, out
+    # The log records the fail-closed event concisely, WITHOUT the dense schema.
+    log_file = tmp_path / "sb" / "logs" / "skill_monitor.log"
+    assert log_file.exists(), "fail-closed event should be logged"
+    log_text = log_file.read_text(encoding="utf-8", errors="replace")
+    assert "not wired" in log_text.lower(), log_text          # event is logged...
+    assert "agent_id" not in log_text, log_text               # ...but the schema is not
+    assert '{"agents"' not in log_text, log_text
+
+
 def test_help_lists_find_skill():
     """--find-skill is a documented option (and --help is handled before initialize)."""
     assert _BASH_PATH, "bash is required for these tests"
@@ -105,3 +126,79 @@ def test_help_lists_find_skill():
     combined = proc.stdout + proc.stderr
     assert proc.returncode == 0, combined
     assert "--find-skill" in combined, combined
+
+
+# ---------------------------------------------------------------------------
+# C6-RT-06 argument-parsing hardening (Copilot review).
+# `--find-skill` arg validation runs during parsing, BEFORE initialize() (which
+# needs jq/sha256sum/curl + policy files), so these malformed-invocation cases
+# exit cleanly without those deps. We isolate the log dir into the sandbox so
+# error()/log() write there instead of $HOME/.openclaw/logs.
+# ---------------------------------------------------------------------------
+def _run_monitor_cli(args, tmp_path):
+    """Invoke the monitor's CLI dispatch (main) with ARGS in an isolated sandbox."""
+    assert _BASH_PATH, "bash is required for these tests"
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    env = {**os.environ, "OPENCLAW_LOGS": _to_bash_path(logs, _BASH_PATH)}
+    return subprocess.run(
+        [_BASH_PATH, _to_bash_path(_MONITOR_SCRIPT, _BASH_PATH), *args],
+        capture_output=True, text=True, check=False, timeout=60, env=env,
+    )
+
+
+def test_find_skill_rejects_flag_as_skill_name(tmp_path):
+    """`--find-skill --output foo` must NOT consume --output as the skill name; reject it."""
+    out = tmp_path / "affected-agents.json"
+    proc = _run_monitor_cli(["--find-skill", "--output", _to_bash_path(out, _BASH_PATH)], tmp_path)
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "requires a skill name" in combined.lower(), combined
+    assert not out.exists(), "no output file may be written for a malformed invocation"
+
+
+def test_find_skill_missing_skill_name(tmp_path):
+    """`--find-skill` with no skill name is rejected."""
+    proc = _run_monitor_cli(["--find-skill"], tmp_path)
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "requires a skill name" in combined.lower(), combined
+
+
+def test_find_skill_output_flag_without_path(tmp_path):
+    """`--find-skill SKILL --output` (missing file) must error, not silently set an empty output."""
+    proc = _run_monitor_cli(["--find-skill", "@attacker/credential-stealer", "--output"], tmp_path)
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "--output requires a file path" in combined.lower(), combined
+
+
+def test_find_skill_rejects_flaglike_output_path(tmp_path):
+    """`--output --evil` must be rejected (option-injection-proof)."""
+    proc = _run_monitor_cli(
+        ["--find-skill", "@attacker/credential-stealer", "--output", "--evil"], tmp_path
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "--output requires a file path" in combined.lower(), combined
+
+
+def test_find_skill_rejects_unexpected_trailing_arg(tmp_path):
+    """A third token that isn't --output is rejected, not silently ignored."""
+    proc = _run_monitor_cli(["--find-skill", "@attacker/credential-stealer", "garbage"], tmp_path)
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "unexpected argument" in combined.lower(), combined
+
+
+def test_find_skill_rejects_trailing_junk_after_output(tmp_path):
+    """Extra args after `--output FILE` are rejected and nothing is written."""
+    out = tmp_path / "affected-agents.json"
+    proc = _run_monitor_cli(
+        ["--find-skill", "@attacker/x", "--output", _to_bash_path(out, _BASH_PATH), "extra"],
+        tmp_path,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "unexpected argument" in combined.lower(), combined
+    assert not out.exists(), combined
