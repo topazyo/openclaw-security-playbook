@@ -261,7 +261,15 @@
    - **Approved in Allowlist**: ❌ No
 
 3. **Determine Scope**
-   
+
+   > **⚠ `--find-skill` requires an external agent inventory and currently fails closed.**
+   > Mapping a skill to the agents that have it installed needs the orchestration platform's
+   > agent→skill inventory (per the DEPENDENCY NOTICE), which this repo-local monitor does not
+   > have. `--find-skill` is a real, accepted option, but it **exits non-zero with a documented
+   > contract and writes no file** until that inventory is wired — it will never fabricate
+   > `affected_agents`. Obtain `affected-agents.json` from your orchestration platform /
+   > telemetry in the schema shown below, then run the downstream steps.
+
    ```bash
    # Find all agents with malicious skill installed
    ./scripts/supply-chain/skill_integrity_monitor.sh \
