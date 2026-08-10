@@ -12,6 +12,7 @@ These drive the real bash `find_skill` function by sourcing the monitor script w
 bash-mount-path handling used by test_skill_restore_origin.py.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -87,7 +88,8 @@ pytestmark = pytest.mark.skipif(_BASH_PATH is None, reason="bash not available")
 def test_find_skill_fails_closed_and_writes_nothing(tmp_path):
     """find_skill must refuse to fabricate affected agents: non-zero, no output file, documented contract."""
     out = _run_find_skill(tmp_path)
-    assert "RC=1" in out, out                 # fail closed (non-zero)
+    rc = re.search(r"\bRC=(\d+)\b", out)        # the documented contract is "non-zero", not a
+    assert rc and int(rc.group(1)) != 0, out    # specific code; any non-zero RC = correctly fails closed
     assert "OUTFILE=absent" in out, out        # no fabricated affected-agents.json written
     low = out.lower()
     assert "not wired" in low, out             # documented contract surfaced
@@ -114,7 +116,7 @@ def test_find_skill_logs_concise_message_not_full_schema(tmp_path):
     assert '{"agents"' not in log_text, log_text
 
 
-def test_help_lists_find_skill(tmp_path):
+def test_help_lists_find_skill():
     """--find-skill is a documented option (and --help is handled before initialize)."""
     assert _BASH_PATH, "bash is required for these tests"
     proc = subprocess.run(
