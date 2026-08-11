@@ -8,7 +8,7 @@ on:
     paths:
       - 'scripts/verification/**'
       - 'configs/examples/docker-compose-full-stack.yml'
-      - 'tests/security/**'
+      - 'tests/security/test_runtime_security_regression.py' # FIX: C6-RT-22
       - '.github/workflows/runtime-security-regression.yml'
   workflow_dispatch:
 
