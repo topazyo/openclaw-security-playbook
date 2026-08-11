@@ -755,6 +755,9 @@ def access(ctx, days, input_csv, provider, tenant_id, client_id, client_secret,
         ["  Privilege creep", "", summary["privilege_creep_count"]],
         ["  Orphaned approvers", "", summary["orphaned_approver_count"]],
     ]
+    incomplete_count = summary.get("incomplete_data_count", 0)  # FIX: C6-RT-20
+    if incomplete_count:  # FIX: C6-RT-20
+        rows_out.append(["  Incomplete checks", "could not run", incomplete_count])  # FIX: C6-RT-20
     click.echo(tabulate(rows_out, headers=["Category", "Condition", "Count"]))
 
     comp = result.get("compliance", {})
