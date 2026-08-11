@@ -112,7 +112,7 @@ def _load_auto_containment_context(tmp_path, module_name: str):
     )
 
 
-def _load_forensics_collector_module(module_name: str):
+def _load_forensics_collector_module(module_name: str, evidence_dir=None):  # FIX: C6-RT-24
     fake_psutil = ModuleType("psutil")
     fake_psutil.Error = RuntimeError  # type: ignore[attr-defined]
     fake_psutil.NoSuchProcess = RuntimeError  # type: ignore[attr-defined]
@@ -129,7 +129,7 @@ def _load_forensics_collector_module(module_name: str):
     fake_asymmetric = ModuleType("cryptography.hazmat.primitives.asymmetric")
     fake_asymmetric.rsa = ModuleType("rsa")  # type: ignore[attr-defined]
     fake_asymmetric.padding = ModuleType("padding")  # type: ignore[attr-defined]
-    return _load_module_from_path(
+    module = _load_module_from_path(  # FIX: C6-RT-24
         FORENSICS_COLLECTOR_PATH,
         module_name,
         {
@@ -140,6 +140,16 @@ def _load_forensics_collector_module(module_name: str):
             "cryptography.hazmat.primitives.asymmetric": fake_asymmetric,
         },
     )
+    # FIX: C6-RT-24: redirect evidence writes into the test's own tmp_path. Without this,
+    # ForensicsCollector uses EVIDENCE_BASE_DIR's default of /var/lib/openclaw/forensics --
+    # creatable on Windows (so these tests "passed" only by writing outside their sandbox
+    # onto the developer's disk) and root-only on Linux, where they raise PermissionError.
+    # EVIDENCE_BASE_DIR is read from module globals inside __init__, so patching the
+    # attribute after load is sufficient, and it matches the _load_auto_containment_context
+    # idiom above. The module itself is correct -- it already honours $EVIDENCE_DIR.
+    if evidence_dir is not None:  # FIX: C6-RT-24
+        module.EVIDENCE_BASE_DIR = Path(evidence_dir) / "forensics"  # type: ignore[attr-defined]  # FIX: C6-RT-24
+    return module  # FIX: C6-RT-24
 
 
 def _load_notification_manager_module(module_name: str):
@@ -467,7 +477,7 @@ def test_C6_H_07_container_update_with_unknown_kwarg_fails_with_spec(tmp_path): 
 def test_C6_H_08_save_manifest_does_not_crash_on_degraded_evidence_items(tmp_path):  # FIX: C6-H-08
     """Locks the C6-H-08 claim: save_manifest must emit CHECKSUMS.txt successfully
     even when manifest contains degraded items lacking checksum_sha256/file_path."""
-    module = _load_forensics_collector_module("forensics_collector_claim_c6_h_08_save_manifest")  # FIX: C6-H-08
+    module = _load_forensics_collector_module("forensics_collector_claim_c6_h_08_save_manifest", tmp_path)  # FIX: C6-RT-24
     inst = module.ForensicsCollector("INC-TEST-C6H08", level="standard")  # FIX: C6-H-08
     inst.evidence_dir = tmp_path / "evidence"  # FIX: C6-H-08
     inst.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C6-H-08
@@ -722,7 +732,7 @@ def test_main_claim_dispatches_requested_containment_action(tmp_path):
 
 
 def test_collect_process_list_claim_collects_running_process_details(tmp_path):
-    module = _load_forensics_collector_module("forensics_collector_claim_process_list")
+    module = _load_forensics_collector_module("forensics_collector_claim_process_list", tmp_path)  # FIX: C6-RT-24
     collector = module.ForensicsCollector("IRP-CLAIM-001", "quick")
     collector.evidence_dir = tmp_path / "forensics"
     collector.evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -830,7 +840,7 @@ def test_main_claim_returns_nonzero_when_all_notifications_fail():
 
 
 def test_save_manifest_handles_degraded_network_capture_without_keyerror(tmp_path):
-    module = _load_forensics_collector_module("forensics_collector_save_manifest_degraded")
+    module = _load_forensics_collector_module("forensics_collector_save_manifest_degraded", tmp_path)  # FIX: C6-RT-24
     collector = module.ForensicsCollector("IRP-DEGRADED-001", "quick")
     collector.evidence_dir = tmp_path / "forensics-degraded"
     collector.evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -858,7 +868,7 @@ def test_save_manifest_handles_degraded_network_capture_without_keyerror(tmp_pat
 
 
 def test_collect_logs_claim_surfaces_system_log_collection_failure(tmp_path):
-    module = _load_forensics_collector_module("forensics_collector_claim_logs")
+    module = _load_forensics_collector_module("forensics_collector_claim_logs", tmp_path)  # FIX: C6-RT-24
     collector = module.ForensicsCollector("IRP-LOGS-001", "quick")
     collector.evidence_dir = tmp_path / "forensics-logs"
     collector.evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -873,7 +883,7 @@ def test_collect_logs_claim_surfaces_system_log_collection_failure(tmp_path):
 
 
 def test_collect_all_claim_surfaces_partial_collection_failure(tmp_path):
-    module = _load_forensics_collector_module("forensics_collector_claim_collect_all")
+    module = _load_forensics_collector_module("forensics_collector_claim_collect_all", tmp_path)  # FIX: C6-RT-24
     collector = module.ForensicsCollector("IRP-COLLECT-001", "quick")
     collector.evidence_dir = tmp_path / "forensics-collect-all"
     collector.evidence_dir.mkdir(parents=True, exist_ok=True)
