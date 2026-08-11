@@ -19,10 +19,29 @@ azure-ad
     variables: AZURE_AD_TENANT_ID, AZURE_AD_CLIENT_ID, AZURE_AD_CLIENT_SECRET.
 
     NOT every rule above runs for this source.  The basic Graph user query
-    cannot supply the columns named in ``AZURE_AD_UNAVAILABLE_FIELDS``, so the
-    prod-access privilege-creep sub-rule and the orphaned-approver check are
-    reported as ``status="incomplete_data"`` rather than as a clean result.
-    See that constant for the authoritative list.
+    cannot supply a trustworthy value for the columns named in
+    ``AZURE_AD_UNAVAILABLE_FIELDS``, so every check that depends on one of them
+    is reported as ``status="incomplete_data"`` rather than as a clean result.
+    See that constant for the authoritative list.  Concretely, for azure-ad:
+
+      - Inactive-user detection RUNS, subject to one precondition: ``LastLogin``
+        comes from ``signInActivity``, which requires an Azure AD Premium P1/P2
+        licence on the tenant.  Without it the field is absent and every user is
+        flagged "no login date recorded" — noisy, but it fails toward review
+        rather than toward a clean result.
+      - Prod-access privilege-creep sub-rule DOES NOT RUN — ``Systems`` is
+        hardcoded ``""``; the basic user query has no system-entitlement data.
+      - Admin+Developer privilege-creep sub-rule DOES NOT RUN as an entitlement
+        check — ``Role`` is populated from the Graph ``jobTitle`` profile
+        attribute, which is free-text HR metadata, not an entitlement.  Real
+        Azure AD entitlements live in ``/directoryRoles``,
+        ``appRoleAssignments`` and group memberships, none of which are queried
+        (doing so would require additional Graph scopes such as
+        ``RoleManagement.Read.Directory`` / ``Directory.Read.All``).  No
+        Role-derived privilege-creep finding is emitted for this source at all,
+        so the marker's "could not run" claim is not contradicted by a finding
+        sitting beside it.  See C6-RT-19.
+      - Orphaned-approver check DOES NOT RUN — ``GrantedBy`` is hardcoded ``""``.
 
 SECURITY NOTE
 -------------
@@ -142,7 +161,22 @@ def _graph_get(endpoint: str, token: str) -> dict[str, Any]:
 # (see load_azure_ad below — Systems/GrantedBy are hardcoded ""). Checks that depend
 # on them therefore did NOT run for the azure-ad source; they must be reported as
 # incomplete_data, never as a clean/zero result (which was false-clean evidence).
-AZURE_AD_UNAVAILABLE_FIELDS = frozenset({"Systems", "GrantedBy"})  # FIX: C6-RT-08
+#
+# FIX: C6-RT-19: "unavailable" here means the source cannot supply a TRUSTWORTHY
+# value for the access-review semantics of that column — NOT merely that the column
+# comes out empty. Two distinct cases are listed:
+#   Systems, GrantedBy — literally absent: load_azure_ad hardcodes them to "".
+#   Role               — POPULATED BUT SEMANTICALLY WRONG: load_azure_ad fills it
+#                        from the Graph `jobTitle` profile attribute, which is
+#                        free-text HR metadata. Entitlements actually live in
+#                        /directoryRoles, appRoleAssignments and group memberships,
+#                        which this module deliberately does not query (that would
+#                        require added Graph scopes — a permissions change, not a
+#                        fix). A jobTitle can never be relied on to satisfy the
+#                        Admin+Developer entitlement test, so that sub-rule cannot
+#                        run as an entitlement check on this source.
+# Every field named here forces an incomplete_data marker on its dependent check.
+AZURE_AD_UNAVAILABLE_FIELDS = frozenset({"Systems", "GrantedBy", "Role"})  # FIX: C6-RT-19
 
 
 @read_only_io
@@ -222,10 +256,14 @@ def analyze_access(
       - privilege_creep
       - orphaned_approvers
 
-    ``unavailable_fields`` names columns the data source could not supply (e.g.
-    the azure-ad provider cannot populate Systems/GrantedBy). Checks that depend
-    on such a field are reported with an explicit ``status="incomplete_data"``
-    marker instead of silently returning no findings — see C6-RT-08.
+    ``unavailable_fields`` names columns for which the data source cannot supply
+    a trustworthy value — either because the column is absent (the azure-ad
+    provider hardcodes Systems/GrantedBy to ""), or because the value it does
+    supply does not mean what the check needs it to mean (the azure-ad Role
+    column carries a Graph ``jobTitle``, not an entitlement — C6-RT-19). Checks
+    that depend on such a field are reported with an explicit
+    ``status="incomplete_data"`` marker instead of silently returning no
+    findings — see C6-RT-08.
     """
     unavailable_fields = unavailable_fields or frozenset()  # FIX: C6-RT-08
     now = datetime.now(UTC)
@@ -271,7 +309,18 @@ def analyze_access(
         # --- Privilege-creep rules ---
         roles = {r.strip().lower() for r in role_raw.split(",") if r.strip()}
 
-        if "admin" in roles and "developer" in roles:
+        # FIX: C6-RT-19: both sub-rules below read `roles`, so both are only meaningful
+        # when the Role column actually carries entitlement data. On a source where it
+        # does not (azure-ad fills Role from the Graph jobTitle profile attribute), a
+        # match is a coincidence of HR job titles, not a privilege finding. Emitting it
+        # as a real finding would contradict the incomplete_data marker emitted below --
+        # the same array would assert the check could not run AND report its verdict --
+        # and, because markers are excluded from the privilege-creep CSV export, it would
+        # reach that artifact as an uncaveated entitlement finding. The marker is the
+        # only honest output for such a source.
+        role_data_is_entitlement = "Role" not in unavailable_fields  # FIX: C6-RT-19
+
+        if role_data_is_entitlement and "admin" in roles and "developer" in roles:  # FIX: C6-RT-19
             privilege_creep.append({
                 "user_id": user_id,
                 "email": email,
@@ -282,7 +331,11 @@ def analyze_access(
 
         prod_access = any(s.lower() in ("prod", "production") for s in systems)
         non_prod_roles = {"developer", "operator", "viewer", "read-only"}
-        if prod_access and roles and roles.issubset(non_prod_roles) and user_id not in already_flagged_creep:
+        if (  # FIX: C6-RT-19
+            role_data_is_entitlement  # FIX: C6-RT-19
+            and prod_access and roles and roles.issubset(non_prod_roles)
+            and user_id not in already_flagged_creep
+        ):
             privilege_creep.append({
                 "user_id": user_id,
                 "email": email,
@@ -314,6 +367,24 @@ def analyze_access(
                 "'Systems' field unavailable from this data source"  # FIX: C6-RT-08
             ),  # FIX: C6-RT-08
         })  # FIX: C6-RT-08
+    # FIX: C6-RT-19: the Role column can be populated yet still unable to answer the
+    # entitlement question (azure-ad fills it from the Graph jobTitle attribute). The
+    # admin_developer_combo sub-rule is therefore inert on that source; report it as
+    # incomplete_data so a privilege_creep count of 0 is never read as "no creep found".
+    if "Role" in unavailable_fields:  # FIX: C6-RT-19
+        privilege_creep.append({  # FIX: C6-RT-19
+            "status": "incomplete_data",  # FIX: C6-RT-19
+            "check": "admin_developer_combo",  # FIX: C6-RT-19
+            "missing_fields": ["Role"],  # FIX: C6-RT-19
+            "issue": (  # FIX: C6-RT-19
+                "role-based privilege-creep check could not run: the azure-ad "  # FIX: C6-RT-19
+                "'Role' column is derived from the Microsoft Graph 'jobTitle' "  # FIX: C6-RT-19
+                "profile attribute rather than from a directory-role or app-role "  # FIX: C6-RT-19
+                "assignment query, so it carries no entitlement data. No "  # FIX: C6-RT-19
+                "Role-derived privilege-creep finding is reported for this "  # FIX: C6-RT-19
+                "source; entitlements were not reviewed"  # FIX: C6-RT-19
+            ),  # FIX: C6-RT-19
+        })  # FIX: C6-RT-19
     if "GrantedBy" in unavailable_fields:  # FIX: C6-RT-08
         orphaned_approvers.append({  # FIX: C6-RT-08
             "status": "incomplete_data",  # FIX: C6-RT-08
@@ -391,20 +462,32 @@ def run_access_review(
 
     input_source = "csv" if input_csv else provider
 
+    # FIX: C6-RT-19: choose the loader and declare its unavailable fields in ONE
+    # branch. Previously the loader was a catch-all `else:` (any non-CSV provider got
+    # load_azure_ad) while unavailable_fields was gated on `input_source == "azure-ad"`
+    # by exact string match. Those two could disagree: provider="Azure-AD" or
+    # "azure_ad" pulled real Microsoft Graph data and then reported zero
+    # incomplete_data markers with iso27001_a9_2_5 "pass" -- a trustworthy-looking
+    # clean review of checks that never ran, the exact false-clean class this finding
+    # exists to remove. Binding them together makes that drift unrepresentable, and an
+    # unrecognised provider now fails closed instead of silently reporting clean.
     if input_csv:
         rows = load_csv(input_csv)
-    else:
+        unavailable_fields: frozenset[str] = frozenset()  # FIX: C6-RT-19
+    elif input_source == "azure-ad":  # FIX: C6-RT-19
         rows = load_azure_ad(
             tenant_id=tenant_id,
             client_id=client_id,
             client_secret=client_secret,
         )
-
-    # FIX: C6-RT-08: declare which required fields the source cannot supply, so
-    # analyze_access reports dependent checks as incomplete rather than clean.
-    unavailable_fields = (  # FIX: C6-RT-08
-        AZURE_AD_UNAVAILABLE_FIELDS if input_source == "azure-ad" else frozenset()  # FIX: C6-RT-08
-    )  # FIX: C6-RT-08
+        # FIX: C6-RT-08: declare which required fields the source cannot supply, so
+        # analyze_access reports dependent checks as incomplete rather than clean.
+        unavailable_fields = AZURE_AD_UNAVAILABLE_FIELDS  # FIX: C6-RT-08
+    else:  # FIX: C6-RT-19
+        raise ValueError(  # FIX: C6-RT-19
+            f"Unsupported provider {provider!r}. Supported providers: 'azure-ad'. "  # FIX: C6-RT-19
+            "Refusing to run rather than report checks that never ran as clean."  # FIX: C6-RT-19
+        )  # FIX: C6-RT-19
 
     findings = analyze_access(  # FIX: C6-RT-08
         rows,
@@ -434,8 +517,12 @@ def run_access_review(
     # (ISO 27001 A.9.2.5) could not fully run -> report "incomplete", never "pass".
     compliance = {
         "soc2_cc6_1": "warn" if summary["inactive_count"] > 0 else "pass",
+        # FIX: C6-RT-19: Role joins the gate set. A.9.2.5 is a review of *entitlements*,
+        # and each of these three fields is independently load-bearing for it: if Systems
+        # and GrantedBy ever became available, a jobTitle-derived Role would still leave
+        # the entitlement review unperformed, so Role alone must still force "incomplete".
         "iso27001_a9_2_5": (  # FIX: C6-RT-08
-            "incomplete" if unavailable_fields & {"Systems", "GrantedBy"}  # FIX: C6-RT-08
+            "incomplete" if unavailable_fields & {"Systems", "GrantedBy", "Role"}  # FIX: C6-RT-19
             else "warn" if summary["privilege_creep_count"] > 0  # FIX: C6-RT-08
             else "pass"  # FIX: C6-RT-08
         ),
