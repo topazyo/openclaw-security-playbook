@@ -1,0 +1,151 @@
+# C6-RT-21 — tests/integration/ was collected by NO CI workflow, so the
+# origin-ledger regression suite for restore_skill (C6-M-17 / issue #123) only
+# ever ran on a developer machine.  This workflow runs the whole directory on
+# the GitHub-hosted runner and fails if any test is skipped rather than run.
+name: Integration Tests # FIX: C6-RT-21
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # FIX: C6-RT-21
+
+on:
+  pull_request:
+    # The pytest target below is the WHOLE tests/integration/ tree, so this
+    # filter must reach every tree those modules import or shell out to.
+    # Each entry is derived from a real reference in tests/integration/*.py.
+    paths:
+      - 'tests/integration/**' # FIX: C6-RT-21
+      - 'tests/fixtures/**' # FIX: C6-RT-21
+      - 'src/**' # FIX: C6-RT-21
+      - 'scripts/supply-chain/**' # FIX: C6-RT-21
+      - 'scripts/incident-response/**' # FIX: C6-RT-21
+      - 'examples/security-controls/**' # FIX: C6-RT-21
+      - 'tools/compliance-reporter.py' # FIX: C6-RT-21
+      - 'configs/organization-policies/**' # FIX: C6-RT-21
+      - 'requirements.txt' # FIX: C6-RT-21
+      - 'pyproject.toml' # FIX: C6-RT-21
+      - 'setup.py' # FIX: C6-RT-21
+      - '.github/workflows/integration-tests.yml' # FIX: C6-RT-21
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-tests:
+    name: Integration Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # requirements.txt: boto3 / PyYAML / psutil / jinja2 / networkx are imported
+      # (or patched) by the incident-response and backup tests.
+      # `pip install -e .`: test_cycle5_claim_regressions.py imports
+      # `clawdbot.scan_vulnerability` at MODULE level — without the editable
+      # install that is a collection error, not a skip.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install pytest
+
+      # Whole-directory target, deliberately: it keeps the `tests/integration/**`
+      # trigger honest — the path filter and the pytest target cover the same set.
+      # The two --deselect'd cases are gated on `sys.platform == "win32"` inside
+      # test_cycle5_claim_regressions.py (they invoke .venv/Scripts/pip-audit.exe),
+      # so on ubuntu-latest they can only ever report as skips. They are excluded
+      # explicitly here rather than silently tolerated by the gate below.
+      - name: Run integration tests
+        env:
+          JUNIT_XML: ${{ runner.temp }}/integration-evidence/junit.xml # FIX: C6-RT-21
+        run: |
+          mkdir -p "$(dirname "$JUNIT_XML")"
+          WIN_ONLY='tests/integration/test_cycle5_claim_regressions.py::TestDependencyAuditShClaim'
+          pytest tests/integration/ -rs --junit-xml="$JUNIT_XML" -v \
+            --deselect "$WIN_ONLY::test_dependency_audit_sh_claim_exits_0_on_clean_requirements" \
+            --deselect "$WIN_ONLY::test_dependency_audit_sh_claim_exits_1_for_seeded_cve_fixture"
+
+      # THE SKIP GATE. A green job must mean "the tests ran", not "the tests were
+      # collected". Runs even when pytest failed so the skip list is always visible.
+      - name: Enforce zero-skip / minimum-collected gate
+        if: always()
+        env:
+          JUNIT_XML: ${{ runner.temp }}/integration-evidence/junit.xml # FIX: C6-RT-21
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          # Floor, not equality: tests/integration/ collects 138 today, minus the 2
+          # win32-only pip-audit cases deselected above = 136. A growing suite still
+          # passes; a suite that silently loses tests (renamed file dropped from
+          # collection, import guard swallowing a module) fails and needs a human
+          # to re-justify the number.
+          EXPECTED_MIN_TESTS = 136
+
+          report = Path(os.environ["JUNIT_XML"])
+          if not report.is_file():
+              print(f"GATE FAIL: {report} was not produced - the test step did not run.")
+              sys.exit(1)
+
+          root = ET.parse(report).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+          total = sum(int(s.get("tests", "0")) for s in suites)
+          errors = sum(int(s.get("errors", "0")) for s in suites)
+          failures = sum(int(s.get("failures", "0")) for s in suites)
+
+          skipped = []
+          for case in root.iter("testcase"):
+              for node in case.findall("skipped"):
+                  name = f"{case.get('classname', '')}::{case.get('name', '')}"
+                  skipped.append((name, (node.get("message") or "").strip()))
+
+          print(
+              f"junit summary: ran={total} failures={failures} "
+              f"errors={errors} skipped={len(skipped)}"
+          )
+
+          ok = True
+          if skipped:
+              print(f"GATE FAIL: {len(skipped)} test(s) SKIPPED; a green job must mean they ran:")
+              for name, reason in skipped:
+                  print(f"  SKIPPED {name}")
+                  print(f"          reason: {reason}")
+              ok = False
+          if total < EXPECTED_MIN_TESTS:
+              print(
+                  f"GATE FAIL: only {total} test(s) ran, expected at least "
+                  f"{EXPECTED_MIN_TESTS} - tests disappeared from collection."
+              )
+              ok = False
+          if errors:
+              print(f"GATE FAIL: {errors} collection/setup error(s) in the junit report.")
+              ok = False
+          # Without this the gate printed "GATE PASS" on a run with failing tests.
+          # The job was still red (the pytest step has no continue-on-error), but a
+          # log line reading PASS next to a red job is exactly the ambiguity this
+          # workflow exists to remove.
+          if failures:
+              print(f"GATE FAIL: {failures} test failure(s) in the junit report.")
+              ok = False
+
+          if ok:
+              print(f"GATE PASS: {total} test(s) ran, 0 skipped, 0 failed.")
+          sys.exit(0 if ok else 1)
+          PY
+
+      - name: Upload integration test evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-evidence
+          path: ${{ runner.temp }}/integration-evidence
+          retention-days: 90
