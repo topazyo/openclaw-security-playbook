@@ -87,7 +87,7 @@ def _read_single_report(log_dir):  # FIX: C5-finding-3
     return json.loads(report_files[0].read_text(encoding="utf-8"))  # FIX: C5-finding-3
 
 
-def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
+def _load_forensics_collector_module(module_name, evidence_dir=None):  # FIX: C6-RT-24
     fake_psutil = ModuleType("psutil")  # FIX: C5-finding-3
     fake_psutil.Error = RuntimeError  # type: ignore[attr-defined]  # FIX: C5-finding-3
     fake_psutil.NoSuchProcess = RuntimeError  # type: ignore[attr-defined]  # FIX: C5-finding-3
@@ -116,6 +116,15 @@ def _load_forensics_collector_module(module_name):  # FIX: C5-finding-3
     }):  # FIX: C5-finding-3
         sys.modules[spec.name] = module  # FIX: C5-finding-3
         spec.loader.exec_module(module)  # FIX: C5-finding-3
+    # FIX: C6-RT-24: redirect evidence writes into the test's own tmp_path. Without this,
+    # ForensicsCollector uses EVIDENCE_BASE_DIR's default of /var/lib/openclaw/forensics --
+    # creatable on Windows (so these tests "passed" only by writing outside their sandbox
+    # onto the developer's disk) and root-only on Linux, where they raise PermissionError.
+    # EVIDENCE_BASE_DIR is read from module globals inside __init__, so patching the
+    # attribute after load is sufficient. The module itself is correct -- it already
+    # honours $EVIDENCE_DIR; these tests simply never set it.
+    if evidence_dir is not None:  # FIX: C6-RT-24
+        module.EVIDENCE_BASE_DIR = Path(evidence_dir) / "forensics"  # type: ignore[attr-defined]  # FIX: C6-RT-24
     return module  # FIX: C5-finding-3
 
 
@@ -212,7 +221,7 @@ class TestDetectionPhase:
 
     def test_forensics_collector_execution(self, tmp_path, incident_simulator):  # FIX: C5-finding-3
         """Test forensics-collector.py gathers evidence through the real collection flow."""  # FIX: C5-finding-3
-        module = _load_forensics_collector_module("forensics_collector_detection_issue_7_tests")  # FIX: C5-finding-3
+        module = _load_forensics_collector_module("forensics_collector_detection_issue_7_tests", tmp_path)  # FIX: C6-RT-24
         collector = module.ForensicsCollector(incident_simulator["incident_id"], "quick")  # FIX: C5-finding-3
         collector.evidence_dir = tmp_path / "forensics"  # FIX: C5-finding-3
         collector.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3
@@ -513,7 +522,7 @@ class TestForensicsCollectorRuntimeParity:
     """Regression tests for forensics collector runtime behavior."""
 
     def test_collect_process_list_avoids_unsupported_connections_attr(self, tmp_path):  # FIX: C5-finding-3
-        module = _load_forensics_collector_module("forensics_collector_issue_4_tests")  # FIX: C5-finding-3
+        module = _load_forensics_collector_module("forensics_collector_issue_4_tests", tmp_path)  # FIX: C6-RT-24
         collector = module.ForensicsCollector("IRP-004-20260214", "quick")  # FIX: C5-finding-3
         collector.evidence_dir = tmp_path / "forensics"  # FIX: C5-finding-3
         collector.evidence_dir.mkdir(parents=True, exist_ok=True)  # FIX: C5-finding-3

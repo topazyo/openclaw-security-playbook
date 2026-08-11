@@ -86,12 +86,107 @@ def _load_optional_json(path: str | None, label: str) -> dict[str, Any] | None:
         return {"error": f"could not load {label}: {exc}"}
 
 
+#: Findings categories emitted by ``scan access`` that may carry
+#: ``incomplete_data`` markers interleaved with real findings.
+_ACCESS_FINDING_CATEGORIES = (  # FIX: C6-RT-20
+    "inactive_users",  # FIX: C6-RT-20
+    "privilege_creep",  # FIX: C6-RT-20
+    "orphaned_approvers",  # FIX: C6-RT-20
+)  # FIX: C6-RT-20
+
+
+def _access_incomplete_checks(access: dict[str, Any] | None) -> list[str]:  # FIX: C6-RT-20
+    """Return one human-readable line per access check that COULD NOT RUN.
+
+    The ``scan access`` producer interleaves ``incomplete_data`` marker dicts of
+    the shape::
+
+        {"status": "incomplete_data",
+         "check": "production_access_in_non_prod_role",
+         "missing_fields": ["Systems"],
+         "issue": "... could not run: 'Systems' field unavailable ..."}
+
+    with real findings inside each category list.  Real findings never carry a
+    ``status`` key, so markers are detected with
+    ``f.get("status") == "incomplete_data"``.
+
+    Returns an empty list for an artifact produced before the marker schema
+    existed (no markers, no ``incomplete_data_count``); the caller falls back to
+    a count-based message in that case.  Never raises on a missing key.
+    """
+    if not isinstance(access, dict):  # FIX: C6-RT-20
+        return []  # FIX: C6-RT-20
+
+    # Markers may live at the top level or nested under a "findings" mapping;
+    # accept either layout so the consumer is not coupled to one nesting.
+    containers: list[dict[str, Any]] = [access]  # FIX: C6-RT-20
+    nested = access.get("findings")  # FIX: C6-RT-20
+    if isinstance(nested, dict):  # FIX: C6-RT-20
+        containers.append(nested)  # FIX: C6-RT-20
+
+    details: list[str] = []  # FIX: C6-RT-20
+    seen: set[tuple[str, tuple[str, ...]]] = set()  # FIX: C6-RT-20
+    for container in containers:  # FIX: C6-RT-20
+        for category in _ACCESS_FINDING_CATEGORIES:  # FIX: C6-RT-20
+            entries = container.get(category)  # FIX: C6-RT-20
+            if not isinstance(entries, list):  # FIX: C6-RT-20
+                continue  # FIX: C6-RT-20
+            for entry in entries:  # FIX: C6-RT-20
+                if not isinstance(entry, dict):  # FIX: C6-RT-20
+                    continue  # FIX: C6-RT-20
+                if entry.get("status") != "incomplete_data":  # FIX: C6-RT-20
+                    continue  # FIX: C6-RT-20
+                check = str(entry.get("check") or category)  # FIX: C6-RT-20
+                raw_fields = entry.get("missing_fields") or []  # FIX: C6-RT-20
+                if isinstance(raw_fields, str):  # FIX: C6-RT-20
+                    raw_fields = [raw_fields]  # FIX: C6-RT-20
+                fields = tuple(str(f) for f in raw_fields)  # FIX: C6-RT-20
+                key = (check, fields)  # FIX: C6-RT-20
+                if key in seen:  # FIX: C6-RT-20
+                    continue  # FIX: C6-RT-20
+                seen.add(key)  # FIX: C6-RT-20
+                if len(fields) == 1:  # FIX: C6-RT-20
+                    reason = f"missing field: {fields[0]}"  # FIX: C6-RT-20
+                elif fields:  # FIX: C6-RT-20
+                    reason = f"missing fields: {', '.join(fields)}"  # FIX: C6-RT-20
+                else:  # FIX: C6-RT-20
+                    reason = "missing field not reported by the data source"  # FIX: C6-RT-20
+                details.append(  # FIX: C6-RT-20
+                    f"access review incomplete: check '{check}' "  # FIX: C6-RT-20
+                    f"could not run ({reason})"  # FIX: C6-RT-20
+                )  # FIX: C6-RT-20
+    return details  # FIX: C6-RT-20
+
+
+def _access_incomplete_controls(access: dict[str, Any] | None) -> list[str]:  # FIX: C6-RT-20
+    """Return the access compliance control keys whose status is ``incomplete``."""
+    if not isinstance(access, dict):  # FIX: C6-RT-20
+        return []  # FIX: C6-RT-20
+    comp = access.get("compliance")  # FIX: C6-RT-20
+    if not isinstance(comp, dict):  # FIX: C6-RT-20
+        return []  # FIX: C6-RT-20
+    return [str(k) for k, v in comp.items() if v == "incomplete"]  # FIX: C6-RT-20
+
+
 def _overall_status(
     compliance: dict[str, Any],
     certificates: dict[str, Any],
     vuln: dict[str, Any] | None,
     access: dict[str, Any] | None,
 ) -> str:
+    """Collapse every embedded section into one overall status string.
+
+    Access-review incompleteness maps to ``"warning"``, not ``"unknown"``
+    (FIX: C6-RT-20).  ``"unknown"`` is already reserved in this function for
+    "the report itself could not be assembled" - the
+    ``if "error" in compliance or "error" in certificates`` branch below.  An
+    access review that RAN but could not complete every check is a materially
+    different state, and it must not be collapsed into the same bucket as a
+    failed report load.  ``"warning"`` is the correct severity and is additive
+    to the existing access branch, which previously looked only at
+    ``inactive_count`` / ``privilege_creep_count`` and therefore reported
+    ``healthy`` for a review in which checks silently could not run.
+    """
     if "error" in compliance or "error" in certificates:
         return "unknown"
     # Critical: any compliance framework below 95 % or critical CVEs
@@ -109,6 +204,12 @@ def _overall_status(
         s = access.get("summary", {})
         if s.get("inactive_count", 0) > 0 or s.get("privilege_creep_count", 0) > 0:
             return "warning"
+        # A review that ran but could not complete every check is NOT healthy.
+        # `.get(..., 0)` keeps a pre-marker-schema artifact behaving as before.
+        if s.get("incomplete_data_count", 0) > 0:  # FIX: C6-RT-20
+            return "warning"  # FIX: C6-RT-20
+        if _access_incomplete_controls(access):  # FIX: C6-RT-20
+            return "warning"  # FIX: C6-RT-20
     return "healthy"
 
 
@@ -185,6 +286,29 @@ def _render_pdf(report: dict[str, Any], output_path: str) -> str | None:
         ))
         story.append(Spacer(1, 8))
 
+    # Access review section  # FIX: C6-RT-20
+    access = report.get("sections", {}).get("access_review_status")  # FIX: C6-RT-20
+    if isinstance(access, dict) and "error" not in access:  # FIX: C6-RT-20
+        a_summary = access.get("summary", {})  # FIX: C6-RT-20
+        if not isinstance(a_summary, dict):  # FIX: C6-RT-20
+            a_summary = {}  # FIX: C6-RT-20
+        story.append(Paragraph("Access Review", styles["Heading2"]))  # FIX: C6-RT-20
+        story.append(Paragraph(  # FIX: C6-RT-20
+            f"Inactive: {a_summary.get('inactive_count', 0)}"  # FIX: C6-RT-20
+            f"  Privilege creep: {a_summary.get('privilege_creep_count', 0)}"  # FIX: C6-RT-20
+            f"  Orphaned approvers: {a_summary.get('orphaned_approver_count', 0)}"  # FIX: C6-RT-20
+            f"  Checks that could not run: {a_summary.get('incomplete_data_count', 0)}",  # FIX: C6-RT-20
+            styles["Normal"],  # FIX: C6-RT-20
+        ))  # FIX: C6-RT-20
+        for detail in _access_incomplete_checks(access):  # FIX: C6-RT-20
+            story.append(Paragraph(f"\u2022 {detail}", styles["Normal"]))  # FIX: C6-RT-20
+        for control in _access_incomplete_controls(access):  # FIX: C6-RT-20
+            story.append(Paragraph(  # FIX: C6-RT-20
+                f"\u2022 control {control} is INCOMPLETE - not attested",  # FIX: C6-RT-20
+                styles["Normal"],  # FIX: C6-RT-20
+            ))  # FIX: C6-RT-20
+        story.append(Spacer(1, 8))  # FIX: C6-RT-20
+
     # Missing evidence
     missing = report.get("missing_evidence", [])
     if missing:
@@ -249,6 +373,33 @@ def generate_weekly_report(
     elif "error" in access:
         warnings.append(f"access review could not be loaded: {access['error']}")
         access = None
+    else:  # FIX: C6-RT-20
+        # An access review that RAN but could not complete every check must name
+        # the specific checks it skipped -- a generic "incomplete" string is not
+        # actionable for an auditor.  Marker detail is preferred; a pre-marker
+        # artifact (no markers, counts only) falls back to a count-based line.
+        incomplete_details = _access_incomplete_checks(access)  # FIX: C6-RT-20
+        incomplete_controls = _access_incomplete_controls(access)  # FIX: C6-RT-20
+        access_summary = access.get("summary", {})  # FIX: C6-RT-20
+        if not isinstance(access_summary, dict):  # FIX: C6-RT-20
+            access_summary = {}  # FIX: C6-RT-20
+        incomplete_count = access_summary.get("incomplete_data_count", 0)  # FIX: C6-RT-20
+        if incomplete_details:  # FIX: C6-RT-20
+            warnings.extend(incomplete_details)  # FIX: C6-RT-20
+        elif incomplete_count:  # FIX: C6-RT-20: guard on the count alone -- an
+            # 'incomplete' compliance control with a zero count is reported by the
+            # loop below, and folding it in here emitted "0 check(s) could not run",
+            # a false statement in an audit-facing warning.
+            warnings.append(  # FIX: C6-RT-20
+                f"access review incomplete: {incomplete_count} check(s) could "  # FIX: C6-RT-20
+                "not run; this artifact carries no per-check detail "  # FIX: C6-RT-20
+                "(re-run 'openclaw-cli scan access' to name them)"  # FIX: C6-RT-20
+            )  # FIX: C6-RT-20
+        for control in incomplete_controls:  # FIX: C6-RT-20
+            warnings.append(  # FIX: C6-RT-20
+                f"access review incomplete: compliance control {control} is "  # FIX: C6-RT-20
+                "'incomplete' - it is NOT attested by this report"  # FIX: C6-RT-20
+            )  # FIX: C6-RT-20
 
     if "error" in compliance:
         warnings.append(f"compliance reporter error: {compliance['error']}")

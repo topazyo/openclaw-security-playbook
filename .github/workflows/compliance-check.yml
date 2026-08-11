@@ -11,6 +11,11 @@ on:
       - "configs/organization-policies/**"
       - "tools/compliance-reporter.py" # FIX: C6-M-??
       - "tools/compliance-data/**" # FIX: C6-M-??
+      - "tests/security/**" # FIX: C6-RT-22
+      - "src/clawdbot/**" # FIX: C6-RT-22
+      - "tools/policy-validator.py" # FIX: C6-RT-22: run by 4 steps + exec_module'd by test_policy_compliance.py
+      - "requirements.txt" # FIX: C6-RT-22: installed by every job in this workflow
+      - "pyproject.toml" # FIX: C6-RT-22: `pip install -e .` makes src/clawdbot importable for the test suite
       - ".github/workflows/compliance-check.yml" # FIX: C6-M-??
   workflow_dispatch:
 

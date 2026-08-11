@@ -79,6 +79,10 @@ mkdir -p "$SB/logs" "$SB/q" "$SB/origins" "$SB/skills"
 # so no sed-based suppression is needed.
 # shellcheck disable=SC1090
 source "$SCRIPT"
+## FIX: C6-RT-11: pin "driver failed to source the script" (restore_skill undefined) as a loud,
+## attributable error instead of a downstream "restore_skill: command not found" — distinguishes
+## that failure mode from path-mangling. Runs before `set +e`; the `||` keeps errexit from aborting.
+declare -f restore_skill >/dev/null 2>&1 || { echo "DRIVER_ERROR: restore_skill undefined after sourcing $SCRIPT (scenario=$SCEN)" >&2; exit 4; }  ## FIX: C6-RT-11
 # errexit OFF: restore_skill returns non-zero on every rejection path and we capture $?
 # (with -e on, `restore_skill ...; echo "RC=$?"` would abort before the echo). nounset and
 # pipefail stay ON so unset-var bugs and pipe failures in the driver surface attributably.
