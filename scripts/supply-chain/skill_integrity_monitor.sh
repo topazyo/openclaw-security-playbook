@@ -831,9 +831,18 @@ restore_skill() {
         # Tamper detection: QUARANTINE_INFO.txt must agree with the recorded origin. Compare ## FIX: C6-M-17
         # canonically (-m: the original location no longer exists once the skill was moved). ## FIX: C6-M-17
         if [ -n "$info_path" ]; then ## FIX: C6-M-17
-            local canon_info ## FIX: C6-M-17
+            local canon_info canon_authoritative ## FIX: C6-RT-25
             canon_info=$(canonicalize_path "$info_path" 2>/dev/null || echo "$info_path") ## FIX: C6-M-17
-            if [ "$canon_info" != "$authoritative" ]; then ## FIX: C6-M-17
+            # C6-RT-25: canonicalize BOTH sides. Comparing a resolved path against the raw
+            # ledger string answered the wrong question: any symlink component in the recorded
+            # origin -- swapped in by an attacker, or a legitimate symlinked mount -- made the
+            # two differ and reported reason=tamper even when QUARANTINE_INFO.txt agreed with
+            # the ledger byte-for-byte. That misattributed a parent-symlink swap to metadata
+            # tampering and made the parent_symlink guard below unreachable in the very case it
+            # exists for. The question this check must answer is "do the info file and the
+            # ledger name the same origin", which is only answerable in a shared normal form.
+            canon_authoritative=$(canonicalize_path "$authoritative" 2>/dev/null || echo "$authoritative") ## FIX: C6-RT-25
+            if [ "$canon_info" != "$canon_authoritative" ]; then ## FIX: C6-RT-25
                 error "Refusing restore: QUARANTINE_INFO.txt path ($info_path) disagrees with recorded origin ($authoritative) — possible tampering" ## FIX: C6-M-17
                 audit "RESTORE_REJECTED" "Skill: $quarantine_id | reason=tamper | info=$info_path | recorded=$authoritative" ## FIX: C6-M-17
                 return 1 ## FIX: C6-M-17
