@@ -104,20 +104,88 @@ jobs:
           pip install -e ".[test]"
           pip install pytest pytest-cov
 
-      - name: Run policy compliance tests
+      # FIX: C6-RT-26: run the WHOLE directory. This replaces three per-file steps that
+      # covered 3 of the 11 files in tests/security/ while this workflow's trigger is
+      # `tests/security/**` -- so a PR editing one of the other eight turned the job
+      # green WITHOUT running the edited test, actively asserting coverage that never
+      # happened. Enumerating files here guarantees every new security test defaults to
+      # unexecuted; naming the directory makes the target match the trigger by
+      # construction. -rs prints the reason for any skip.
+      #
+      # test_detection_replay_validation.py and test_runtime_security_regression.py now
+      # also run in their own workflows. That duplication is deliberate: an --ignore list
+      # to avoid it would recreate the exact target-vs-trigger asymmetry this fixes, and
+      # would rot silently as files are added. Neither needs the `yara` apt package that
+      # detection-replay-validation.yml installs (that suite passes skip_yara=True,
+      # require_yara=False), so this job's dependency set is sufficient.
+      - name: Run security test suite # FIX: C6-RT-26
         run: |
-          pytest tests/security/test_policy_compliance.py --junit-xml=test-results-policy.xml -v
+          pytest tests/security/ --junit-xml=test-results-security.xml -v -rs
 
-      - name: Run vulnerability scanning tests
+      # FIX: C6-RT-26: a green job must mean "the tests ran", not "the tests were
+      # collected" -- same gate shape as integration-tests.yml (C6-RT-21), which caught
+      # 8 pre-existing failures the moment a directory was switched on.
+      - name: Enforce zero-skip / minimum-collected gate # FIX: C6-RT-26
+        if: always()
         run: |
-          pytest tests/security/test_vulnerability_scanning.py --junit-xml=test-results-vuln.xml -v
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
 
-      # FIX: C6-RT-23: this file was run by NO workflow, which is why a security control
-      # that never fired went unnoticed for a whole cycle. -rs prints the reason for any
-      # skip, so a skipped guard test can never again read as a pass.
-      - name: Run read-only I/O guard tests # FIX: C6-RT-23
-        run: |
-          pytest tests/security/test_scan_access_security.py --junit-xml=test-results-readonly-io.xml -v -rs
+          # Measured, not guessed: tests/security/ collects 175 on this branch (173 pass
+          # locally plus the 2 flask cases that importorskip away without the `test`
+          # extra, which this job installs). A floor rather than equality so a growing
+          # suite still passes; a suite that silently LOSES tests fails and needs a human
+          # to re-justify the number.
+          EXPECTED_MIN_TESTS = 175
+
+          report = Path("test-results-security.xml")
+          if not report.is_file():
+              print(f"GATE FAIL: {report} was not produced - the test step did not run.")
+              sys.exit(1)
+
+          root = ET.parse(report).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+          total = sum(int(s.get("tests", "0")) for s in suites)
+          errors = sum(int(s.get("errors", "0")) for s in suites)
+          failures = sum(int(s.get("failures", "0")) for s in suites)
+
+          skipped = []
+          for case in root.iter("testcase"):
+              for node in case.findall("skipped"):
+                  name = f"{case.get('classname', '')}::{case.get('name', '')}"
+                  skipped.append((name, (node.get("message") or "").strip()))
+
+          print(
+              f"junit summary: ran={total} failures={failures} "
+              f"errors={errors} skipped={len(skipped)}"
+          )
+
+          ok = True
+          if skipped:
+              print(f"GATE FAIL: {len(skipped)} test(s) SKIPPED; a green job must mean they ran:")
+              for name, reason in skipped:
+                  print(f"  SKIPPED {name}")
+                  print(f"          reason: {reason}")
+              ok = False
+          if total < EXPECTED_MIN_TESTS:
+              print(
+                  f"GATE FAIL: only {total} test(s) ran, expected at least "
+                  f"{EXPECTED_MIN_TESTS} - tests disappeared from collection."
+              )
+              ok = False
+          if errors:
+              print(f"GATE FAIL: {errors} collection/setup error(s) in the junit report.")
+              ok = False
+          if failures:
+              print(f"GATE FAIL: {failures} test failure(s) in the junit report.")
+              ok = False
+
+          if ok:
+              print(f"GATE PASS: {total} test(s) ran, 0 skipped, 0 failed.")
+          sys.exit(0 if ok else 1)
+          PY
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
