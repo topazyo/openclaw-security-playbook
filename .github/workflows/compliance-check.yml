@@ -99,7 +99,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install -e .
+          # FIX: C6-RT-23: [test] brings flask, so the @read_only_io GET-guard tests
+          # exercise a real Flask request context instead of importorskip-ing away.
+          pip install -e ".[test]"
           pip install pytest pytest-cov
 
       - name: Run policy compliance tests
@@ -109,6 +111,13 @@ jobs:
       - name: Run vulnerability scanning tests
         run: |
           pytest tests/security/test_vulnerability_scanning.py --junit-xml=test-results-vuln.xml -v
+
+      # FIX: C6-RT-23: this file was run by NO workflow, which is why a security control
+      # that never fired went unnoticed for a whole cycle. -rs prints the reason for any
+      # skip, so a skipped guard test can never again read as a pass.
+      - name: Run read-only I/O guard tests # FIX: C6-RT-23
+        run: |
+          pytest tests/security/test_scan_access_security.py --junit-xml=test-results-readonly-io.xml -v -rs
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

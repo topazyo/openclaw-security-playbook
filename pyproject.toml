@@ -23,6 +23,13 @@ dependencies = [
 [project.optional-dependencies]  # FIX: C6-RT-07
 # PDF rendering for `openclaw-cli report weekly --pdf` (lazy-imported in src/clawdbot/report_weekly.py)
 reporting = ["reportlab>=4.0"]  # FIX: C6-RT-07
+# Test-only. flask is required to exercise the @read_only_io GET guard against a REAL
+# Flask request context. Deliberately NOT a runtime dependency: this is a security
+# playbook, not a web app, and the decorator lazy-imports flask inside its wrapper.
+# Without this extra the two real-Flask tests importorskip away on every machine, which
+# is one of the three reasons C6-RT-23 (a security control that was a no-op) survived an
+# entire audit cycle unnoticed. Installed by the compliance-check security-tests job.
+test = ["flask>=3.0"]  # FIX: C6-RT-23
 
 [project.scripts]
 openclaw-cli = "clawdbot.openclaw_cli:main"
