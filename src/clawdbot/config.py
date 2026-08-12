@@ -47,19 +47,30 @@ def read_only_io(func: F) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Check if we are in a Flask HTTP GET context. Raises ReadOnlyIOViolation
         # if so. FastAPI detection is not implemented — see docstring scope note.
+        #
+        # C6-RT-23: the raise MUST stay outside the try. ReadOnlyIOViolation subclasses
+        # RuntimeError, and this handler catches RuntimeError — so raising inside the try
+        # meant the guard caught its own exception and fell through to the call. The GET
+        # branch was dead code and the whole control was a no-op from C5-H-07 until now.
+        # RuntimeError has to remain caught here because that is what real Flask raises
+        # when `request` is touched outside an active request context, which is not a
+        # violation; so the only safe shape is to decide inside the try and act after it.
+        in_get_context = False  # FIX: C6-RT-23
         try:  # FIX: C5-H-07
             # Flask detection only — FastAPI is explicitly out of scope
             from flask import request as flask_request  # type: ignore[import-untyped]  # FIX: C5-H-07
 
-            if flask_request.method == "GET":  # FIX: C5-H-07
-                raise ReadOnlyIOViolation(
-                    f"Function {func.__name__} performs I/O and cannot be called "
-                    "from an HTTP GET handler (GET must be idempotent and side-effect-free). "
-                    "This is a security violation. Use POST instead."
-                )
+            in_get_context = flask_request.method == "GET"  # FIX: C6-RT-23
         except (ImportError, RuntimeError):  # FIX: C5-H-07
             # Flask not available or not in request context, continue
-            pass
+            in_get_context = False  # FIX: C6-RT-23
+
+        if in_get_context:  # FIX: C6-RT-23
+            raise ReadOnlyIOViolation(
+                f"Function {func.__name__} performs I/O and cannot be called "
+                "from an HTTP GET handler (GET must be idempotent and side-effect-free). "
+                "This is a security violation. Use POST instead."
+            )
 
         return func(*args, **kwargs)  # FIX: C5-H-07
 
