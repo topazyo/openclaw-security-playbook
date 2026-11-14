@@ -246,6 +246,8 @@ jobs:
       # PYSEC-2026-3447 (MANIFEST.in exclusions silently bypassed when a pattern and an
       # on-disk filename differ only by Unicode normalisation), which is what failed this
       # job on every run. Raising the floor to the patched release clears it. # FIX: C6-CI-04
+      # FIX: C7-04 The audits below no longer read the runner environment; this step now only
+      # FIX: C7-04 keeps the pip that installs pip-audit current.
       - name: Upgrade pip and build tooling to patched versions (CVE-2026-3219, PYSEC-2026-3447)
         run: python -m pip install --upgrade "pip>=26.1" "setuptools>=83.0.0" # FIX: C6-CI-04
 
@@ -253,17 +255,67 @@ jobs:
         run: |
           pip install pip-audit
 
-      - name: Run pip-audit
-        run: |
-          pip-audit --format json --output pip-audit.json || true
-          pip-audit --desc
+      # FIX: C7-04 Audit the hash-pinned production set as written. No venv needed, so it runs
+      # FIX: C7-04 first and an install failure below cannot hide its verdict.
+      - name: Audit requirements-prod.txt # FIX: C7-04
+        shell: bash # FIX: C7-04
+        run: | # FIX: C7-04
+          audit() { pip-audit -r requirements-prod.txt --require-hashes --disable-pip "$@"; } # FIX: C7-04
+          audit -f json -o pip-audit-prod.json || true # FIX: C7-04
+          audit --desc # FIX: C7-04
+
+      # FIX: C7-04 Rebuild what the image ships (Dockerfile.hardened:107-110, :139-140): the hashed
+      # FIX: C7-04 prod set, then the package, whose install_requires floors resolve to the newest
+      # FIX: C7-04 releases. Purge what the image purges (:248-257) and the package itself (not on
+      # FIX: C7-04 PyPI), so only shipped third-party code is audited. Once the image installs the
+      # FIX: C7-04 wheel with --no-deps, this covers `pip install .` users rather than the image.
+      - name: Install what ships into a clean venv # FIX: C7-04
+        id: ship # FIX: C7-04
+        if: ${{ !cancelled() }} # FIX: C7-04 still audit the environment when the prod audit failed
+        shell: bash # FIX: C7-04
+        run: | # FIX: C7-04
+          set -euo pipefail # FIX: C7-04
+          py="$RUNNER_TEMP/ship/bin/python" # FIX: C7-04
+          python -m venv --upgrade-deps "$RUNNER_TEMP/ship" # FIX: C7-04
+          "$py" -m pip install --require-hashes --no-deps -r requirements-prod.txt # FIX: C7-04
+          "$py" -m pip install . # FIX: C7-04
+          "$py" -m pip list # FIX: C7-04 the log lists every package audited below
+          "$py" -m pip show clawdbot > /dev/null # FIX: C7-04 the package itself is installed
+          "$py" -m pip check # FIX: C7-04 and every install_requires entry it declares
+          "$py" -m pip uninstall -y clawdbot wheel setuptools # FIX: C7-04
+          "$py" -m pip uninstall -y pip # FIX: C7-04
+          site="$("$py" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" # FIX: C7-04
+          test -d "$site" # FIX: C7-04
+          # FIX: C7-04 floor for the audit below: every distribution left in the venv (review #1)
+          floor="$(find "$site" -maxdepth 1 -type d -name '*.dist-info' | wc -l)" # FIX: C7-04
+          test "$floor" -gt 0 # FIX: C7-04
+          echo "SHIP_SITE=$site" >> "$GITHUB_ENV" # FIX: C7-04
+          echo "SHIP_MIN_ENTRIES=$floor" >> "$GITHUB_ENV" # FIX: C7-04
+
+      # FIX: C7-04 Gated on the install: `pip-audit --path` with an empty or missing path exits 0
+      # FIX: C7-04 having audited nothing, which would read as clean.
+      - name: Audit the installed environment # FIX: C7-04
+        if: ${{ !cancelled() && steps.ship.outcome == 'success' }} # FIX: C7-04
+        shell: bash # FIX: C7-04
+        run: | # FIX: C7-04
+          : "${SHIP_SITE:?install step did not export SHIP_SITE}" # FIX: C7-04
+          : "${SHIP_MIN_ENTRIES:?install step did not export SHIP_MIN_ENTRIES}" # FIX: C7-04
+          pip-audit --path "$SHIP_SITE" -f json -o pip-audit.json || true # FIX: C7-04
+          # FIX: C7-04 fail closed if it listed fewer packages than the venv holds, or audited none
+          seen="$(python -c 'import json; print(len(json.load(open("pip-audit.json"))["dependencies"]))')" # FIX: C7-04
+          skip='import json; d = json.load(open("pip-audit.json"))["dependencies"]' # FIX: C7-04
+          audited="$(python -c "$skip"'; print(sum("skip_reason" not in e for e in d))')" # FIX: C7-04
+          echo "pip-audit listed $seen, audited $audited; venv holds $SHIP_MIN_ENTRIES" # FIX: C7-04
+          test "$seen" -ge "$SHIP_MIN_ENTRIES" # FIX: C7-04
+          test "$audited" -gt 0 # FIX: C7-04 every entry skipped is no audit (review #2)
+          pip-audit --path "$SHIP_SITE" --desc # FIX: C7-04
 
       - name: Upload pip-audit results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pip-audit-results
-          path: pip-audit.json
+          path: pip-audit*.json # FIX: C7-04 pip-audit-prod.json and pip-audit.json
           retention-days: 90
 
   secret-scanning:
@@ -325,12 +377,14 @@ jobs:
           path: ./results
 
       - name: Download pip-audit results
+        if: ${{ !cancelled() }} # FIX: C7-04 still fetch it when the Bandit download failed
         uses: actions/download-artifact@v4
         with:
           name: pip-audit-results
           path: ./results
 
       - name: Generate summary
+        if: ${{ !cancelled() }} # FIX: C7-04 Trivy verdict even when a download failed
         env:
           TRIVY_JOB_RESULT: ${{ needs.trivy-scan.result }} # FIX: C5-H-09
         run: |
@@ -354,47 +408,81 @@ jobs:
               echo "Scan finished with unexpected status: $TRIVY_JOB_RESULT. Treat as inconclusive." >> $GITHUB_STEP_SUMMARY # FIX: C5-H-09
               ;; # FIX: C5-H-09
           esac # FIX: C5-H-09 # FIX: C6-C-01
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Bandit Python Security Scan" >> $GITHUB_STEP_SUMMARY
-          if [ -f ./results/bandit-results.json ]; then
-            echo "Completed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Dependency Audits" >> $GITHUB_STEP_SUMMARY
-          if [ -f ./results/pip-audit.json ]; then
-            echo "pip-audit completed" >> $GITHUB_STEP_SUMMARY
-          fi
+          # FIX: C7-04 Bandit and pip-audit sections moved to the reporter step below, which reads
+          # FIX: C7-04 the result files. These printed "Completed"/"pip-audit completed" whenever
+          # FIX: C7-04 a file existed, including when it held findings.
 
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
+      # FIX: C7-04 One reporter for every event: it writes the job summary always (the nightly runs
+      # FIX: C7-04 under `schedule` via workflow_call and never comments) and comments on PRs only.
+      - name: Report Bandit and pip-audit results # FIX: C7-04
+        if: ${{ !cancelled() }} # FIX: C7-04 report "inconclusive" even when a download failed
         uses: actions/github-script@v7
+        env: # FIX: C7-04
+          BANDIT_JOB_RESULT: ${{ needs.bandit-scan.result }} # FIX: C7-04
+          PIP_AUDIT_JOB_RESULT: ${{ needs.pip-audit.result }} # FIX: C7-04
         with:
           script: |
             const fs = require('fs');
             let comment = '## 🔒 Security Scan Results\n\n';
-            
-            try {
-              const bandit = JSON.parse(fs.readFileSync('./results/bandit-results.json', 'utf8'));
-              const highSeverity = bandit.results.filter(r => r.issue_severity === 'HIGH' || r.issue_severity === 'MEDIUM').length;
-              comment += `### Bandit Scan\n- **${highSeverity}** HIGH/MEDIUM severity issues found\n\n`;
-            } catch (e) {
-              comment += '### Bandit Scan\n- ✅ No issues found\n\n';
-            }
-            
-            try {
-              const pipAudit = JSON.parse(fs.readFileSync('./results/pip-audit.json', 'utf8'));
-              comment += `### pip-audit\n- **${pipAudit.dependencies?.length || 0}** vulnerable dependencies\n\n`;
-            } catch (e) {
-              comment += '### pip-audit\n- ✅ No vulnerabilities found\n\n';
-            }
-            
+            // FIX: C7-04 a missing, unparseable or wrong-shaped result file is never "clean"
+            const load = (path) => { // FIX: C7-04
+              try { // FIX: C7-04
+                return { data: JSON.parse(fs.readFileSync(path, 'utf8')) }; // FIX: C7-04
+              } catch (e) { // FIX: C7-04
+                return { why: e.code === 'ENOENT' ? 'result file missing' : 'result file unparseable' }; // FIX: C7-04
+              } // FIX: C7-04
+            }; // FIX: C7-04
+            const inconclusive = (why) => `- ⚠️ Inconclusive: ${why}; no verdict.\n\n`; // FIX: C7-04
+            const jobLine = (job, result) => `- ${job} job result: ${result || 'unknown'}\n`; // FIX: C7-04
+
+            comment += '### Bandit Scan\n' + jobLine('Bandit', process.env.BANDIT_JOB_RESULT); // FIX: C7-04
+            const bandit = load('./results/bandit-results.json'); // FIX: C7-04
+            // FIX: C7-04 `"results": []` is a clean -ll run, unless Bandit scanned no code at all
+            const loc = bandit.data && bandit.data.metrics && bandit.data.metrics._totals; // FIX: C7-04
+            if (bandit.data && Array.isArray(bandit.data.results) && !(loc && loc.loc > 0)) { // FIX: C7-04
+              comment += inconclusive('Bandit scanned no lines of code'); // FIX: C7-04
+            } else if (bandit.data && Array.isArray(bandit.data.results)) { // FIX: C7-04
+              const sev = (r) => r.issue_severity === 'HIGH' || r.issue_severity === 'MEDIUM'; // FIX: C7-04
+              const highSeverity = bandit.data.results.filter(sev).length; // FIX: C7-04
+              comment += `- **${highSeverity}** HIGH/MEDIUM severity issues found\n\n`; // FIX: C7-04
+            } else { // FIX: C7-04
+              comment += inconclusive(bandit.why || 'no results array'); // FIX: C7-04
+            } // FIX: C7-04
+
+            // FIX: C7-04 count entries whose `vulns` list is non-empty, not every audited package
+            const audits = [ // FIX: C7-04
+              ['requirements-prod.txt', './results/pip-audit-prod.json'], // FIX: C7-04
+              ['installed environment', './results/pip-audit.json'], // FIX: C7-04
+            ]; // FIX: C7-04
+            for (const [label, path] of audits) { // FIX: C7-04
+              // FIX: C7-04 one job runs both audits, so this line is shared by both sections
+              comment += `### pip-audit (${label})\n`; // FIX: C7-04
+              comment += jobLine('pip-audit', process.env.PIP_AUDIT_JOB_RESULT); // FIX: C7-04
+              const audit = load(path); // FIX: C7-04
+              const deps = audit.data && audit.data.dependencies; // FIX: C7-04
+              const audited = Array.isArray(deps) ? deps.filter((d) => !d.skip_reason) : []; // FIX: C7-04
+              if (audited.length === 0) { // FIX: C7-04 empty, or every entry skipped = audited nothing
+                comment += inconclusive(audit.why || 'no dependencies audited'); // FIX: C7-04
+                continue; // FIX: C7-04
+              } // FIX: C7-04
+              const hasVulns = (d) => Array.isArray(d.vulns) && d.vulns.length > 0; // FIX: C7-04
+              const vulnerable = audited.filter(hasVulns).length; // FIX: C7-04
+              comment += `- **${vulnerable}** vulnerable dependencies`; // FIX: C7-04
+              comment += ` (${audited.length} audited, ${deps.length - audited.length} skipped)\n\n`; // FIX: C7-04
+            } // FIX: C7-04
+
             comment += '\n📊 View detailed results in the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
-            
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: comment
-            });
+
+            await core.summary.addRaw(comment).write(); // FIX: C7-04
+            if (context.eventName === 'pull_request') { // FIX: C7-04 was a step-level `if:`
+              try { // FIX: C7-04 a fork PR's read-only token gets 403; the summary above stands
+                await github.rest.issues.createComment({ // FIX: C7-04 now awaited
+                  owner: context.repo.owner, // FIX: C7-04
+                  repo: context.repo.repo, // FIX: C7-04
+                  issue_number: context.issue.number, // FIX: C7-04
+                  body: comment, // FIX: C7-04
+                }); // FIX: C7-04
+              } catch (e) { // FIX: C7-04
+                core.warning(`PR comment not posted: ${e.message}`); // FIX: C7-04
+              } // FIX: C7-04
+            } // FIX: C7-04
