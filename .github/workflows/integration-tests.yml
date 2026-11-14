@@ -2,6 +2,8 @@
 # origin-ledger regression suite for restore_skill (C6-M-17 / issue #123) only
 # ever ran on a developer machine.  This workflow runs the whole directory on
 # the GitHub-hosted runner and fails if any test is skipped rather than run.
+# C7-01 — tests/unit/ (180 tests) was likewise collected by no workflow; it now  # FIX: C7-01
+# runs here under the same zero-skip / minimum-count gate.  # FIX: C7-01
 name: Integration Tests # FIX: C6-RT-21
 
 env:
@@ -25,6 +27,16 @@ on:
       - 'pyproject.toml' # FIX: C6-RT-21
       - 'setup.py' # FIX: C6-RT-21
       - '.github/workflows/integration-tests.yml' # FIX: C6-RT-21
+      # tests/unit/ loads modules from all of tools/, examples/ and scripts/, and  # FIX: C7-01
+      # test_clawdbot_runtime.py reads the two config trees below (one assertion  # FIX: C7-01
+      # pins the immutable gateway bind 127.0.0.1:18789). These subsume the  # FIX: C7-01
+      # narrower C6-RT-21 entries above, which are left as they were.  # FIX: C7-01
+      - 'tests/unit/**' # FIX: C7-01
+      - 'tools/**' # FIX: C7-01
+      - 'examples/**' # FIX: C7-01
+      - 'scripts/**' # FIX: C7-01
+      - 'configs/agent-config/**' # FIX: C7-01
+      - 'configs/templates/**' # FIX: C7-01
   workflow_dispatch:
 
 permissions:
@@ -48,11 +60,15 @@ jobs:
       # `pip install -e .`: test_cycle5_claim_regressions.py imports
       # `clawdbot.scan_vulnerability` at MODULE level — without the editable
       # install that is a collection error, not a skip.
+      # [reporting] brings reportlab for the two importorskip'd PDF tests in  # FIX: C7-01
+      # tests/unit/test_report_weekly_access.py. [test] (flask) is used by  # FIX: C7-01
+      # tests/security, not here; installed so this job matches the documented  # FIX: C7-01
+      # test environment. Stays editable: clawdbot derives REPO_ROOT from __file__.  # FIX: C7-01
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install -e .
+          pip install -e ".[test,reporting]" # FIX: C7-01
           pip install pytest
 
       # Whole-directory target, deliberately: it keeps the `tests/integration/**`
@@ -71,12 +87,24 @@ jobs:
             --deselect "$WIN_ONLY::test_dependency_audit_sh_claim_exits_0_on_clean_requirements" \
             --deselect "$WIN_ONLY::test_dependency_audit_sh_claim_exits_1_for_seeded_cve_fixture"
 
+      # Whole-directory target, same reasoning as above. `!cancelled()` so a red  # FIX: C7-01
+      # integration step does not skip this one; otherwise the gate would report  # FIX: C7-01
+      # "junit not produced" instead of the unit suite's real result.  # FIX: C7-01
+      - name: Run unit tests # FIX: C7-01
+        if: ${{ !cancelled() }} # FIX: C7-01
+        env: # FIX: C7-01
+          UNIT_JUNIT_XML: ${{ runner.temp }}/integration-evidence/unit-junit.xml # FIX: C7-01
+        run: | # FIX: C7-01
+          mkdir -p "$(dirname "$UNIT_JUNIT_XML")" # FIX: C7-01
+          pytest tests/unit/ -rs --junit-xml="$UNIT_JUNIT_XML" -v # FIX: C7-01
+
       # THE SKIP GATE. A green job must mean "the tests ran", not "the tests were
       # collected". Runs even when pytest failed so the skip list is always visible.
       - name: Enforce zero-skip / minimum-collected gate
         if: always()
         env:
           JUNIT_XML: ${{ runner.temp }}/integration-evidence/junit.xml # FIX: C6-RT-21
+          UNIT_JUNIT_XML: ${{ runner.temp }}/integration-evidence/unit-junit.xml # FIX: C7-01
         run: |
           python - <<'PY'
           import os
@@ -84,62 +112,77 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          # Floor, not equality: tests/integration/ collects 138 today, minus the 2
-          # win32-only pip-audit cases deselected above = 136. A growing suite still
-          # passes; a suite that silently loses tests (renamed file dropped from
-          # collection, import guard swallowing a module) fails and needs a human
-          # to re-justify the number.
-          EXPECTED_MIN_TESTS = 136
+          # One gate, applied to each junit report the job produces.  # FIX: C7-01
+          # Floors, not equality. A growing suite still passes; a suite that  # FIX: C7-01
+          # silently loses tests (renamed file dropped from collection, import guard  # FIX: C7-01
+          # swallowing a module) fails and needs a human to re-justify the number.  # FIX: C7-01
+          #  - integration: tests/integration/ collects 138, minus the 2 win32-only  # FIX: C7-01
+          #    pip-audit cases deselected above = 136.  # FIX: C7-01
+          #  - unit: tests/unit/ collects 180 at 9e0d934 (measured: 180 passed,  # FIX: C7-01
+          #    0 skipped on Ubuntu with [test,reporting]).  # FIX: C7-01
+          SUITES = [  # FIX: C7-01
+              ("integration", "JUNIT_XML", 136),  # FIX: C7-01
+              ("unit", "UNIT_JUNIT_XML", 180),  # FIX: C7-01
+          ]  # FIX: C7-01
 
-          report = Path(os.environ["JUNIT_XML"])
-          if not report.is_file():
-              print(f"GATE FAIL: {report} was not produced - the test step did not run.")
-              sys.exit(1)
 
-          root = ET.parse(report).getroot()
-          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
-          total = sum(int(s.get("tests", "0")) for s in suites)
-          errors = sum(int(s.get("errors", "0")) for s in suites)
-          failures = sum(int(s.get("failures", "0")) for s in suites)
+          def check(label, report, expected_min_tests):  # FIX: C7-01
+              if not report.is_file():  # FIX: C7-01
+                  print(f"GATE FAIL [{label}]: {report} was not produced - the test step did not run.")  # FIX: C7-01
+                  return False  # FIX: C7-01
 
-          skipped = []
-          for case in root.iter("testcase"):
-              for node in case.findall("skipped"):
-                  name = f"{case.get('classname', '')}::{case.get('name', '')}"
-                  skipped.append((name, (node.get("message") or "").strip()))
+              root = ET.parse(report).getroot()  # FIX: C7-01
+              suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))  # FIX: C7-01
+              total = sum(int(s.get("tests", "0")) for s in suites)  # FIX: C7-01
+              errors = sum(int(s.get("errors", "0")) for s in suites)  # FIX: C7-01
+              failures = sum(int(s.get("failures", "0")) for s in suites)  # FIX: C7-01
 
-          print(
-              f"junit summary: ran={total} failures={failures} "
-              f"errors={errors} skipped={len(skipped)}"
-          )
+              skipped = []  # FIX: C7-01
+              for case in root.iter("testcase"):  # FIX: C7-01
+                  for node in case.findall("skipped"):  # FIX: C7-01
+                      name = f"{case.get('classname', '')}::{case.get('name', '')}"  # FIX: C7-01
+                      skipped.append((name, (node.get("message") or "").strip()))  # FIX: C7-01
 
-          ok = True
-          if skipped:
-              print(f"GATE FAIL: {len(skipped)} test(s) SKIPPED; a green job must mean they ran:")
-              for name, reason in skipped:
-                  print(f"  SKIPPED {name}")
-                  print(f"          reason: {reason}")
-              ok = False
-          if total < EXPECTED_MIN_TESTS:
-              print(
-                  f"GATE FAIL: only {total} test(s) ran, expected at least "
-                  f"{EXPECTED_MIN_TESTS} - tests disappeared from collection."
-              )
-              ok = False
-          if errors:
-              print(f"GATE FAIL: {errors} collection/setup error(s) in the junit report.")
-              ok = False
-          # Without this the gate printed "GATE PASS" on a run with failing tests.
-          # The job was still red (the pytest step has no continue-on-error), but a
-          # log line reading PASS next to a red job is exactly the ambiguity this
-          # workflow exists to remove.
-          if failures:
-              print(f"GATE FAIL: {failures} test failure(s) in the junit report.")
-              ok = False
+              print(  # FIX: C7-01
+                  f"junit summary [{label}]: ran={total} failures={failures} "  # FIX: C7-01
+                  f"errors={errors} skipped={len(skipped)}"  # FIX: C7-01
+              )  # FIX: C7-01
 
-          if ok:
-              print(f"GATE PASS: {total} test(s) ran, 0 skipped, 0 failed.")
-          sys.exit(0 if ok else 1)
+              ok = True  # FIX: C7-01
+              if skipped:  # FIX: C7-01
+                  print(  # FIX: C7-01
+                      f"GATE FAIL [{label}]: {len(skipped)} test(s) SKIPPED; "  # FIX: C7-01
+                      "a green job must mean they ran:"  # FIX: C7-01
+                  )  # FIX: C7-01
+                  for name, reason in skipped:  # FIX: C7-01
+                      print(f"  SKIPPED {name}")  # FIX: C7-01
+                      print(f"          reason: {reason}")  # FIX: C7-01
+                  ok = False  # FIX: C7-01
+              if total < expected_min_tests:  # FIX: C7-01
+                  print(  # FIX: C7-01
+                      f"GATE FAIL [{label}]: only {total} test(s) ran, expected at least "  # FIX: C7-01
+                      f"{expected_min_tests} - tests disappeared from collection."  # FIX: C7-01
+                  )  # FIX: C7-01
+                  ok = False  # FIX: C7-01
+              if errors:  # FIX: C7-01
+                  print(f"GATE FAIL [{label}]: {errors} collection/setup error(s) in the junit report.")  # FIX: C7-01
+                  ok = False  # FIX: C7-01
+              # Without this the gate printed "GATE PASS" on a run with failing tests.  # FIX: C7-01
+              # The job was still red (the pytest step has no continue-on-error), but a  # FIX: C7-01
+              # log line reading PASS next to a red job is exactly the ambiguity this  # FIX: C7-01
+              # workflow exists to remove.  # FIX: C7-01
+              if failures:  # FIX: C7-01
+                  print(f"GATE FAIL [{label}]: {failures} test failure(s) in the junit report.")  # FIX: C7-01
+                  ok = False  # FIX: C7-01
+
+              if ok:  # FIX: C7-01
+                  print(f"GATE PASS [{label}]: {total} test(s) ran, 0 skipped, 0 failed.")  # FIX: C7-01
+              return ok  # FIX: C7-01
+
+
+          # Every suite is checked even after one fails, so the log always shows both.  # FIX: C7-01
+          results = [check(label, Path(os.environ[var]), floor) for label, var, floor in SUITES]  # FIX: C7-01
+          sys.exit(0 if all(results) else 1)  # FIX: C7-01
           PY
 
       - name: Upload integration test evidence
