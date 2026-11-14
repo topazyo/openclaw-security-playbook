@@ -35,7 +35,7 @@ import re
 import json
 import hashlib
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple  # FIX: C7-05c Tuple annotates verify_integrity
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from enum import Enum

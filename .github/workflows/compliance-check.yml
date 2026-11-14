@@ -10,7 +10,7 @@ on:
       - "docs/policies/**"
       - "configs/organization-policies/**"
       - "tools/compliance-reporter.py" # FIX: C6-M-??
-      - "tools/compliance-data/**" # FIX: C6-M-??
+      # FIX: C7-05c removed "tools/compliance-data/**": no tracked file under it and no job reads it
       - "tests/security/**" # FIX: C6-RT-22
       - "src/clawdbot/**" # FIX: C6-RT-22
       - "tools/policy-validator.py" # FIX: C6-RT-22: run by 4 steps + exec_module'd by test_policy_compliance.py
