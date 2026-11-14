@@ -22,18 +22,22 @@ jobs:
           pip install ruff==0.15.13 # FIX: C7-05c
           ruff check --select F821 --output-format github . # FIX: C7-05c
       - name: YAML Lint
+        if: ${{ !cancelled() }} # FIX: C7-05c each check reports even when an earlier one failed
         run: |
           pip install yamllint sigma-cli
           yamllint configs/
       - name: ShellCheck
+        if: ${{ !cancelled() }} # FIX: C7-05c
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck yara
           find scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning -x
       - name: Validate Detection Rules
+        if: ${{ !cancelled() }} # FIX: C7-05c
         run: |
           python scripts/verification/validate_detection_rules.py
       - name: Guard Phantom Integration References
+        if: ${{ !cancelled() }} # FIX: C7-05c
         # FIX: C7-05c removed two allowlist entries naming gitignored local-only files: they are
         # FIX: C7-05c absent from every CI checkout, so they allowlisted nothing here.
         env: # FIX: C5-finding-1

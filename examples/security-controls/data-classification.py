@@ -671,7 +671,12 @@ def test_classification_detection():
     label = classifier.classify_text("Public press release")
     if label.classification != DataClassification.PUBLIC:
         raise AssertionError("Public content should be classified as Public")
-    
+
+    # Test confidential marking: 653570b once deleted this branch unnoticed  # FIX: C7-05c
+    label = classifier.classify_text("CONFIDENTIAL: Q4 revenue projections")  # FIX: C7-05c
+    if label.classification != DataClassification.CONFIDENTIAL:  # FIX: C7-05c
+        raise AssertionError("Confidential marking should be classified as Confidential")  # FIX: C7-05c
+
     print("✓ test_classification_detection passed")
 
 
