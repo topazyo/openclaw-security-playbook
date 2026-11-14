@@ -9,19 +9,28 @@ on:
       - 'scripts/**'
       - 'examples/**'
       - 'configs/**'
-      - 'requirements.txt'
+      - 'requirements*.txt' # FIX: C7-03 was requirements.txt; prod set is COPYed (Dockerfile.hardened:83)
       - 'package.json'
       - 'package-lock.json'
+      - 'src/**' # FIX: C7-03 Bandit target; COPY src/ (Dockerfile.hardened:129)
+      - 'tools/**' # FIX: C7-03 Bandit target; COPY tools/ (Dockerfile.hardened:400)
+      - 'pyproject.toml' # FIX: C7-03 package build (Dockerfile.hardened:130)
+      - 'setup.py' # FIX: C7-03 package build (Dockerfile.hardened:130)
+      - 'README.md' # FIX: C7-03 COPY (Dockerfile.hardened:130,395); pyproject.toml readme
+      - 'detections/**' # FIX: C7-03 COPY detections/ (Dockerfile.hardened:397), Trivy image scan
+      - '.dockerignore' # FIX: C7-03 defines the Docker build context
+      - '.gitleaks.toml' # FIX: C7-03 GITLEAKS_CONFIG of the secret-scanning job
+      - '.github/workflows/security-scan.yml' # FIX: C7-03 this workflow
   push:
     branches:
       - main
-  schedule:
-    # Run daily at 02:00 UTC
-    - cron: '0 2 * * *'
+  # FIX: C7-03 schedule moved to security-scan-nightly.yml, which calls this file, so a
+  # FIX: C7-03 60-day inactivity disable can only take the cron, never the PR/push gate.
+  workflow_call: # FIX: C7-03
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read # FIX: C7-03 was write for every job; only sbom-generation needs write
   security-events: write
   pull-requests: write
 
@@ -32,6 +41,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Run Trivy vulnerability scanner (filesystem)
         id: trivy-fs
@@ -140,6 +151,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -152,8 +165,8 @@ jobs:
 
       - name: Run Bandit scan
         run: |
-          bandit -r scripts/ examples/ tools/ -ll -f json -o bandit-results.json || true
-          bandit -r scripts/ examples/ tools/ -ll -f txt
+          bandit -r src/ scripts/ examples/ tools/ -ll -f json -o bandit-results.json || true # FIX: C7-03 add src/
+          bandit -r src/ scripts/ examples/ tools/ -ll -f txt # FIX: C7-03 add src/
 
       - name: Upload Bandit results
         uses: actions/upload-artifact@v4
@@ -169,6 +182,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Detect npm project
         id: npm-project
@@ -217,6 +232,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -257,6 +274,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false # FIX: C7-03
 
       - name: Run Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
@@ -267,9 +285,13 @@ jobs:
   sbom-generation:
     name: Generate SBOM
     runs-on: ubuntu-latest
+    permissions: # FIX: C7-03 replaces the top-level block for this job only
+      contents: write # FIX: C7-03 dependency-snapshot submits to the dependency graph
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0.17.0
@@ -293,6 +315,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with: # FIX: C7-03
+          persist-credentials: false # FIX: C7-03
 
       - name: Download Bandit results
         uses: actions/download-artifact@v4

@@ -1,0 +1,23 @@
+# FIX: C7-03 Nightly trigger for Security Scanning, split out of security-scan.yml so that a
+# FIX: C7-03 60-day inactivity disable (which applies to scheduled workflows) takes only this cron
+# FIX: C7-03 and never the pull-request/push gate. It calls security-scan.yml as a reusable
+# FIX: C7-03 workflow so the jobs exist once; never copy them here.
+name: Security Scanning (nightly) # FIX: C7-03
+
+on: # FIX: C7-03
+  schedule: # FIX: C7-03
+    # FIX: C7-03 Run daily at 02:00 UTC (moved from security-scan.yml)
+    - cron: '0 2 * * *' # FIX: C7-03
+  workflow_dispatch: # FIX: C7-03 post-merge check of the workflow_call wiring
+
+# FIX: C7-03 A called workflow can only narrow the caller's token, and every nested job's
+# FIX: C7-03 permissions are checked before any job runs, so grant the union it requests:
+# FIX: C7-03 contents (sbom-generation), security-events (SARIF), pull-requests (top level).
+permissions: # FIX: C7-03
+  contents: write # FIX: C7-03
+  security-events: write # FIX: C7-03
+  pull-requests: write # FIX: C7-03
+
+jobs: # FIX: C7-03
+  security-scan: # FIX: C7-03
+    uses: ./.github/workflows/security-scan.yml # FIX: C7-03
