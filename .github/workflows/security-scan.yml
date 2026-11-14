@@ -282,17 +282,15 @@ jobs:
           "$py" -m pip list # FIX: C7-04 the log lists every package audited below
           "$py" -m pip show clawdbot > /dev/null # FIX: C7-04 the package itself is installed
           "$py" -m pip check # FIX: C7-04 and every install_requires entry it declares
-          # FIX: C7-04 floor for the audit below: it must see at least the declared requirements
-          count='import importlib.metadata as m; reqs = m.requires("clawdbot")' # FIX: C7-04
-          count="$count"'; print(sum("extra ==" not in r for r in reqs))' # FIX: C7-04 runtime deps, not extras
-          declared="$("$py" -c "$count")" # FIX: C7-04
-          test "$declared" -gt 0 # FIX: C7-04
-          echo "SHIP_MIN_ENTRIES=$declared" >> "$GITHUB_ENV" # FIX: C7-04
           "$py" -m pip uninstall -y clawdbot wheel setuptools # FIX: C7-04
           "$py" -m pip uninstall -y pip # FIX: C7-04
           site="$("$py" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" # FIX: C7-04
           test -d "$site" # FIX: C7-04
+          # FIX: C7-04 floor for the audit below: every distribution left in the venv (review #1)
+          floor="$(find "$site" -maxdepth 1 -type d -name '*.dist-info' | wc -l)" # FIX: C7-04
+          test "$floor" -gt 0 # FIX: C7-04
           echo "SHIP_SITE=$site" >> "$GITHUB_ENV" # FIX: C7-04
+          echo "SHIP_MIN_ENTRIES=$floor" >> "$GITHUB_ENV" # FIX: C7-04
 
       # FIX: C7-04 Gated on the install: `pip-audit --path` with an empty or missing path exits 0
       # FIX: C7-04 having audited nothing, which would read as clean.
@@ -303,10 +301,13 @@ jobs:
           : "${SHIP_SITE:?install step did not export SHIP_SITE}" # FIX: C7-04
           : "${SHIP_MIN_ENTRIES:?install step did not export SHIP_MIN_ENTRIES}" # FIX: C7-04
           pip-audit --path "$SHIP_SITE" -f json -o pip-audit.json || true # FIX: C7-04
-          # FIX: C7-04 fail closed if it audited fewer packages than the package declares
+          # FIX: C7-04 fail closed if it listed fewer packages than the venv holds, or audited none
           seen="$(python -c 'import json; print(len(json.load(open("pip-audit.json"))["dependencies"]))')" # FIX: C7-04
-          echo "pip-audit saw $seen packages; floor $SHIP_MIN_ENTRIES" # FIX: C7-04
+          skip='import json; d = json.load(open("pip-audit.json"))["dependencies"]' # FIX: C7-04
+          audited="$(python -c "$skip"'; print(sum("skip_reason" not in e for e in d))')" # FIX: C7-04
+          echo "pip-audit listed $seen, audited $audited; venv holds $SHIP_MIN_ENTRIES" # FIX: C7-04
           test "$seen" -ge "$SHIP_MIN_ENTRIES" # FIX: C7-04
+          test "$audited" -gt 0 # FIX: C7-04 every entry skipped is no audit (review #2)
           pip-audit --path "$SHIP_SITE" --desc # FIX: C7-04
 
       - name: Upload pip-audit results
@@ -432,9 +433,9 @@ jobs:
               } // FIX: C7-04
             }; // FIX: C7-04
             const inconclusive = (why) => `- ⚠️ Inconclusive: ${why}; no verdict.\n\n`; // FIX: C7-04
-            const jobLine = (result) => `- Job result: ${result || 'unknown'}\n`; // FIX: C7-04
+            const jobLine = (job, result) => `- ${job} job result: ${result || 'unknown'}\n`; // FIX: C7-04
 
-            comment += '### Bandit Scan\n' + jobLine(process.env.BANDIT_JOB_RESULT); // FIX: C7-04
+            comment += '### Bandit Scan\n' + jobLine('Bandit', process.env.BANDIT_JOB_RESULT); // FIX: C7-04
             const bandit = load('./results/bandit-results.json'); // FIX: C7-04
             // FIX: C7-04 `"results": []` is a clean -ll run, unless Bandit scanned no code at all
             const loc = bandit.data && bandit.data.metrics && bandit.data.metrics._totals; // FIX: C7-04
@@ -454,17 +455,20 @@ jobs:
               ['installed environment', './results/pip-audit.json'], // FIX: C7-04
             ]; // FIX: C7-04
             for (const [label, path] of audits) { // FIX: C7-04
-              comment += `### pip-audit (${label})\n` + jobLine(process.env.PIP_AUDIT_JOB_RESULT); // FIX: C7-04
+              // FIX: C7-04 one job runs both audits, so this line is shared by both sections
+              comment += `### pip-audit (${label})\n`; // FIX: C7-04
+              comment += jobLine('pip-audit', process.env.PIP_AUDIT_JOB_RESULT); // FIX: C7-04
               const audit = load(path); // FIX: C7-04
               const deps = audit.data && audit.data.dependencies; // FIX: C7-04
-              if (!Array.isArray(deps) || deps.length === 0) { // FIX: C7-04 empty = audited nothing
+              const audited = Array.isArray(deps) ? deps.filter((d) => !d.skip_reason) : []; // FIX: C7-04
+              if (audited.length === 0) { // FIX: C7-04 empty, or every entry skipped = audited nothing
                 comment += inconclusive(audit.why || 'no dependencies audited'); // FIX: C7-04
                 continue; // FIX: C7-04
               } // FIX: C7-04
-              const vulnerable = deps.filter((d) => Array.isArray(d.vulns) && d.vulns.length > 0).length; // FIX: C7-04
-              const skipped = deps.filter((d) => d.skip_reason).length; // FIX: C7-04
+              const hasVulns = (d) => Array.isArray(d.vulns) && d.vulns.length > 0; // FIX: C7-04
+              const vulnerable = audited.filter(hasVulns).length; // FIX: C7-04
               comment += `- **${vulnerable}** vulnerable dependencies`; // FIX: C7-04
-              comment += ` (${deps.length} audited, ${skipped} skipped)\n\n`; // FIX: C7-04
+              comment += ` (${audited.length} audited, ${deps.length - audited.length} skipped)\n\n`; // FIX: C7-04
             } // FIX: C7-04
 
             comment += '\n📊 View detailed results in the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
