@@ -16,6 +16,22 @@ on:
       - "tools/policy-validator.py" # FIX: C6-RT-22: run by 4 steps + exec_module'd by test_policy_compliance.py
       - "requirements.txt" # FIX: C6-RT-22: installed by every job in this workflow
       - "pyproject.toml" # FIX: C6-RT-22: `pip install -e .` makes src/clawdbot importable for the test suite
+      - "setup.py" # FIX: C7-05a: run by `pip install -e` (setuptools.build_meta)
+      - ".yamllint.yml" # FIX: C7-05a: config-syntax job runs `yamllint -c .yamllint.yml configs/`
+      # FIX: C7-05a: only what this workflow's jobs load: exact paths, or a glob only where every match is
+      # FIX: C7-05a: loaded. A wider glob would give a green check to files no job here runs (cf. C6-RT-26).
+      - "scripts/forensics/verify_hash_chain.py" # FIX: C7-05a: test_verify_hash_chain.py:51
+      - "scripts/verification/validate_detection_replay.py" # FIX: C7-05a: test_detection_replay_validation.py:14
+      - "scripts/verification/exercise_malicious_skill_chain.py" # FIX: C7-05a test_malicious_skill_chain_exercise.py:12
+      - "scripts/verification/runtime_security_regression.py" # FIX: C7-05a: test_runtime_security_regression.py:11
+      - "tools/openclaw-cli.py" # FIX: C7-05a: test_evidence_snapshot_cli.py:14
+      - "examples/security-controls/input-validation.py" # FIX: C7-05a: test_evasion_hardening.py:27-35
+      # FIX: C7-05a: each rule is named by a replay case; opened at validate_detection_replay.py:239
+      - "detections/sigma/**" # FIX: C7-05a
+      - "detections/ioc/ioc-openclaw.yar" # FIX: C7-05a: test_evasion_hardening.py:45-46
+      - ".claude/hooks/security_defaults_hook.sh" # FIX: C7-05a: subprocessed by test_security_defaults_hook.py:17-18
+      # FIX: C7-05a: SEC-005 checks these exist (policy-validator.py:82; list at security-policy.json:165)
+      - "examples/incident-response/playbook-*.md" # FIX: C7-05a
       - ".github/workflows/compliance-check.yml" # FIX: C6-M-??
   workflow_dispatch:
 
