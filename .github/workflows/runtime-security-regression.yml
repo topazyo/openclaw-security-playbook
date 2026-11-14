@@ -10,6 +10,10 @@ on:
       # FIX: C7-05b: configs/examples/docker-compose-full-stack.yml removed; nothing in this job reads it.
       - 'scripts/hardening/docker/seccomp-profiles/clawdbot.json' # FIX: C7-05b: runtime_security_regression.py:30,77
       - 'configs/organization-policies/security-policy.json' # FIX: C7-05b: Check 7, verify_openclaw_security.sh:392
+      # FIX: C7-05b: Check 7 also requires this directory; a rename or move must run the pack. No other
+      # FIX: C7-05b: workflow runs the verifier, so Detection Replay Validation does not cover it.
+      - 'detections/sigma/**' # FIX: C7-05b
+      - 'pyproject.toml' # FIX: C7-05b: [tool.pytest.ini_options] configures the harness unit-test step
       - 'tests/security/test_runtime_security_regression.py' # FIX: C6-RT-22
       - '.github/workflows/runtime-security-regression.yml'
   workflow_dispatch:
