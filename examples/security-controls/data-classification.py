@@ -239,7 +239,21 @@ class DataClassifier:
                 assigned_at=datetime.now(timezone.utc).isoformat(),
                 assigned_by='automatic'
             )
-        
+
+        # FIX: C7-05c Confidential branch restored. 653570b (timezone change) deleted it by accident,
+        # FIX: C7-05c leaving `text_lower` undefined: every non-Restricted input raised NameError.
+        # Check for Confidential markers  # FIX: C7-05c
+        text_lower = text.lower()  # FIX: C7-05c
+        if any(keyword in text_lower for keyword in self.CONFIDENTIAL_KEYWORDS):  # FIX: C7-05c
+            return ClassificationLabel(  # FIX: C7-05c
+                classification=DataClassification.CONFIDENTIAL,  # FIX: C7-05c
+                reason='Contains confidential marking keyword',  # FIX: C7-05c
+                detected_patterns=['confidential_keyword'],  # FIX: C7-05c
+                confidence=0.80,  # FIX: C7-05c
+                assigned_at=datetime.now(timezone.utc).isoformat(),  # FIX: C7-05c
+                assigned_by='automatic'  # FIX: C7-05c
+            )  # FIX: C7-05c
+
         # Check for Public markers
         if any(keyword in text_lower for keyword in self.PUBLIC_KEYWORDS):
             return ClassificationLabel(
@@ -657,7 +671,12 @@ def test_classification_detection():
     label = classifier.classify_text("Public press release")
     if label.classification != DataClassification.PUBLIC:
         raise AssertionError("Public content should be classified as Public")
-    
+
+    # Test confidential marking: 653570b once deleted this branch unnoticed  # FIX: C7-05c
+    label = classifier.classify_text("CONFIDENTIAL: Q4 revenue projections")  # FIX: C7-05c
+    if label.classification != DataClassification.CONFIDENTIAL:  # FIX: C7-05c
+        raise AssertionError("Confidential marking should be classified as Confidential")  # FIX: C7-05c
+
     print("✓ test_classification_detection passed")
 
 

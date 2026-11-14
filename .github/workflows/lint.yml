@@ -14,19 +14,32 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      # FIX: C7-05c Undefined names are runtime errors ruff finds statically: two shipped in
+      # FIX: C7-05c examples/security-controls/ (one module failed at import). Kept first so an
+      # FIX: C7-05c earlier step's failure cannot skip it. --select replaces ruff's defaults.
+      - name: Python undefined names (ruff F821) # FIX: C7-05c
+        run: | # FIX: C7-05c
+          pip install ruff==0.15.13 # FIX: C7-05c
+          ruff check --select F821 --output-format github . # FIX: C7-05c
       - name: YAML Lint
+        if: ${{ !cancelled() }} # FIX: C7-05c each check reports even when an earlier one failed
         run: |
           pip install yamllint sigma-cli
           yamllint configs/
       - name: ShellCheck
+        if: ${{ !cancelled() }} # FIX: C7-05c
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck yara
           find scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning -x
       - name: Validate Detection Rules
+        if: ${{ !cancelled() }} # FIX: C7-05c
         run: |
           python scripts/verification/validate_detection_rules.py
       - name: Guard Phantom Integration References
+        if: ${{ !cancelled() }} # FIX: C7-05c
+        # FIX: C7-05c removed two allowlist entries naming gitignored local-only files: they are
+        # FIX: C7-05c absent from every CI checkout, so they allowlisted nothing here.
         env: # FIX: C5-finding-1
           PHANTOM_INTEGRATION_ALLOWLIST: | # FIX: C5-finding-1
             README.md # FIX: C5-finding-1
@@ -38,8 +51,6 @@ jobs:
             examples/incident-response/playbook-skill-compromise.md # FIX: C5-finding-1
             configs/examples/with-community-tools.yml # FIX: C5-finding-1
             .github/copilot-instructions.md # FIX: C5-finding-1
-            .github/audit/findings-2026-04-24.md # FIX: C5-finding-1
-            .github/agents/openclaw-audit.chatmode.md # FIX: C5-finding-1
             scripts/supply-chain/skill_manifest.py # FIX: C5-finding-1
             scripts/forensics/verify_hash_chain.py # FIX: C5-finding-1
             scripts/verification/verify_openclaw_security.sh # FIX: C5-finding-1
